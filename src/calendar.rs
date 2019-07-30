@@ -7,6 +7,7 @@ use chrono::{DateTime, Date, Datelike, Local};
 pub struct Calendar {
     cur_date: Date<Local>,
     first_draw: bool,
+    offset: i32,
 }
 
 fn draw_month(
@@ -40,15 +41,25 @@ fn draw_month(
     //
     // Draw the of the month
     //
-
     draw_text(
         ROBOTO_REGULAR,
         &mut buf.subdimensions((0, 0, 304, 72)),
         background_color,
         &Color::new(1.0, 1.0, 1.0, 1.0),
-        68.0,
+        64.0,
         month_str,
     )?;
+
+    if time.year() != orig.year() {
+        draw_text(
+            ROBOTO_REGULAR,
+            &mut buf.subdimensions((320, 0, 64, 32)),
+            background_color,
+            &Color::new(0.8, 0.8, 0.8, 1.0),
+            24.0,
+            &format!("{:}", time.year()),
+        )?;
+    }
 
     //
     // Draw the week day
@@ -141,6 +152,7 @@ impl Calendar {
         Calendar{
             cur_date: Local::now().date(),
             first_draw: true,
+            offset: 0,
         }
     }
 }
@@ -153,7 +165,20 @@ impl ModuleImpl for Calendar {
         time: &DateTime<Local>,
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         let time = time.date();
-        let t = time.with_day(1).unwrap();
+        let mut t = time.with_day(1).unwrap();
+        if self.offset != 0 {
+            let mut new_month = t.month() as i32 + self.offset;
+            let mut new_year = t.year();
+            while new_month > 12 {
+                new_year += 1;
+                new_month -= 12;
+            }
+            while new_month < 0 {
+                new_year -= 1;
+                new_month += 12;
+            }
+            t = t.with_year(new_year).unwrap().with_month(new_month as u32).unwrap();
+        }
         let mut damage: Vec<(i32, i32, i32, i32)> = Vec::new();
         damage.push(draw_month(
             &mut buf.subdimensions((0, 0, 384, 344)),
@@ -193,5 +218,20 @@ impl ModuleImpl for Calendar {
         }
     }
 
-    fn input(&mut self, _input: Input) {}
+    fn input(&mut self, input: Input) {
+        match input {
+            Input::Scroll{pos: _, x: _, y} => {
+                if y < 0.0 {
+                    self.offset += 1;
+                } else {
+                    self.offset -= 1;
+                }
+                self.first_draw = true;
+            },
+            Input::Click{pos: _, button: _} => {
+                self.offset = 0;
+                self.first_draw = true;
+            }
+        }
+    }
 }

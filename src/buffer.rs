@@ -25,6 +25,19 @@ impl<'a> Buffer<'a> {
         }
     }
 
+    pub fn get_signed_bounds(&self) -> (i32, i32, i32, i32) {
+        if let Some(subdim) = self.subdimensions {
+            (
+                subdim.0 as i32,
+                subdim.1 as i32,
+                subdim.2 as i32,
+                subdim.3 as i32,
+            )
+        } else {
+            (0, 0, self.dimensions.0 as i32, self.dimensions.1 as i32)
+        }
+    }
+
     pub fn subdimensions(&mut self, subdimensions: (u32, u32, u32, u32)) -> Buffer {
         let bounds = self.get_bounds();
         if subdimensions.0 + subdimensions.2 > bounds.2
@@ -49,10 +62,22 @@ impl<'a> Buffer<'a> {
     }
 
     pub fn memset(&mut self, c: &Color) {
-        unsafe {
-            let ptr = self.buf.as_mut_ptr();
-            for p in 0..(self.dimensions.0 * self.dimensions.1) {
-                *((ptr as *mut u32).offset(p as isize)) = c.as_argb8888();
+        if let Some(subdim) = self.subdimensions {
+            unsafe {
+                let ptr = self.buf.as_mut_ptr();
+                for y in subdim.1..(subdim.1 + subdim.3) {
+                    for x in subdim.0..(subdim.0 + subdim.2) {
+                        *((ptr as *mut u32).offset((x + y * self.dimensions.0) as isize)) =
+                            c.as_argb8888();
+                    }
+                }
+            }
+        } else {
+            unsafe {
+                let ptr = self.buf.as_mut_ptr();
+                for p in 0..(self.dimensions.0 * self.dimensions.1) {
+                    *((ptr as *mut u32).offset(p as isize)) = c.as_argb8888();
+                }
             }
         }
     }

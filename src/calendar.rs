@@ -1,8 +1,8 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::module::{ModuleImpl, Input};
-use crate::draw::{draw_text, ROBOTO_REGULAR, DEJAVUSANS_MONO};
-use chrono::{DateTime, Date, Datelike, Local};
+use crate::draw::{draw_text, DEJAVUSANS_MONO, ROBOTO_REGULAR};
+use crate::module::{Input, ModuleImpl};
+use chrono::{Date, DateTime, Datelike, Local};
 
 pub struct Calendar {
     cur_date: Date<Local>,
@@ -149,7 +149,7 @@ fn draw_month(
 
 impl Calendar {
     pub fn new() -> Calendar {
-        Calendar{
+        Calendar {
             cur_date: Local::now().date(),
             first_draw: true,
             offset: 0,
@@ -167,17 +167,21 @@ impl ModuleImpl for Calendar {
         let time = time.date();
         let mut t = time.with_day(1).unwrap();
         if self.offset != 0 {
-            let mut new_month = t.month() as i32 + self.offset;
-            let mut new_year = t.year();
-            while new_month > 12 {
-                new_year += 1;
-                new_month -= 12;
+            let mut month = (t.month() - 1) as i32 + self.offset;
+            let mut year = t.year();
+            while month > 11 {
+                year += 1;
+                month -= 12;
             }
-            while new_month < 0 {
-                new_year -= 1;
-                new_month += 12;
+            while month < 0 {
+                year -= 1;
+                month += 12;
             }
-            t = t.with_year(new_year).unwrap().with_month(new_month as u32).unwrap();
+            t = t
+                .with_year(year)
+                .unwrap()
+                .with_month((month + 1) as u32)
+                .unwrap();
         }
         let mut damage: Vec<(i32, i32, i32, i32)> = Vec::new();
         damage.push(draw_month(
@@ -206,11 +210,11 @@ impl ModuleImpl for Calendar {
         Ok(damage)
     }
 
-    fn update(&mut self, time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error>{
+    fn update(&mut self, time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
         if self.first_draw {
             self.first_draw = false;
             Ok(true)
-        } else if time.date() != self.cur_date || force{
+        } else if time.date() != self.cur_date || force {
             self.cur_date = time.date();
             Ok(true)
         } else {
@@ -220,15 +224,15 @@ impl ModuleImpl for Calendar {
 
     fn input(&mut self, input: Input) {
         match input {
-            Input::Scroll{pos: _, x: _, y} => {
-                if y < 0.0 {
+            Input::Scroll { pos: _, x: _, y } => {
+                if y > 0.0 {
                     self.offset += 1;
                 } else {
                     self.offset -= 1;
                 }
                 self.first_draw = true;
-            },
-            Input::Click{pos: _, button: _} => {
+            }
+            Input::Click { pos: _, button: _ } => {
                 self.offset = 0;
                 self.first_draw = true;
             }

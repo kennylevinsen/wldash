@@ -15,32 +15,32 @@ use os_pipe::pipe;
 use chrono::{Duration as ChronoDuration, Local, Timelike};
 
 use sctk::keyboard::{map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind};
-use sctk::reexports::client::protocol::{wl_shm, wl_pointer};
+use sctk::reexports::client::protocol::{wl_pointer, wl_shm};
 use sctk::reexports::client::{Display, EventQueue, NewProxy};
 use sctk::utils::DoubleMemPool;
 use sctk::window::{ConceptFrame, Event as WEvent, Window};
 use sctk::Environment;
 
-mod buffer;
-mod color;
-mod module;
-mod draw;
-mod clock;
-mod calendar;
 mod backlight;
+mod buffer;
+mod calendar;
+mod clock;
+mod color;
+mod draw;
+mod module;
 
-use crate::buffer::Buffer;
-use crate::color::Color;
-use crate::module::{Module, Input};
-use crate::clock::Clock;
 use crate::backlight::Backlight;
+use crate::buffer::Buffer;
 use crate::calendar::Calendar;
+use crate::clock::Clock;
+use crate::color::Color;
+use crate::module::{Input, Module};
 
 enum Cmd {
     Exit,
     Configure,
     Draw,
-    Input{pos: (u32, u32), input: Input},
+    Input { pos: (u32, u32), input: Input },
 }
 
 struct App {
@@ -72,14 +72,16 @@ impl App {
         let mmap = pool.mmap();
         let mut buf = Buffer::new(mmap, self.dimensions);
         let mut margin_buf = buf.subdimensions((20, 20, buf_x - 40, buf_y - 40));
+
         let bg = Color::new(0.0, 0.0, 0.0, 0.9);
 
         let mut damage = vec![];
         for module in self.modules.iter() {
-        	if module.update(&time, force)? {
-        		let mut d = module.draw(&mut margin_buf, &bg, &time)?;
-        		damage.append(&mut d);
-        	}
+            if module.update(&time, force)? {
+                let mut b = &mut margin_buf.subdimensions(module.get_bounds());
+                let mut d = module.draw(&mut b, &bg, &time)?;
+                damage.append(&mut d);
+            }
         }
 
         mmap.flush().unwrap();
@@ -134,12 +136,12 @@ impl App {
     }
 
     fn get_module(&self, pos: (u32, u32)) -> Option<&Module> {
-    	for m in self.modules.iter() {
-    		if m.intersect(pos) {
-    			return Some(&m)
-    		}
-    	}
-    	None
+        for m in self.modules.iter() {
+            if m.intersect(pos) {
+                return Some(&m);
+            }
+        }
+        None
     }
 
     fn new(dimensions: (u32, u32)) -> App {
@@ -197,64 +199,102 @@ impl App {
 
         let pointer_clone = cmd_queue.clone();
         seat.get_pointer(move |ptr| {
-        	let mut pos: (u32, u32) = (0, 0);
-        	let mut vert_scroll: f64 = 0.0;
-        	let mut horiz_scroll: f64 = 0.0;
-        	let mut btn: u32 = 0;
-        	let mut btn_clicked = false;
-	        ptr.implement_closure(
-	            move |evt, _| match evt {
-	            	wl_pointer::Event::Enter{ serial: _, surface: _, surface_x, surface_y } => {
-	            		pos = (surface_x as u32, surface_y as u32);
-	            	},
-	            	wl_pointer::Event::Leave{ serial: _, surface: _ } => {
-	            		pos = (0, 0);
-	            	},
-	            	wl_pointer::Event::Motion{ time: _, surface_x, surface_y } => {
-	            		pos = (surface_x as u32, surface_y as u32);
-	            	},
-	            	wl_pointer::Event::Axis{ time: _, axis, value } => {
-	            		if axis == wl_pointer::Axis::VerticalScroll {
-	                		vert_scroll += value;
-	                	}
-	            	},
-	            	wl_pointer::Event::Button{ serial: _, time: _, button, state } => match state {
-	            		wl_pointer::ButtonState::Released => {
-	            			btn = button;
-	            			btn_clicked = true;
-	            		},
-	            		_ => {}
-	            	},
-	            	wl_pointer::Event::Frame => {
-	            		if pos.0 < 20 || pos.1 < 20 {
-	            			// Ignore stuff outside our margins
-	            			return
-	            		}
-            			let pos = (pos.0-20, pos.1-20);
-	            		if vert_scroll != 0.0 || horiz_scroll != 0.0 {
-	            			pointer_clone.lock().unwrap().push_back(Cmd::Input{pos: pos, input: Input::Scroll{pos: pos, x: horiz_scroll, y: vert_scroll}});
-	                		vert_scroll = 0.0;
-	                		horiz_scroll = 0.0;
-	                	}
-	                	if btn_clicked {
-	            			pointer_clone.lock().unwrap().push_back(Cmd::Input{pos: pos, input: Input::Click{pos: pos, button: btn}});
-	                		btn_clicked = false;
-	                	}
-	            	}
-	                _ => {}
-	            },
-	            (),
-	        )
-	    })
-	    .unwrap();
+            let mut pos: (u32, u32) = (0, 0);
+            let mut vert_scroll: f64 = 0.0;
+            let mut horiz_scroll: f64 = 0.0;
+            let mut btn: u32 = 0;
+            let mut btn_clicked = false;
+            ptr.implement_closure(
+                move |evt, _| match evt {
+                    wl_pointer::Event::Enter {
+                        serial: _,
+                        surface: _,
+                        surface_x,
+                        surface_y,
+                    } => {
+                        pos = (surface_x as u32, surface_y as u32);
+                    }
+                    wl_pointer::Event::Leave {
+                        serial: _,
+                        surface: _,
+                    } => {
+                        pos = (0, 0);
+                    }
+                    wl_pointer::Event::Motion {
+                        time: _,
+                        surface_x,
+                        surface_y,
+                    } => {
+                        pos = (surface_x as u32, surface_y as u32);
+                    }
+                    wl_pointer::Event::Axis {
+                        time: _,
+                        axis,
+                        value,
+                    } => {
+                        if axis == wl_pointer::Axis::VerticalScroll {
+                            vert_scroll += value;
+                        }
+                    }
+                    wl_pointer::Event::Button {
+                        serial: _,
+                        time: _,
+                        button,
+                        state,
+                    } => match state {
+                        wl_pointer::ButtonState::Released => {
+                            btn = button;
+                            btn_clicked = true;
+                        }
+                        _ => {}
+                    },
+                    wl_pointer::Event::Frame => {
+                        if pos.0 < 20 || pos.1 < 20 {
+                            // Ignore stuff outside our margins
+                            return;
+                        }
+                        let pos = (pos.0 - 20, pos.1 - 20);
+                        if vert_scroll != 0.0 || horiz_scroll != 0.0 {
+                            pointer_clone.lock().unwrap().push_back(Cmd::Input {
+                                pos: pos,
+                                input: Input::Scroll {
+                                    pos: pos,
+                                    x: horiz_scroll,
+                                    y: vert_scroll,
+                                },
+                            });
+                            vert_scroll = 0.0;
+                            horiz_scroll = 0.0;
+                        }
+                        if btn_clicked {
+                            pointer_clone.lock().unwrap().push_back(Cmd::Input {
+                                pos: pos,
+                                input: Input::Click {
+                                    pos: pos,
+                                    button: btn,
+                                },
+                            });
+                            btn_clicked = false;
+                        }
+                    }
+                    _ => {}
+                },
+                (),
+            )
+        })
+        .unwrap();
 
         window.set_title("dashboard".to_string());
         window.set_app_id("dashboard".to_string());
 
-        let modules = vec![
-        	Module::new(Box::new(Clock::new()), (0, 0, 720, 320)),
-        	Module::new(Box::new(Calendar::new()), (0, 384, 1280, 344)),
-        	Module::new(Box::new(Backlight::default().unwrap()), (720, 0, 256, 24))];
+        let mut modules = vec![
+            Module::new(Box::new(Clock::new()), (0, 0, 720, 320)),
+            Module::new(Box::new(Calendar::new()), (0, 384, 1280, 344)),
+        ];
+
+        if let Ok(m) = Backlight::new() {
+            modules.push(Module::new(Box::new(m), (720, 0, 256, 24)));
+        }
 
         App {
             window: window,
@@ -309,14 +349,15 @@ fn main() {
                 Cmd::Draw => {
                     app.redraw(false).expect("Failed to draw");
                     app.flush_display();
-                },
-                Cmd::Input{pos, input} => {
-                	if pos.0 >= 20 || pos.1 >= 20 { // We need to deal with our margin.
-	                	if let Some(m) = app.get_module(pos) {
-	                		m.input(input);
-	                        q.lock().unwrap().push_back(Cmd::Draw);
-	                	}
-	                }
+                }
+                Cmd::Input { pos, input } => {
+                    if pos.0 >= 20 || pos.1 >= 20 {
+                        // We need to deal with our margin.
+                        if let Some(m) = app.get_module(pos) {
+                            m.input(input);
+                            q.lock().unwrap().push_back(Cmd::Draw);
+                        }
+                    }
                 }
                 Cmd::Exit => {
                     std::process::exit(0);

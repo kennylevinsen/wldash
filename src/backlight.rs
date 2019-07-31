@@ -1,13 +1,13 @@
-use crate::module::{ModuleImpl, Input};
 use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{draw_text, ROBOTO_REGULAR};
+use crate::module::{Input, ModuleImpl};
 
-use std::fs::OpenOptions;
-use std::path::{Path, PathBuf};
-use std::io::{Read, Write};
-use std::io::{Error, ErrorKind};
 use chrono::{DateTime, Local};
+use std::fs::OpenOptions;
+use std::io::{Error, ErrorKind};
+use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 
 pub struct Backlight {
     device_path: PathBuf,
@@ -17,19 +17,16 @@ pub struct Backlight {
 }
 
 fn read_file_as_u64(path: &Path) -> Result<u64, Error> {
-    let mut file = OpenOptions::new()
-            .read(true)
-            .open(path)?;
+    let mut file = OpenOptions::new().read(true).open(path)?;
     let mut str = String::new();
     file.read_to_string(&mut str)?;
     str.pop();
-    str.parse::<u64>().map_err(|_e| {Error::new(ErrorKind::Other, "unable to parse value")})
+    str.parse::<u64>()
+        .map_err(|_e| Error::new(ErrorKind::Other, "unable to parse value"))
 }
 
 fn write_file_as_u64(path: &Path, value: u64) -> Result<(), Error> {
-    let mut file = OpenOptions::new()
-            .write(true)
-            .open(path)?;
+    let mut file = OpenOptions::new().write(true).open(path)?;
     file.write_fmt(format_args!("{}", value))
 }
 
@@ -42,7 +39,10 @@ impl Backlight {
     }
 
     pub fn sync(&mut self) -> Result<(), Error> {
-        write_file_as_u64(self.device_path.join("brightness").as_path(), self.cur_brightness)?;
+        write_file_as_u64(
+            self.device_path.join("brightness").as_path(),
+            self.cur_brightness,
+        )?;
         self.update()?;
         Ok(())
     }
@@ -70,12 +70,17 @@ impl Backlight {
         Ok(())
     }
 
-    pub fn default() -> Result<Self, Error> {
-        let devices = Path::new("/sys/class/backlight")
-                           .read_dir()?;
+    pub fn new() -> Result<Self, Error> {
+        let devices = Path::new("/sys/class/backlight").read_dir()?;
 
-        let first_device = devices.take(1).next().unwrap().unwrap();
-        let mut dev = Backlight{
+        let first_device = match devices.take(1).next() {
+            Some(v) => match v {
+                Ok(v) => v,
+                Err(_) => return Err(Error::new(ErrorKind::Other, "no backlight device")),
+            },
+            None => return Err(Error::new(ErrorKind::Other, "no backlight device")),
+        };
+        let mut dev = Backlight {
             device_path: first_device.path(),
             cur_brightness: 0,
             max_brightness: 0,
@@ -89,7 +94,12 @@ impl Backlight {
 }
 
 impl ModuleImpl for Backlight {
-    fn draw(&self, buf: &mut Buffer, bg: &Color, _time: &DateTime<Local>) -> Result<Vec<(i32, i32, i32, i32)>, Error> {
+    fn draw(
+        &self,
+        buf: &mut Buffer,
+        bg: &Color,
+        _time: &DateTime<Local>,
+    ) -> Result<Vec<(i32, i32, i32, i32)>, Error> {
         buf.memset(bg);
         draw_text(
             ROBOTO_REGULAR,
@@ -102,7 +112,7 @@ impl ModuleImpl for Backlight {
         Ok(vec![buf.get_signed_bounds()])
     }
 
-    fn update(&mut self, _time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error>{
+    fn update(&mut self, _time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
         if self.dirty || force {
             self.dirty = false;
             Ok(true)
@@ -113,23 +123,28 @@ impl ModuleImpl for Backlight {
 
     fn input(&mut self, input: Input) {
         match input {
-            Input::Scroll{pos: _pos, x: _x, y} => {
+            Input::Scroll {
+                pos: _pos,
+                x: _x,
+                y,
+            } => {
                 self.add((y * -1.0) as f32 / 8.0).unwrap();
                 self.sync().unwrap();
-            },
-            Input::Click{pos: _pos, button} => {
+            }
+            Input::Click { pos: _pos, button } => {
                 match button {
-                    273 => { // Right click
+                    273 => {
+                        // Right click
                         self.cur_brightness = if self.cur_brightness == 1 {
                             self.max_brightness
                         } else {
                             1
                         };
                         self.sync().unwrap();
-                    },
+                    }
                     _ => {}
                 }
-            },
+            }
         }
     }
 }

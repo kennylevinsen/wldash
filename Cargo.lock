@@ -320,6 +320,7 @@ version = "0.23.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "dlib 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -360,6 +361,8 @@ dependencies = [
  "os_pipe 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusttype 0.7.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "smithay-client-toolkit 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wayland-client 0.23.5 (registry+https://github.com/rust-lang/crates.io-index)",
+ "wayland-protocols 0.23.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

@@ -1,9 +1,5 @@
 #![feature(seek_convenience)]
 
-extern crate byteorder;
-extern crate chrono;
-extern crate smithay_client_toolkit as sctk;
-
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
@@ -14,12 +10,16 @@ use os_pipe::pipe;
 
 use chrono::{Duration as ChronoDuration, Local, Timelike};
 
-use sctk::keyboard::{map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind};
-use sctk::reexports::client::protocol::{wl_pointer, wl_shm};
-use sctk::reexports::client::{Display, EventQueue, NewProxy};
-use sctk::utils::DoubleMemPool;
-use sctk::window::{ConceptFrame, Event as WEvent, Window};
-use sctk::Environment;
+use smithay_client_toolkit::keyboard::{
+    map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind,
+};
+use smithay_client_toolkit::utils::DoubleMemPool;
+
+use wayland_client::protocol::{wl_compositor, wl_pointer, wl_shm, wl_surface};
+use wayland_client::{Display, EventQueue, GlobalEvent, GlobalManager, NewProxy};
+use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
+    zwlr_layer_shell_v1, zwlr_layer_surface_v1,
+};
 
 mod backlight;
 mod buffer;
@@ -47,7 +47,8 @@ struct App {
     pools: DoubleMemPool,
     display: Display,
     event_queue: EventQueue,
-    window: Window<ConceptFrame>,
+    surface: wl_surface::WlSurface,
+    shell_surface: zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
     cmd_queue: Arc<Mutex<VecDeque<Cmd>>>,
     dimensions: (u32, u32),
     modules: Vec<Module>,
@@ -94,16 +95,16 @@ impl App {
             4 * buf_x as i32,
             wl_shm::Format::Argb8888,
         );
-        self.window.surface().attach(Some(&new_buffer), 0, 0);
+        self.surface.attach(Some(&new_buffer), 0, 0);
         for d in damage {
-            self.window.surface().damage(d.0, d.1, d.2, d.3);
+            self.surface.damage(d.0, d.1, d.2, d.3);
         }
-        self.window.surface().commit();
+        self.surface.commit();
         Ok(())
     }
 
-    fn window(&mut self) -> &mut Window<ConceptFrame> {
-        &mut self.window
+    fn shell_surface(&mut self) -> &mut zwlr_layer_surface_v1::ZwlrLayerSurfaceV1 {
+        &mut self.shell_surface
     }
 
     fn cmd_queue(&self) -> Arc<Mutex<VecDeque<Cmd>>> {
@@ -148,40 +149,119 @@ impl App {
         let cmd_queue = Arc::new(Mutex::new(VecDeque::new()));
 
         let (display, mut event_queue) = Display::connect_to_env().unwrap();
-        let env = Environment::from_display(&*display, &mut event_queue).unwrap();
 
-        let pools = DoubleMemPool::new(&env.shm, || {}).expect("Failed to create a memory pool !");
+        let display_wrapper = display
+            .as_ref()
+            .make_wrapper(&event_queue.get_token())
+            .unwrap()
+            .into();
 
-        let surface = env
-            .compositor
+        //
+        // Set up global manager
+        //
+        let manager = GlobalManager::new_with_cb(&display_wrapper, move |event, _| match event {
+            GlobalEvent::New {
+                id: _,
+                interface: _,
+                version: _,
+            } => {}
+            GlobalEvent::Removed {
+                id: _,
+                interface: _,
+            } => {}
+        });
+
+        // double sync to retrieve the global list
+        // and the globals metadata
+        event_queue.sync_roundtrip().unwrap();
+        event_queue.sync_roundtrip().unwrap();
+
+        // wl_compositor
+        let compositor: wl_compositor::WlCompositor = manager
+            .instantiate_range(1, 4, NewProxy::implement_dummy)
+            .expect("server didn't advertise `wl_compositor`");
+
+        // wl_shm
+        let shm_formats = Arc::new(Mutex::new(Vec::new()));
+        let shm_formats2 = shm_formats.clone();
+        let shm = manager
+            .instantiate_range(1, 1, |shm| {
+                shm.implement_closure(
+                    move |evt, _| {
+                        if let wl_shm::Event::Format { format } = evt {
+                            shm_formats2.lock().unwrap().push(format);
+                        }
+                    },
+                    (),
+                )
+            })
+            .expect("server didn't advertise `wl_shm`");
+
+        let pools = DoubleMemPool::new(&shm, || {}).expect("Failed to create a memory pool !");
+
+        //
+        // Prepare shell so that we can create our shell surface
+        //
+
+        // shells
+        let shell = if let Ok(layer) = manager.instantiate_exact(
+            1,
+            |layer: NewProxy<zwlr_layer_shell_v1::ZwlrLayerShellV1>| {
+                layer.implement_closure(|_, _| {}, ())
+            },
+        ) {
+            layer
+        } else {
+            panic!("server didn't advertise `zwlr_layer_shell_v1`");
+        };
+
+        // sync to retrieve the global events
+        event_queue.sync_roundtrip().unwrap();
+
+        let surface = compositor
             .create_surface(NewProxy::implement_dummy)
             .unwrap();
 
         let event_clone = cmd_queue.clone();
-        let mut window =
-            Window::<ConceptFrame>::init_from_env(&env, surface, dimensions.clone(), move |evt| {
-                match evt {
-                    WEvent::Close => return,
-                    WEvent::Refresh => {
-                        event_clone.lock().unwrap().push_back(Cmd::Draw);
-                    }
-                    WEvent::Configure {
-                        new_size: _,
-                        states: _,
-                    } => {
-                        event_clone.lock().unwrap().push_back(Cmd::Configure);
-                    }
-                }
-            })
-            .expect("Failed to create a window !");
-
-        let seat = env
-            .manager
-            .instantiate_range(1, 6, NewProxy::implement_dummy)
+        let shell_surface = shell
+            .get_layer_surface(
+                &surface,
+                None,
+                zwlr_layer_shell_v1::Layer::Overlay,
+                "".to_string(),
+                move |layer| {
+                    layer.implement_closure(
+                        move |evt, layer| match evt {
+                            zwlr_layer_surface_v1::Event::Configure {
+                                serial,
+                                width: _,
+                                height: _,
+                            } => {
+                                layer.ack_configure(serial);
+                                event_clone.lock().unwrap().push_back(Cmd::Configure);
+                            }
+                            _ => unreachable!(),
+                        },
+                        (),
+                    )
+                },
+            )
             .unwrap();
 
-        window.new_seat(&seat);
+        shell_surface.set_keyboard_interactivity(1);
+        surface.commit();
+        event_queue.sync_roundtrip().unwrap();
 
+        //
+        // Get our seat
+        //
+        let seat = manager
+            .instantiate_range(1, 6, NewProxy::implement_dummy)
+            .unwrap();
+ 
+        //
+        // Keyboard processing
+        //
         let kbd_clone = cmd_queue.clone();
         map_keyboard_auto_with_repeat(
             &seat,
@@ -197,6 +277,9 @@ impl App {
         )
         .expect("Failed to map keyboard");
 
+        //
+        // Cursor processing
+        //
         let pointer_clone = cmd_queue.clone();
         seat.get_pointer(move |ptr| {
             let mut pos: (u32, u32) = (0, 0);
@@ -284,9 +367,6 @@ impl App {
         })
         .unwrap();
 
-        window.set_title("dashboard".to_string());
-        window.set_app_id("dashboard".to_string());
-
         let mut modules = vec![
             Module::new(Box::new(Clock::new()), (0, 0, 720, 320)),
             Module::new(Box::new(Calendar::new()), (0, 384, 1280, 344)),
@@ -297,7 +377,8 @@ impl App {
         }
 
         App {
-            window: window,
+            surface: surface,
+            shell_surface: shell_surface,
             display: display,
             event_queue: event_queue,
             cmd_queue: cmd_queue,
@@ -341,7 +422,7 @@ fn main() {
             Some(cmd) => match cmd {
                 Cmd::Configure => {
                     let d = app.dimensions();
-                    app.window().resize(d.0, d.1);
+                    app.shell_surface().set_size(d.0, d.1);
                     app.wipe();
                     app.redraw(true).expect("Failed to draw");
                     app.flush_display();

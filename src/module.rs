@@ -11,12 +11,19 @@ pub enum Input {
 }
 
 impl Input {
-	pub fn offset(&self, offset: (u32, u32)) -> Input{
-		match self {
-		Input::Click{pos, button} => Input::Click{pos: (pos.0 - offset.0, pos.1 - offset.1), button: *button},
-		Input::Scroll{pos, x, y} => Input::Scroll{pos: (pos.0 - offset.0, pos.1 - offset.1), x: *x, y: *y},
-		}
-	}
+    pub fn offset(&self, offset: (u32, u32)) -> Input {
+        match self {
+            Input::Click { pos, button } => Input::Click {
+                pos: (pos.0 - offset.0, pos.1 - offset.1),
+                button: *button,
+            },
+            Input::Scroll { pos, x, y } => Input::Scroll {
+                pos: (pos.0 - offset.0, pos.1 - offset.1),
+                x: *x,
+                y: *y,
+            },
+        }
+    }
 }
 
 pub trait ModuleImpl {

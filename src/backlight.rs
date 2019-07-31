@@ -1,6 +1,6 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_text, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_text, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use chrono::{DateTime, Local};
@@ -103,12 +103,20 @@ impl ModuleImpl for Backlight {
         buf.memset(bg);
         draw_text(
             ROBOTO_REGULAR,
-            &mut buf.subdimensions((0, 0, 256, 24)),
+            &mut buf.subdimensions((0, 0, 128, 24)),
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             24.0,
-            &format!("backlight: {:}%", self.brightness() as u8),
+            "backlight",
         )?;
+        draw_bar(
+            &mut buf.subdimensions((128, 0, 384, 24)),
+            bg,
+            &Color::new(1.0, 1.0, 1.0, 1.0),
+            384,
+            24,
+            self.brightness() / 100.0,
+        );
         Ok(vec![buf.get_signed_bounds()])
     }
 

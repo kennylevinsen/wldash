@@ -101,3 +101,26 @@ pub fn draw_text_fixed_width(
 
     Ok(())
 }
+
+pub fn draw_bar(
+    buf: &mut Buffer,
+    background_color: &Color,
+    color: &Color,
+    length: u32,
+    height: u32,
+    fill: f32,
+) -> Result<(), ::std::io::Error> {
+    let mut buf = buf.subdimensions((0, 0, length, height));
+
+    let mut fill_pos = (((length as f32) * fill) as u32);
+    if fill_pos > length {
+        fill_pos = length;
+    }
+    for y in 0..height {
+        for x in 0..fill_pos {
+            buf.put((x, y), &background_color.blend(color, 1.0));
+        }
+    }
+
+    Ok(())
+}

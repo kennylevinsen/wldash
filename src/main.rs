@@ -369,7 +369,7 @@ impl App {
         ];
 
         if let Ok(m) = Backlight::new() {
-            modules.push(Module::new(Box::new(m), (720, 0, 256, 24)));
+            modules.push(Module::new(Box::new(m), (720, 0, 512, 32)));
         }
 
         App {

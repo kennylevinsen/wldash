@@ -1,5 +1,3 @@
-#![feature(seek_convenience)]
-
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;

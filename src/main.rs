@@ -198,10 +198,33 @@ impl App {
         let pools = DoubleMemPool::new(&shm, || {}).expect("Failed to create a memory pool !");
 
         //
+        // Get our seat
+        //
+        let seat = manager
+            .instantiate_range(1, 6, NewProxy::implement_dummy)
+            .unwrap();
+
+        //
+        // Keyboard processing
+        //
+        let kbd_clone = cmd_queue.clone();
+        map_keyboard_auto_with_repeat(
+            &seat,
+            KeyRepeatKind::System,
+            move |event: KbEvent, _| match event {
+                KbEvent::Key { keysym, .. } => match keysym {
+                    0xFF1B => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
+                    _ => (),
+                },
+                _ => (),
+            },
+            |_, _| {},
+        )
+        .expect("Failed to map keyboard");
+
+        //
         // Prepare shell so that we can create our shell surface
         //
-
-        // shells
         let shell = if let Ok(layer) = manager.instantiate_exact(
             1,
             |layer: NewProxy<zwlr_layer_shell_v1::ZwlrLayerShellV1>| {
@@ -249,31 +272,6 @@ impl App {
         shell_surface.set_keyboard_interactivity(1);
         surface.commit();
         event_queue.sync_roundtrip().unwrap();
-
-        //
-        // Get our seat
-        //
-        let seat = manager
-            .instantiate_range(1, 6, NewProxy::implement_dummy)
-            .unwrap();
- 
-        //
-        // Keyboard processing
-        //
-        let kbd_clone = cmd_queue.clone();
-        map_keyboard_auto_with_repeat(
-            &seat,
-            KeyRepeatKind::System,
-            move |event: KbEvent, _| match event {
-                KbEvent::Key { keysym, .. } => match keysym {
-                    0xFF1B => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
-                    _ => (),
-                },
-                _ => (),
-            },
-            |_, _| {},
-        )
-        .expect("Failed to map keyboard");
 
         //
         // Cursor processing

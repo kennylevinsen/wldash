@@ -432,12 +432,11 @@ fn main() {
                     app.flush_display();
                 }
                 Cmd::Input { pos, input } => {
-                    if pos.0 >= 20 || pos.1 >= 20 {
-                        // We need to deal with our margin.
-                        if let Some(m) = app.get_module(pos) {
-                            m.input(input);
-                            q.lock().unwrap().push_back(Cmd::Draw);
-                        }
+                    if let Some(m) = app.get_module(pos) {
+                        let bounds = m.get_bounds();
+                        let input = input.offset((bounds.0, bounds.1));
+                        m.input(input);
+                        q.lock().unwrap().push_back(Cmd::Draw);
                     }
                 }
                 Cmd::Exit => {

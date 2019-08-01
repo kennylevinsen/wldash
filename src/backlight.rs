@@ -116,7 +116,7 @@ impl ModuleImpl for Backlight {
             384,
             24,
             self.brightness() / 100.0,
-        );
+        )?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

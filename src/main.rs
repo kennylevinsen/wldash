@@ -46,7 +46,6 @@ struct App {
     display: Display,
     event_queue: EventQueue,
     surface: wl_surface::WlSurface,
-    shell_surface: zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
     cmd_queue: Arc<Mutex<VecDeque<Cmd>>>,
     dimensions: (u32, u32),
     modules: Vec<Module>,
@@ -101,20 +100,12 @@ impl App {
         Ok(())
     }
 
-    fn shell_surface(&mut self) -> &mut zwlr_layer_surface_v1::ZwlrLayerSurfaceV1 {
-        &mut self.shell_surface
-    }
-
     fn cmd_queue(&self) -> Arc<Mutex<VecDeque<Cmd>>> {
         self.cmd_queue.clone()
     }
 
     fn flush_display(&mut self) {
         self.display.flush().expect("unable to flush display");
-    }
-
-    fn dimensions(&self) -> (u32, u32) {
-        self.dimensions
     }
 
     fn event_queue(&mut self) -> &mut EventQueue {
@@ -221,6 +212,7 @@ impl App {
             |_, _| {},
         )
         .expect("Failed to map keyboard");
+        event_queue.sync_roundtrip().unwrap();
 
         //
         // Prepare shell so that we can create our shell surface
@@ -235,9 +227,6 @@ impl App {
         } else {
             panic!("server didn't advertise `zwlr_layer_shell_v1`");
         };
-
-        // sync to retrieve the global events
-        event_queue.sync_roundtrip().unwrap();
 
         let surface = compositor
             .create_surface(NewProxy::implement_dummy)
@@ -270,8 +259,10 @@ impl App {
             .unwrap();
 
         shell_surface.set_keyboard_interactivity(1);
+        shell_surface.set_size(dimensions.0, dimensions.1);
         surface.commit();
         event_queue.sync_roundtrip().unwrap();
+
 
         //
         // Cursor processing
@@ -372,9 +363,10 @@ impl App {
             modules.push(Module::new(Box::new(m), (720, 0, 512, 32)));
         }
 
+        event_queue.sync_roundtrip().unwrap();
+
         App {
             surface: surface,
-            shell_surface: shell_surface,
             display: display,
             event_queue: event_queue,
             cmd_queue: cmd_queue,
@@ -417,8 +409,6 @@ fn main() {
         match cmd {
             Some(cmd) => match cmd {
                 Cmd::Configure => {
-                    let d = app.dimensions();
-                    app.shell_surface().set_size(d.0, d.1);
                     app.wipe();
                     app.redraw(true).expect("Failed to draw");
                     app.flush_display();

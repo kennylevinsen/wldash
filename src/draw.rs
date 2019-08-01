@@ -112,7 +112,7 @@ pub fn draw_bar(
 ) -> Result<(), ::std::io::Error> {
     let mut buf = buf.subdimensions((0, 0, length, height));
 
-    let mut fill_pos = (((length as f32) * fill) as u32);
+    let mut fill_pos = ((length as f32) * fill) as u32;
     if fill_pos > length {
         fill_pos = length;
     }

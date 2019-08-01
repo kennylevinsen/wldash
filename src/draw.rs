@@ -102,9 +102,27 @@ pub fn draw_text_fixed_width(
     Ok(())
 }
 
+pub fn draw_box(
+    buf: &mut Buffer,
+    c: &Color,
+    dim: (u32, u32),
+) -> Result<(), ::std::io::Error> {
+    let mut buf = buf.subdimensions((0, 0, dim.0, dim.1));
+
+    for x in 0..dim.0 {
+        buf.put((x, 0), c);
+        buf.put((x, dim.1 - 1), c);
+    }
+    for y in 0..dim.1 {
+        buf.put((0, y), c);
+        buf.put((dim.0 - 1, y), c);
+    }
+
+    Ok(())
+}
+
 pub fn draw_bar(
     buf: &mut Buffer,
-    background_color: &Color,
     color: &Color,
     length: u32,
     height: u32,
@@ -118,7 +136,7 @@ pub fn draw_bar(
     }
     for y in 0..height {
         for x in 0..fill_pos {
-            buf.put((x, y), &background_color.blend(color, 1.0));
+            buf.put((x, y), color);
         }
     }
 

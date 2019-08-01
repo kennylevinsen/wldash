@@ -2,6 +2,7 @@ use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{draw_text, DEJAVUSANS_MONO, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
+
 use chrono::{Date, DateTime, Datelike, Local};
 
 pub struct Calendar {

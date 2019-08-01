@@ -3,11 +3,12 @@ use crate::color::Color;
 use crate::draw::{draw_bar, draw_text, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
-use chrono::{DateTime, Local};
 use std::fs::OpenOptions;
 use std::io::{Error, ErrorKind};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+
+use chrono::{DateTime, Local};
 
 pub struct Backlight {
     device_path: PathBuf,
@@ -111,7 +112,6 @@ impl ModuleImpl for Backlight {
         )?;
         draw_bar(
             &mut buf.subdimensions((128, 0, 384, 24)),
-            bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             384,
             24,

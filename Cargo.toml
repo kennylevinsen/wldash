@@ -14,3 +14,5 @@ memmap = "0.7"
 os_pipe = "0.8.1"
 wayland-client = { version = "0.23", features = ["dlopen"] }
 wayland-protocols = { version = "0.23", features = ["client", "unstable_protocols"] }
+libpulse-binding = { version = "2.6.0"}
+dbus = "0.6"

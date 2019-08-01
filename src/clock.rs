@@ -2,14 +2,31 @@ use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{draw_text, draw_text_fixed_width, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
-use chrono::{DateTime, Datelike, Local, Timelike};
+
+use std::sync::mpsc::Sender;
+
+use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 
 pub struct Clock {
     cur_time: DateTime<Local>,
 }
 
 impl Clock {
-    pub fn new() -> Clock {
+    pub fn new(ch: Sender<bool>) -> Clock {
+        std::thread::spawn(move || loop {
+            let n = Local::now();
+            let target = (n + Duration::seconds(60))
+                .with_second(0)
+                .unwrap()
+                .with_nanosecond(0)
+                .unwrap();
+
+            let d = target - n;
+
+            std::thread::sleep(d.to_std().unwrap());
+            ch.send(true).unwrap();
+        });
+
         Clock {
             cur_time: Local::now(),
         }
@@ -60,6 +77,7 @@ impl ModuleImpl for Clock {
             || force
         {
             self.cur_time = time.clone();
+            println!("UPDATE");
             Ok(true)
         } else {
             Ok(false)

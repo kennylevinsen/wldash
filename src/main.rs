@@ -1,12 +1,13 @@
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
+use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
 
-use chrono::{Duration as ChronoDuration, Local, Timelike};
+use chrono::{Local};
 
 use smithay_client_toolkit::keyboard::{
     map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind,
@@ -26,6 +27,7 @@ mod clock;
 mod color;
 mod draw;
 mod module;
+mod sound;
 
 use crate::backlight::Backlight;
 use crate::buffer::Buffer;
@@ -33,6 +35,8 @@ use crate::calendar::Calendar;
 use crate::clock::Clock;
 use crate::color::Color;
 use crate::module::{Input, Module};
+use crate::sound::PulseAudio;
+use crate::draw::draw_box;
 
 enum Cmd {
     Exit,
@@ -62,6 +66,8 @@ impl App {
 
         let (buf_x, buf_y) = self.dimensions;
 
+        let bg = Color::new(0.0, 0.0, 0.0, 0.9);
+
         // resize the pool if relevant
 
         pool.resize((4 * buf_x * buf_y) as usize)
@@ -69,16 +75,16 @@ impl App {
 
         let mmap = pool.mmap();
         let mut buf = Buffer::new(mmap, self.dimensions);
-        let mut margin_buf = buf.subdimensions((20, 20, buf_x - 40, buf_y - 40));
-
-        let bg = Color::new(0.0, 0.0, 0.0, 0.9);
-
         let mut damage = vec![];
-        for module in self.modules.iter() {
-            if module.update(&time, force)? {
-                let mut b = &mut margin_buf.subdimensions(module.get_bounds());
-                let mut d = module.draw(&mut b, &bg, &time)?;
-                damage.append(&mut d);
+
+        {
+            let mut margin_buf = buf.subdimensions((20, 20, buf_x - 40, buf_y - 40));
+            for module in self.modules.iter() {
+                if module.update(&time, force)? {
+                    let mut b = &mut margin_buf.subdimensions(module.get_bounds());
+                    let mut d = module.draw(&mut b, &bg, &time)?;
+                    damage.append(&mut d);
+                }
             }
         }
 
@@ -134,7 +140,21 @@ impl App {
         None
     }
 
-    fn new(dimensions: (u32, u32)) -> App {
+    fn new(dimensions: (u32, u32), tx: Sender<bool>) -> App {
+        let mut modules = vec![
+            Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 720, 320)),
+            Module::new(Box::new(Calendar::new()), (0, 384, 1280, 344)),
+        ];
+
+        let mut vert_off = 0;
+        if let Ok(m) = Backlight::new() {
+            modules.push(Module::new(Box::new(m), (720, vert_off, 512, 32)));
+            vert_off += 32;
+        }
+        if let Ok(m) = PulseAudio::new(tx.clone()) {
+            modules.push(Module::new(Box::new(m), (720, vert_off, 512, 32)));
+        }
+
         let cmd_queue = Arc::new(Mutex::new(VecDeque::new()));
 
         let (display, mut event_queue) = Display::connect_to_env().unwrap();
@@ -263,7 +283,6 @@ impl App {
         surface.commit();
         event_queue.sync_roundtrip().unwrap();
 
-
         //
         // Cursor processing
         //
@@ -354,15 +373,6 @@ impl App {
         })
         .unwrap();
 
-        let mut modules = vec![
-            Module::new(Box::new(Clock::new()), (0, 0, 720, 320)),
-            Module::new(Box::new(Calendar::new()), (0, 384, 1280, 344)),
-        ];
-
-        if let Ok(m) = Backlight::new() {
-            modules.push(Module::new(Box::new(m), (720, 0, 512, 32)));
-        }
-
         event_queue.sync_roundtrip().unwrap();
 
         App {
@@ -379,21 +389,13 @@ impl App {
 
 fn main() {
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();
+    let (tx_draw, rx_draw) = channel();
 
-    let mut app = App::new((1320u32, 784u32));
+    let mut app = App::new((1320u32, 784u32), tx_draw);
 
     let worker_queue = app.cmd_queue();
     std::thread::spawn(move || loop {
-        let n = Local::now();
-        let target = (n + ChronoDuration::seconds(60))
-            .with_second(0)
-            .unwrap()
-            .with_nanosecond(0)
-            .unwrap();
-
-        let d = target - n;
-
-        std::thread::sleep(d.to_std().unwrap());
+        rx_draw.recv().unwrap();
         worker_queue.lock().unwrap().push_back(Cmd::Draw);
         tx_pipe.write_all(&[0x1]).unwrap();
     });

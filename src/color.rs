@@ -58,9 +58,9 @@ impl Color {
     }
 
     pub fn as_argb8888(&self) -> u32 {
-        ((255.0 * self.opacity) as u32) << 24
-            | ((255.0 * self.red) as u32) << 16
-            | ((255.0 * self.green) as u32) << 8
-            | ((255.0 * self.red) as u32)
+        ((255.0 * self.opacity) as u32 & 0xFF) << 24
+            | ((255.0 * self.red) as u32 & 0xFF) << 16
+            | ((255.0 * self.green) as u32 & 0xFF) << 8
+            | ((255.0 * self.blue) as u32 & 0xFF)
     }
 }

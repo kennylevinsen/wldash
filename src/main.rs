@@ -152,7 +152,7 @@ impl App {
     fn new(dimensions: (u32, u32), tx: Sender<bool>) -> App {
         let mut modules = vec![
             Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 720, 320)),
-            Module::new(Box::new(Calendar::new()), (0, 384, 1280, 344)),
+            Module::new(Box::new(Calendar::new()), (0, 368, 1280, 344)),
         ];
 
         if let Ok(m) = Launcher::new() {

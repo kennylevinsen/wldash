@@ -1,6 +1,6 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_text, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_text, draw_box, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::fs::OpenOptions;
@@ -102,20 +102,26 @@ impl ModuleImpl for Backlight {
         _time: &DateTime<Local>,
     ) -> Result<Vec<(i32, i32, i32, i32)>, Error> {
         buf.memset(bg);
+        let c = Color::new(1.0, 1.0, 1.0, 1.0);
         draw_text(
             ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 24)),
             bg,
-            &Color::new(1.0, 1.0, 1.0, 1.0),
+            &c,
             24.0,
             "backlight",
         )?;
         draw_bar(
-            &mut buf.subdimensions((128, 0, 384, 24)),
-            &Color::new(1.0, 1.0, 1.0, 1.0),
-            384,
+            &mut buf.subdimensions((128, 0, 432, 24)),
+            &c,
+            432,
             24,
             self.brightness() / 100.0,
+        )?;
+        draw_box(
+            &mut buf.subdimensions((128, 0, 432, 24)),
+            &c,
+            (432, 24),
         )?;
         Ok(vec![buf.get_signed_bounds()])
     }

@@ -67,25 +67,35 @@ impl ModuleImpl for Launcher {
             };
             let size = if idx == self.offset && self.cur.len() > 0 {
                 let l = self.cur.len();
+                let off = m.to_lowercase().find(&self.cur.to_lowercase()).unwrap();
                 let s1 = draw_text(
                     ROBOTO_REGULAR,
                     &mut b,
                     bg,
-                    &Color::new(1.0, 1.0, 1.0, 1.0),
+                    &Color::new(0.75, 0.75, 0.75, 1.0),
                     32.0,
-                    &m[0..l],
+                    &m[0..off],
                 )?;
                 let mut b2 = b.subdimensions((s1.0+1, 0, width_remaining as u32 - s1.0-1, 32))?;
                 let s2 = draw_text(
                     ROBOTO_REGULAR,
                     &mut b2,
                     bg,
+                    &Color::new(1.0, 1.0, 1.0, 1.0),
+                    32.0,
+                    &m[off..off+l],
+                )?;
+                let mut b3 = b.subdimensions((s1.0+s2.0+2, 0, width_remaining as u32 - s1.0- s2.0 - 2, 32))?;
+                let s3 = draw_text(
+                    ROBOTO_REGULAR,
+                    &mut b3,
+                    bg,
                     &Color::new(0.75, 0.75, 0.75, 1.0),
                     32.0,
-                    &m[l..],
+                    &m[off+l..],
                 )?;
 
-                (s1.0 + s2.0 + 1, s1.1 + s2.1)
+                (s1.0 + s2.0 + s3.0 + 3, s1.1 + s2.1 + s3.1)
             } else {
                 draw_text(
                     ROBOTO_REGULAR,
@@ -125,7 +135,7 @@ impl ModuleImpl for Launcher {
             self.matches = self
                 .options
                 .iter()
-                .filter(|x| x.len() >= self.cur.len() && x[0..self.cur.len()].to_lowercase() == self.cur.to_lowercase())
+                .filter(|x| x.to_lowercase().find(&self.cur.to_lowercase()).is_some())
                 .map(|x| x.to_string())
                 .collect();
 

@@ -82,23 +82,6 @@ impl<'a> Buffer<'a> {
         }
     }
 
-    pub fn highlight_bounds(&mut self, c: &Color) {
-        let end = if let Some(subdim) = self.subdimensions {
-            (subdim.2, subdim.3)
-        } else {
-            (self.dimensions.0, self.dimensions.1)
-        };
-
-        for x in 0..end.0 {
-            self.put((x, 0), c);
-            self.put((x, end.1 - 1), c);
-        }
-        for y in 0..end.1 {
-            self.put((0, y), c);
-            self.put((end.0 - 1, y), c);
-        }
-    }
-
     pub fn put(&mut self, pos: (u32, u32), c: &Color) {
         let true_pos = if let Some(subdim) = self.subdimensions {
             if pos.0 > subdim.2 || pos.1 > subdim.3 {

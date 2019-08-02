@@ -90,6 +90,11 @@ impl App {
 
         mmap.flush().unwrap();
 
+        if damage.len() == 0 {
+            // Nothing to do
+            return Ok(());
+        }
+
         // get a buffer and attach it
         let new_buffer = pool.buffer(
             0,

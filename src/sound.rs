@@ -498,7 +498,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
                     .device
                     .lock()
                     .unwrap()
-                    .set_volume((y * -1.0) as f32 / 8.0)
+                    .set_volume(y as f32 / 8.0)
                     .unwrap();
                 s.dirty = true;
 

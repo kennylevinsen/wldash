@@ -136,7 +136,7 @@ impl ModuleImpl for Backlight {
                 x: _x,
                 y,
             } => {
-                self.add((y * -1.0) as f32 / 8.0).unwrap();
+                self.add(y as f32 / 8.0).unwrap();
                 self.sync().unwrap();
             }
             Input::Click { pos: _pos, button } => {

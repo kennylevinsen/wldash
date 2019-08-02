@@ -54,7 +54,7 @@ impl ModuleImpl for Launcher {
             bg,
                 &Color::new(0.5, 0.5, 0.5, 1.0),
             32.0,
-            "run: ",
+            "Run: ",
         )?;
 
 

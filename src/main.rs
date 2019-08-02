@@ -28,6 +28,7 @@ mod color;
 mod draw;
 mod module;
 mod sound;
+mod battery;
 
 use crate::backlight::Backlight;
 use crate::buffer::Buffer;
@@ -36,6 +37,9 @@ use crate::clock::Clock;
 use crate::color::Color;
 use crate::module::{Input, Module};
 use crate::sound::PulseAudio;
+use crate::battery::UpowerBattery;
+
+
 
 enum Cmd {
     Exit,
@@ -151,6 +155,10 @@ impl App {
         ];
 
         let mut vert_off = 0;
+        if let Ok(m) = UpowerBattery::new(tx.clone()) {
+            modules.push(Module::new(Box::new(m), (720, vert_off, 512, 32)));
+            vert_off += 32;
+        }
         if let Ok(m) = Backlight::new() {
             modules.push(Module::new(Box::new(m), (720, vert_off, 512, 32)));
             vert_off += 32;

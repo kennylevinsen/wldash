@@ -125,7 +125,7 @@ impl ModuleImpl for Launcher {
             self.matches = self
                 .options
                 .iter()
-                .filter(|x| x.len() >= self.cur.len() && x[0..self.cur.len()] == self.cur)
+                .filter(|x| x.len() >= self.cur.len() && x[0..self.cur.len()].to_lowercase() == self.cur.to_lowercase())
                 .map(|x| x.to_string())
                 .collect();
 

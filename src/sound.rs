@@ -493,21 +493,18 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
                 x: _x,
                 y,
             } => {
-                let mut s = self.lock().unwrap();
-                s
+                self
+                    .lock()
+                    .unwrap()
                     .device
                     .lock()
                     .unwrap()
                     .set_volume(y as f32 / 8.0)
                     .unwrap();
-                s.dirty = true;
-
             }
             Input::Click { pos: _pos, button } => match button {
                 273 => {
-                    let mut s = self.lock().unwrap();
-                    s.device.lock().unwrap().toggle().unwrap();
-                    s.dirty = true;
+                    self.lock().unwrap().device.lock().unwrap().toggle().unwrap();
                 }
                 _ => {}
             },

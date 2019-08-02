@@ -2,6 +2,8 @@
 
 A dashboard/launcher/control-panel thing for Wayland.
 
+Consider this alpha-quality: While it works, *everything* is subject to change with a moments notice. You may end up pulling in the latest changes, and *poof*, wldash suddenly turns into an artisan espresso machine.
+
 ## Features
 
 ### Date and time

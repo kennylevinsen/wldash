@@ -53,7 +53,7 @@ impl ModuleImpl for Launcher {
             ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 32))?,
             bg,
-                &Color::new(0.5, 0.5, 0.5, 1.0),
+                &Color::new(0.75, 0.75, 0.75, 1.0),
             32.0,
             "Run: ",
         )?;

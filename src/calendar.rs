@@ -7,8 +7,8 @@ use chrono::{Date, DateTime, Datelike, Local};
 
 pub struct Calendar {
     cur_date: Date<Local>,
-    first_draw: bool,
-    offset: i32,
+    dirty: bool,
+    offset: f64,
 }
 
 fn draw_month(
@@ -152,8 +152,8 @@ impl Calendar {
     pub fn new() -> Calendar {
         Calendar {
             cur_date: Local::now().date(),
-            first_draw: true,
-            offset: 0,
+            dirty: true,
+            offset: 0.0,
         }
     }
 }
@@ -167,8 +167,9 @@ impl ModuleImpl for Calendar {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         let time = time.date();
         let mut t = time.with_day(1).unwrap();
-        if self.offset != 0 {
-            let mut month = (t.month() - 1) as i32 + self.offset;
+        let o = (self.offset / 100.0) as i32;
+        if o != 0 {
+            let mut month = (t.month() - 1) as i32 + o;
             let mut year = t.year();
             while month > 11 {
                 year += 1;
@@ -212,8 +213,8 @@ impl ModuleImpl for Calendar {
     }
 
     fn update(&mut self, time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
-        if self.first_draw {
-            self.first_draw = false;
+        if self.dirty {
+            self.dirty = false;
             Ok(true)
         } else if time.date() != self.cur_date || force {
             self.cur_date = time.date();
@@ -226,16 +227,18 @@ impl ModuleImpl for Calendar {
     fn input(&mut self, input: Input) {
         match input {
             Input::Scroll { pos: _, x: _, y } => {
-                if y > 0.0 {
-                    self.offset += 1;
-                } else {
-                    self.offset -= 1;
-                }
-                self.first_draw = true;
+                self.offset += y;
+                self.dirty = true;
             }
-            Input::Click { pos: _, button: _ } => {
-                self.offset = 0;
-                self.first_draw = true;
+            Input::Click { pos: (x, _), button: _ } => {
+                if x < 448 {
+                    self.offset -= 100.0;
+                } else if x >= 896 {
+                    self.offset += 100.0;
+                } else {
+                    self.offset = 0.0;
+                }
+                self.dirty = true;
             }
             _ => {}
         }

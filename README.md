@@ -12,7 +12,7 @@ In nice, big letters!
 
 ### 3 month calendar
 
-Scroll on it to navigate.
+Scroll or click on the months to navigate.
 
 ### Battery level
 

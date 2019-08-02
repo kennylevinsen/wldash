@@ -117,17 +117,6 @@ impl ModuleImpl for Launcher {
             }
         }
 
-
-        // draw_text_fixed_width(
-        //     ROBOTO_REGULAR,
-        //     &mut buf.subdimensions((0, 64, 288 * 2 + 64, 256))?,
-        //     bg,
-        //     &Color::new(1.0, 1.0, 1.0, 1.0),
-        //     256.0,
-        //     vec![120, 120, 64, 120, 120],
-        //     &format!("{:02}:{:02}", time.hour(), time.minute()),
-        // )?;
-
         Ok(vec![buf.get_signed_bounds()])
     }
 

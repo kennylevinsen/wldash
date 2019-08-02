@@ -156,7 +156,7 @@ impl App {
         ];
 
         if let Ok(m) = Launcher::new() {
-            modules.push(Module::new(Box::new(m), (0, 712, 1280, 32)));
+            modules.push(Module::new(Box::new(m), (0, 768, 1280, 32)));
         }
 
         let mut vert_off = 0;
@@ -412,7 +412,7 @@ fn main() {
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();
     let (tx_draw, rx_draw) = channel();
 
-    let mut app = App::new((1320u32, 784u32), tx_draw);
+    let mut app = App::new((1320u32, 848u32), tx_draw);
 
     let worker_queue = app.cmd_queue();
     std::thread::spawn(move || loop {

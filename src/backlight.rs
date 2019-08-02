@@ -143,7 +143,13 @@ impl ModuleImpl for Backlight {
                 y,
             } => {
                 self.add(y as f32 / 8.0).unwrap();
-                self.sync().unwrap();
+                match self.sync() {
+                    Ok(val) => val,
+                    Err(err) => {
+                        eprintln!("Error while trying to change brightness: {}", err);
+                        ()
+                    }
+                }
             }
             Input::Click { pos: _pos, button } => {
                 match button {
@@ -154,7 +160,13 @@ impl ModuleImpl for Backlight {
                         } else {
                             1
                         };
-                        self.sync().unwrap();
+                        match self.sync() {
+                            Ok(val) => val,
+                            Err(err) => {
+                                eprintln!("Error while trying to change brightness: {}", err);
+                                ()
+                            }
+                        }
                     }
                     _ => {}
                 }

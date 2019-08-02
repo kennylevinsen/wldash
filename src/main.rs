@@ -152,7 +152,7 @@ impl App {
             vert_off += 32;
         }
         if let Ok(m) = PulseAudio::new(tx.clone()) {
-            modules.push(Module::new(Box::new(m), (720, vert_off, 512, 32)));
+            modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
         }
 
         let cmd_queue = Arc::new(Mutex::new(VecDeque::new()));

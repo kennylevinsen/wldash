@@ -1,6 +1,6 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_text, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_text, draw_box, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::cell::RefCell;
@@ -145,7 +145,7 @@ impl PulseAudioClient {
                 let cl12 = cl1.clone();
                 let cl13 = cl1.clone();
                 match rx.recv() {
-                    Err(_) => {}
+                    Err(_) => return,
                     Ok(req) => {
                         let mut introspector = conn.context.borrow_mut().introspect();
 
@@ -154,7 +154,7 @@ impl PulseAudioClient {
                                 introspector.get_server_info(move |info| {
                                     let _res = cl11.lock().unwrap().server_info_callback(info);
                                     if let Some(s) = &s {
-                                        s.send(true).unwrap();
+                                        let _ = s.send(true);
                                     }
                                 });
                             }
@@ -162,7 +162,7 @@ impl PulseAudioClient {
                                 introspector.get_sink_info_by_index(index, move |res| {
                                     cl12.lock().unwrap().sink_info_callback(res);
                                     if let Some(s) = &s {
-                                        s.send(true).unwrap();
+                                        let _ = s.send(true);
                                     }
                                 });
                             }
@@ -170,20 +170,20 @@ impl PulseAudioClient {
                                 introspector.get_sink_info_by_name(&name, move |res| {
                                     cl13.lock().unwrap().sink_info_callback(res);
                                     if let Some(s) = &s {
-                                        s.send(true).unwrap();
+                                        let _ = s.send(true);
                                     }
                                 });
                             }
                             PulseAudioClientRequest::SetSinkVolumeByName(s, name, volumes) => {
                                 introspector.set_sink_volume_by_name(&name, &volumes, None);
                                 if let Some(s) = &s {
-                                    s.send(true).unwrap();
+                                    let _ = s.send(true);
                                 }
                             }
                             PulseAudioClientRequest::SetSinkMuteByName(s, name, mute) => {
                                 introspector.set_sink_mute_by_name(&name, mute, None);
                                 if let Some(s) = &s {
-                                    s.send(true).unwrap();
+                                    let _ = s.send(true);
                                 }
                             }
                         };
@@ -195,12 +195,6 @@ impl PulseAudioClient {
                 }
             }
         });
-        if !rx1.recv().unwrap() {
-            return Err(::std::io::Error::new(
-                ::std::io::ErrorKind::Other,
-                "unable to start pulseaudio thread",
-            ));
-        }
 
         // subscribe
         let cl2 = client.clone();
@@ -231,7 +225,8 @@ impl PulseAudioClient {
 
             conn.mainloop.borrow_mut().run().unwrap();
         });
-        if !rx2.recv().unwrap() {
+
+        if !rx1.recv().unwrap() || !rx2.recv().unwrap() {
             return Err(::std::io::Error::new(
                 ::std::io::ErrorKind::Other,
                 "unable to start pulseaudio thread",
@@ -437,7 +432,14 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
         _time: &DateTime<Local>,
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         let s = self.lock().unwrap();
+        let muted = s.device.lock().unwrap().muted;
+        let mut vol =(s.device.lock().unwrap().volume() as f32) / 100.0;
         buf.memset(bg);
+        let c = if muted {
+            Color::new(1.0, 1.0, 0.0, 1.0)
+        } else {
+            Color::new(1.0, 1.0, 1.0, 1.0)
+        };
         draw_text(
             ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 24)),
@@ -446,32 +448,31 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
             24.0,
             "volume",
         )?;
-        let vol = if s.device.lock().unwrap().muted { 0.0 } else { (s.device.lock().unwrap().volume() as f32) / 100.0 };
         draw_bar(
-            &mut buf.subdimensions((128, 0, 384, 24)),
-            &Color::new(1.0, 1.0, 1.0, 1.0),
-            384,
+            &mut buf.subdimensions((128, 0, 432, 24)),
+            &c,
+            432,
             24,
             vol,
         )?;
-        if vol > 1.0 {
+        let mut iter = 1.0;
+        while vol > 1.0 {
+            let c = &Color::new(0.75 / iter, 0.25 / iter, 0.25 / iter, 1.0);
+            vol -= 1.0;
+            iter += 1.0;
             draw_bar(
-                &mut buf.subdimensions((128, 0, 384, 24)),
-                &Color::new(0.75, 0.25, 0.25, 1.0),
-                384,
+                &mut buf.subdimensions((128, 0, 432, 24)),
+                &c,
+                432,
                 24,
-                vol - 1.0,
+                vol,
             )?;
         }
-        if vol > 2.0 {
-            draw_bar(
-                &mut buf.subdimensions((128, 0, 384, 24)),
-                &Color::new(0.50, 0.10, 0.10, 1.0),
-                384,
-                24,
-                vol - 2.0,
-            )?;
-        }
+        draw_box(
+            &mut buf.subdimensions((128, 0, 432, 24)),
+            &c,
+            (432, 24),
+        )?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

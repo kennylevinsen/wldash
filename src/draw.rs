@@ -12,7 +12,7 @@ pub fn draw_text(
     color: &Color,
     size: f32,
     s: &str,
-) -> Result<(), ::std::io::Error> {
+) -> Result<(u32, u32), ::std::io::Error> {
     // Load the font
     // This only succeeds if collection consists of one font
     let font = Font::from_bytes(font_data as &[u8]).expect("Error constructing Font");
@@ -27,9 +27,18 @@ pub fn draw_text(
         .layout(s, scale, point(0.0, v_metrics.ascent))
         .collect();
 
+    let mut x_max: u32 = 0;
+    let mut y_max: u32 = 0;
+
     // Loop through the glyphs in the text, positing each one on a line
     for glyph in glyphs {
         if let Some(bounding_box) = glyph.pixel_bounding_box() {
+            if bounding_box.max.x > x_max as i32 {
+                x_max = bounding_box.max.x as u32;
+            }
+            if bounding_box.max.y > y_max as i32 {
+                y_max = bounding_box.max.y as u32;
+            }
             // Draw the glyph into the image per-pixel by using the draw closure
             glyph.draw(|x, y, o| {
                 let x = x + bounding_box.min.x as u32;
@@ -41,12 +50,12 @@ pub fn draw_text(
                 } else {
                     o
                 };
-                buf.put((x, y), &background_color.blend(color, o));
+                let _ = buf.put((x, y), &background_color.blend(color, o));
             });
         }
     }
 
-    Ok(())
+    Ok((x_max, y_max))
 }
 
 pub fn draw_text_fixed_width(
@@ -92,7 +101,7 @@ pub fn draw_text_fixed_width(
                 } else {
                     o
                 };
-                buf.put((x, y), &background_color.blend(color, o));
+                let _ = buf.put((x, y), &background_color.blend(color, o));
             });
             x_pos += 1;
             x_off += x_dist;
@@ -107,15 +116,15 @@ pub fn draw_box(
     c: &Color,
     dim: (u32, u32),
 ) -> Result<(), ::std::io::Error> {
-    let mut buf = buf.subdimensions((0, 0, dim.0, dim.1));
+    let mut buf = buf.subdimensions((0, 0, dim.0, dim.1))?;
 
     for x in 0..dim.0 {
-        buf.put((x, 0), c);
-        buf.put((x, dim.1 - 1), c);
+        let _ = buf.put((x, 0), c);
+        let _ = buf.put((x, dim.1 - 1), c);
     }
     for y in 0..dim.1 {
-        buf.put((0, y), c);
-        buf.put((dim.0 - 1, y), c);
+        buf.put((0, y), c)?;
+        buf.put((dim.0 - 1, y), c)?;
     }
 
     Ok(())
@@ -128,7 +137,7 @@ pub fn draw_bar(
     height: u32,
     fill: f32,
 ) -> Result<(), ::std::io::Error> {
-    let mut buf = buf.subdimensions((0, 0, length, height));
+    let mut buf = buf.subdimensions((0, 0, length, height))?;
 
     let mut fill_pos = ((length as f32) * fill) as u32;
     if fill_pos > length {
@@ -136,7 +145,7 @@ pub fn draw_bar(
     }
     for y in 0..height {
         for x in 0..fill_pos {
-            buf.put((x, y), color);
+            let _ = buf.put((x, y), color);
         }
     }
 

@@ -38,18 +38,17 @@ impl<'a> Buffer<'a> {
         }
     }
 
-    pub fn subdimensions(&mut self, subdimensions: (u32, u32, u32, u32)) -> Buffer {
+    pub fn subdimensions(&mut self, subdimensions: (u32, u32, u32, u32)) -> Result<Buffer, ::std::io::Error> {
         let bounds = self.get_bounds();
         if subdimensions.0 + subdimensions.2 > bounds.2
             || subdimensions.1 + subdimensions.3 > bounds.3
         {
-            panic!(
-                "cannot create subdimensions larger than buffer: {:?} > {:?}",
+            return Err(::std::io::Error::new(::std::io::ErrorKind::Other, format!("cannot create subdimensions larger than buffer: {:?} > {:?}",
                 subdimensions, bounds
-            );
+            )));
         }
 
-        Buffer {
+        Ok(Buffer {
             buf: self.buf,
             dimensions: self.dimensions,
             subdimensions: Some((
@@ -58,7 +57,7 @@ impl<'a> Buffer<'a> {
                 subdimensions.2,
                 subdimensions.3,
             )),
-        }
+        })
     }
 
     pub fn memset(&mut self, c: &Color) {
@@ -82,21 +81,18 @@ impl<'a> Buffer<'a> {
         }
     }
 
-    pub fn put(&mut self, pos: (u32, u32), c: &Color) {
+    pub fn put(&mut self, pos: (u32, u32), c: &Color) -> Result<(), ::std::io::Error> {
         let true_pos = if let Some(subdim) = self.subdimensions {
             if pos.0 > subdim.2 || pos.1 > subdim.3 {
-                panic!(
-                    "put({:?}) is not within subdimensions of buffer ({:?})",
-                    pos, subdim
-                );
+                return Err(::std::io::Error::new(::std::io::ErrorKind::Other, format!("put({:?}) is not within subdimensions of buffer ({:?})",
+                    pos, subdim)));
             }
             (pos.0 + subdim.0, pos.1 + subdim.1)
         } else {
             if pos.0 >= self.dimensions.0 || pos.1 >= self.dimensions.1 {
-                panic!(
-                    "put({:?}) is not within dimensions of buffer ({:?})",
+                return Err(::std::io::Error::new(::std::io::ErrorKind::Other, format!("put({:?}) is not within dimensions of buffer ({:?})",
                     pos, self.dimensions
-                );
+                )));
             }
             pos
         };
@@ -107,6 +103,8 @@ impl<'a> Buffer<'a> {
                 .as_mut_ptr()
                 .offset(4 * (true_pos.0 + (true_pos.1 * self.dimensions.0)) as isize);
             *(ptr as *mut u32) = c.as_argb8888();
-        }
+        };
+
+        Ok(())
     }
 }

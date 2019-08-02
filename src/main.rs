@@ -10,7 +10,7 @@ use os_pipe::pipe;
 use chrono::{Local};
 
 use smithay_client_toolkit::keyboard::{
-    map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind,
+    map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind, KeyState, keysyms,
 };
 use smithay_client_toolkit::utils::DoubleMemPool;
 
@@ -29,6 +29,7 @@ mod draw;
 mod module;
 mod sound;
 mod battery;
+mod launcher;
 
 use crate::backlight::Backlight;
 use crate::buffer::Buffer;
@@ -38,14 +39,14 @@ use crate::color::Color;
 use crate::module::{Input, Module};
 use crate::sound::PulseAudio;
 use crate::battery::UpowerBattery;
-
-
+use crate::launcher::Launcher;
 
 enum Cmd {
     Exit,
     Configure,
     Draw,
-    Input { pos: (u32, u32), input: Input },
+    MouseInput { pos: (u32, u32), input: Input },
+    KeyboardInput { input: Input },
 }
 
 struct App {
@@ -81,10 +82,10 @@ impl App {
         let mut damage = vec![];
 
         {
-            let mut margin_buf = buf.subdimensions((20, 20, buf_x - 40, buf_y - 40));
+            let mut margin_buf = buf.subdimensions((20, 20, buf_x - 40, buf_y - 40))?;
             for module in self.modules.iter() {
                 if module.update(&time, force)? {
-                    let mut b = &mut margin_buf.subdimensions(module.get_bounds());
+                    let mut b = &mut margin_buf.subdimensions(module.get_bounds())?;
                     let mut d = module.draw(&mut b, &bg, &time)?;
                     damage.append(&mut d);
                 }
@@ -153,6 +154,10 @@ impl App {
             Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 720, 320)),
             Module::new(Box::new(Calendar::new()), (0, 384, 1280, 344)),
         ];
+
+        if let Ok(m) = Launcher::new() {
+            modules.push(Module::new(Box::new(m), (0, 712, 1280, 32)));
+        }
 
         let mut vert_off = 0;
         if let Ok(m) = UpowerBattery::new(tx.clone()) {
@@ -235,8 +240,11 @@ impl App {
             &seat,
             KeyRepeatKind::System,
             move |event: KbEvent, _| match event {
-                KbEvent::Key { keysym, .. } => match keysym {
-                    0xFF1B => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
+                KbEvent::Key { keysym, utf8, state, .. } => match state {
+                    KeyState::Pressed => match keysym {
+                        keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
+                        v => kbd_clone.lock().unwrap().push_back(Cmd::KeyboardInput{input: Input::Keypress{ key: v, interpreted: utf8 }}),
+                    },
                     _ => (),
                 },
                 _ => (),
@@ -356,7 +364,7 @@ impl App {
                         }
                         let pos = (pos.0 - 20, pos.1 - 20);
                         if vert_scroll != 0.0 || horiz_scroll != 0.0 {
-                            pointer_clone.lock().unwrap().push_back(Cmd::Input {
+                            pointer_clone.lock().unwrap().push_back(Cmd::MouseInput {
                                 pos: pos,
                                 input: Input::Scroll {
                                     pos: pos,
@@ -368,7 +376,7 @@ impl App {
                             horiz_scroll = 0.0;
                         }
                         if btn_clicked {
-                            pointer_clone.lock().unwrap().push_back(Cmd::Input {
+                            pointer_clone.lock().unwrap().push_back(Cmd::MouseInput {
                                 pos: pos,
                                 input: Input::Click {
                                     pos: pos,
@@ -400,6 +408,7 @@ impl App {
 }
 
 fn main() {
+
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();
     let (tx_draw, rx_draw) = channel();
 
@@ -431,13 +440,19 @@ fn main() {
                     app.redraw(false).expect("Failed to draw");
                     app.flush_display();
                 }
-                Cmd::Input { pos, input } => {
+                Cmd::MouseInput { pos, input } => {
                     if let Some(m) = app.get_module(pos) {
                         let bounds = m.get_bounds();
                         let input = input.offset((bounds.0, bounds.1));
                         m.input(input);
                         q.lock().unwrap().push_back(Cmd::Draw);
                     }
+                }
+                Cmd::KeyboardInput { input } => {
+                    for m in app.modules.iter() {
+                        m.input(input.clone());
+                    }
+                    q.lock().unwrap().push_back(Cmd::Draw);
                 }
                 Cmd::Exit => {
                     std::process::exit(0);

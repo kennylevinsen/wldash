@@ -44,7 +44,7 @@ impl ModuleImpl for Clock {
 
         draw_text(
             ROBOTO_REGULAR,
-            &mut buf.subdimensions((0, 0, 448, 64)),
+            &mut buf.subdimensions((0, 0, 448, 64))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             64.0,
@@ -59,7 +59,7 @@ impl ModuleImpl for Clock {
 
         draw_text_fixed_width(
             ROBOTO_REGULAR,
-            &mut buf.subdimensions((0, 64, 288 * 2 + 64, 256)),
+            &mut buf.subdimensions((0, 64, 288 * 2 + 64, 256))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             256.0,

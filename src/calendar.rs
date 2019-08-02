@@ -44,7 +44,7 @@ fn draw_month(
     //
     draw_text(
         ROBOTO_REGULAR,
-        &mut buf.subdimensions((0, 0, 304, 72)),
+        &mut buf.subdimensions((0, 0, 304, 72))?,
         background_color,
         &Color::new(1.0, 1.0, 1.0, 1.0),
         64.0,
@@ -54,7 +54,7 @@ fn draw_month(
     if time.year() != orig.year() {
         draw_text(
             ROBOTO_REGULAR,
-            &mut buf.subdimensions((320, 0, 64, 32)),
+            &mut buf.subdimensions((320, 0, 64, 32))?,
             background_color,
             &Color::new(0.8, 0.8, 0.8, 1.0),
             24.0,
@@ -80,7 +80,7 @@ fn draw_month(
 
         draw_text(
             DEJAVUSANS_MONO,
-            &mut buf.subdimensions((idx * 48 + 4, (y_off * 32) + 64, 32, 16)),
+            &mut buf.subdimensions((idx * 48 + 4, (y_off * 32) + 64, 32, 16))?,
             background_color,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             16.0,
@@ -108,7 +108,7 @@ fn draw_month(
         let wk = time.iso_week();
         draw_text(
             DEJAVUSANS_MONO,
-            &mut buf.subdimensions((0 * 48, (y_off * 32) + 64, 38, 32)),
+            &mut buf.subdimensions((0 * 48, (y_off * 32) + 64, 38, 32))?,
             background_color,
             &Color::new(0.75, 0.75, 0.75, 1.0),
             32.0,
@@ -127,7 +127,7 @@ fn draw_month(
             };
             draw_text(
                 DEJAVUSANS_MONO,
-                &mut buf.subdimensions((x_pos * 48, (y_off * 32) + 64, 38, 32)),
+                &mut buf.subdimensions((x_pos * 48, (y_off * 32) + 64, 38, 32))?,
                 background_color,
                 &c,
                 32.0,
@@ -186,13 +186,13 @@ impl ModuleImpl for Calendar {
         }
         let mut damage: Vec<(i32, i32, i32, i32)> = Vec::new();
         damage.push(draw_month(
-            &mut buf.subdimensions((0, 0, 384, 344)),
+            &mut buf.subdimensions((0, 0, 384, 344))?,
             background_color,
             &time,
             &t.pred().with_day(1).unwrap(),
         )?);
         damage.push(draw_month(
-            &mut buf.subdimensions((448, 0, 384, 344)),
+            &mut buf.subdimensions((448, 0, 384, 344))?,
             background_color,
             &time,
             &t,
@@ -203,7 +203,7 @@ impl ModuleImpl for Calendar {
             t.with_month(t.month() + 1).unwrap()
         };
         damage.push(draw_month(
-            &mut buf.subdimensions((896, 0, 384, 344)),
+            &mut buf.subdimensions((896, 0, 384, 344))?,
             background_color,
             &time,
             &n,
@@ -237,6 +237,7 @@ impl ModuleImpl for Calendar {
                 self.offset = 0;
                 self.first_draw = true;
             }
+            _ => {}
         }
     }
 }

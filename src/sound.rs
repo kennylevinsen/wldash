@@ -442,14 +442,14 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
         };
         draw_text(
             ROBOTO_REGULAR,
-            &mut buf.subdimensions((0, 0, 128, 24)),
+            &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             24.0,
             "volume",
         )?;
         draw_bar(
-            &mut buf.subdimensions((128, 0, 432, 24)),
+            &mut buf.subdimensions((128, 0, 432, 24))?,
             &c,
             432,
             24,
@@ -461,7 +461,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
             vol -= 1.0;
             iter += 1.0;
             draw_bar(
-                &mut buf.subdimensions((128, 0, 432, 24)),
+                &mut buf.subdimensions((128, 0, 432, 24))?,
                 &c,
                 432,
                 24,
@@ -469,7 +469,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
             )?;
         }
         draw_box(
-            &mut buf.subdimensions((128, 0, 432, 24)),
+            &mut buf.subdimensions((128, 0, 432, 24))?,
             &c,
             (432, 24),
         )?;
@@ -508,6 +508,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
                 }
                 _ => {}
             },
+            _ => {}
         }
     }
 }

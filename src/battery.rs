@@ -157,14 +157,14 @@ impl ModuleImpl for UpowerBattery {
         let inner = self.inner.lock().unwrap();
         draw_text(
             ROBOTO_REGULAR,
-            &mut buf.subdimensions((0, 0, 128, 24)),
+            &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &c,
             24.0,
             "battery",
         )?;
         draw_bar(
-            &mut buf.subdimensions((128, 0, 432, 24)),
+            &mut buf.subdimensions((128, 0, 432, 24))?,
             &c,
             432,
             24,
@@ -172,7 +172,7 @@ impl ModuleImpl for UpowerBattery {
         )?;
 
         draw_box(
-            &mut buf.subdimensions((128, 0, 432, 24)),
+            &mut buf.subdimensions((128, 0, 432, 24))?,
             &c,
             (432, 24),
         )?;

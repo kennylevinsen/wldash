@@ -77,7 +77,6 @@ impl ModuleImpl for Clock {
             || force
         {
             self.cur_time = time.clone();
-            println!("UPDATE");
             Ok(true)
         } else {
             Ok(false)

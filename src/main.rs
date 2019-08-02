@@ -156,11 +156,11 @@ impl App {
 
         let mut vert_off = 0;
         if let Ok(m) = UpowerBattery::new(tx.clone()) {
-            modules.push(Module::new(Box::new(m), (720, vert_off, 512, 32)));
+            modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
             vert_off += 32;
         }
         if let Ok(m) = Backlight::new() {
-            modules.push(Module::new(Box::new(m), (720, vert_off, 512, 32)));
+            modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
             vert_off += 32;
         }
         if let Ok(m) = PulseAudio::new(tx.clone()) {

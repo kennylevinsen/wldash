@@ -4,25 +4,27 @@ A dashboard/launcher/control-panel thing for Wayland.
 
 ## Features
 
-- Date and time
+### Date and time
 
-- 3 month calendar
+In nice, big letters!
+
+### 3 month calendar
 
 Scroll on it to navigate.
 
-- Battery level
+### Battery level
 
 Over upower, only visible if upower battery is detected
 
-- Audio volume
+### Audio volume
 
 Over pulseaudio, only visible if pulseaudio connection is successful. Scroll to adjust volume, right-click to toggle mute.
 
-- Backlight control
+### Backlight control
 
 Using backlight sys file, only visible of backlight is detected. Scroll to adjust, right-click to toggle between the extreme values.
 
-- Launcher
+### Launcher
 
 Works like bemenu: pipe a list into wldash, and it will print out the selection made. Use https://github.com/kennylevinsen/dot-desktop if you want to launch using desktop files.
 

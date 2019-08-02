@@ -36,7 +36,6 @@ use crate::clock::Clock;
 use crate::color::Color;
 use crate::module::{Input, Module};
 use crate::sound::PulseAudio;
-use crate::draw::draw_box;
 
 enum Cmd {
     Exit,

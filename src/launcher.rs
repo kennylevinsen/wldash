@@ -4,6 +4,7 @@ use crate::draw::{draw_text, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::io::Read;
+use std::cmp::Ordering;
 
 use atty::Stream;
 
@@ -132,14 +133,29 @@ impl ModuleImpl for Launcher {
 
     fn update(&mut self, _time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
         if self.dirty || force {
-            self.matches = self
+            let mut m = self
                 .options
                 .iter()
-                .filter(|x| x.to_lowercase().find(&self.cur.to_lowercase()).is_some())
-                .map(|x| x.to_string())
-                .collect();
+                .map(|x| (x.to_lowercase().find(&self.cur.to_lowercase()), x))
+                .filter(|(x, _)| x.is_some())
+                .map(|(x, y)| (x.unwrap(), y.to_string()))
+                .collect::<Vec<(usize, String)>>();
 
-            self.matches.sort();
+            m.sort_by(|(x1, y1), (x2, y2)| {
+                if x1 < x2 {
+                    Ordering::Less
+                } else if x1 > x2 {
+                    Ordering::Greater
+                } else if y1.len() < y2.len() {
+                    Ordering::Less
+                } else if y1.len() > y2.len() {
+                    Ordering::Greater
+                } else {
+                    y1.cmp(y2)
+                }
+            });
+
+            self.matches = m.into_iter().map(|(_, x)| x).collect();
             self.dirty = false;
             Ok(true)
         } else {

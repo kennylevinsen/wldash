@@ -63,7 +63,7 @@ impl ModuleImpl for Clock {
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             256.0,
-            vec![120, 120, 64, 120, 120],
+            &[120, 120, 64, 120, 120],
             &format!("{:02}:{:02}", time.hour(), time.minute()),
         )?;
 

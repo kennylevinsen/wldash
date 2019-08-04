@@ -54,7 +54,7 @@ struct PulseAudioSoundDevice {
     client: Arc<Mutex<PulseAudioClient>>,
     name: Option<String>,
     volume: Option<ChannelVolumes>,
-    volume_avg: u32,
+    volume_avg: f32,
     muted: bool,
 }
 
@@ -313,7 +313,7 @@ impl PulseAudioSoundDevice {
             client: cl,
             name: Some(name.to_string()),
             volume: None,
-            volume_avg: 0,
+            volume_avg: 0.0,
             muted: false,
         }));
         let (tx, rx) = channel();
@@ -335,10 +335,10 @@ impl PulseAudioSoundDevice {
 
     fn update_volume(&mut self, volume: ChannelVolumes) {
         self.volume = Some(volume);
-        self.volume_avg = (volume.avg().0 as f32 / VOLUME_NORM.0 as f32 * 100.0).round() as u32;
+        self.volume_avg = volume.avg().0 as f32 / VOLUME_NORM.0 as f32;
     }
 
-    fn volume(&self) -> u32 {
+    fn volume(&self) -> f32 {
         self.volume_avg
     }
 
@@ -365,7 +365,7 @@ impl PulseAudioSoundDevice {
         };
 
         // apply step to volumes
-        let step = (step * VOLUME_NORM.0 as f32 / 100.0).round() as i32;
+        let step = (step * VOLUME_NORM.0 as f32).round() as i32;
         for vol in volume.values.iter_mut() {
             vol.0 = min(max(0, vol.0 as i32 + step) as u32, VOLUME_MAX.0);
         }
@@ -433,7 +433,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         let s = self.lock().unwrap();
         let muted = s.device.lock().unwrap().muted;
-        let mut vol =(s.device.lock().unwrap().volume() as f32) / 100.0;
+        let mut vol = s.device.lock().unwrap().volume();
         buf.memset(bg);
         let c = if muted {
             Color::new(1.0, 1.0, 0.0, 1.0)
@@ -499,7 +499,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
                     .device
                     .lock()
                     .unwrap()
-                    .set_volume(y as f32 / 8.0)
+                    .set_volume(y as f32 / 800.0)
                     .unwrap();
             }
             Input::Click { pos: _pos, button } => match button {

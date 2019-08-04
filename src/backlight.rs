@@ -51,14 +51,14 @@ impl Backlight {
     pub fn brightness(&self) -> f32 {
         if self.cur_brightness > self.max_brightness {
             // what.
-            return 100.0;
+            return 1.0;
         }
 
-        (self.cur_brightness as f32 / self.max_brightness as f32) * 100.0
+        (self.cur_brightness as f32 / self.max_brightness as f32)
     }
 
     pub fn add(&mut self, diff: f32) -> Result<(), Error> {
-        let inc = ((self.max_brightness as f32) / 100.0 * diff) as i64;
+        let inc = (self.max_brightness as f32 * diff) as i64;
 
         self.cur_brightness = if self.cur_brightness as i64 + inc < 1 {
             1
@@ -116,7 +116,7 @@ impl ModuleImpl for Backlight {
             &c,
             432,
             24,
-            self.brightness() / 100.0,
+            self.brightness(),
         )?;
         draw_box(
             &mut buf.subdimensions((128, 0, 432, 24))?,
@@ -142,7 +142,7 @@ impl ModuleImpl for Backlight {
                 x: _x,
                 y,
             } => {
-                self.add(y as f32 / 8.0).unwrap();
+                self.add(y as f32 / 800.0).unwrap();
                 match self.sync() {
                     Ok(val) => val,
                     Err(err) => {

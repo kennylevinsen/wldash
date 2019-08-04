@@ -187,25 +187,31 @@ impl ModuleImpl for UpowerBattery {
         _time: &DateTime<Local>,
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
-        let c = Color::new(1.0, 1.0, 1.0, 1.0);
+        let text_color = Color::new(1.0, 1.0, 1.0, 1.0);
+        let bar_color = match self.inner.lock().unwrap().state {
+            UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => Color::new(1.0, 1.0, 1.0, 1.0),
+            UpowerBatteryState::Charging | UpowerBatteryState::Full => Color::new(0.5, 1.0, 0.5, 1.0),
+            UpowerBatteryState::NotCharging | UpowerBatteryState::Empty => Color::new(1.0, 0.5, 0.5, 1.0),
+        };
+
         let inner = self.inner.lock().unwrap();
         draw_text(
             ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
-            &c,
+            &text_color,
             24.0,
             "battery",
         )?;
         draw_bar(
             &mut buf.subdimensions((128, 0, 432, 24))?,
-            &c,
+            &bar_color,
             432,
             24,
             (inner.capacity as f32) / 100.0,
         )?;
 
-        draw_box(&mut buf.subdimensions((128, 0, 432, 24))?, &c, (432, 24))?;
+        draw_box(&mut buf.subdimensions((128, 0, 432, 24))?, &bar_color, (432, 24))?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

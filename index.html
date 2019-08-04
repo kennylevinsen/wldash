@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>kl.wtf</title>
+		<style>
+			body {
+				display: grid;
+				justify-items: center;
+				align-items: center;
+			}
+			h1 {
+				font-size: 3em;
+				text-align: center;
+				font-family: monospace;
+			}
+			h2 {
+				text-align: center;
+				font-family: monospace;
+			}
+			section {
+				max-width: 720px;
+			}
+			a {
+				text-decoration: unset;
+				color: rgb(100, 100, 100);
+			}
+			li {
+				list-style-type: '— ';
+			}
+			p {
+				margin-bottom: 2em;
+			}
+			img {
+				width: 100%;
+				border-radius: 10px;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>wldash</h1>
+			<h2>wayland launcher/dashboard</h2>
+		</header>
+		<section>
+			<img src="images/wldash_scaled.jpg" alt="screenshot of wldash" />
+			<p>
+				<a href="https://github.com/kennylevinsen/wldash"><code>wldash</code></a> is a convenient dashboard and launcher, allowing easy access to things like date and time, backlight and volume control.
+			</p>
+			<p>
+				 More modules are added as development continues.
+			</p>
+			<p>
+				To run:
+				<pre><code>
+	git clone https://github.com/kennylevinsen/wldash
+	cd wldash
+	cargo build --release
+	cp ./target/release/wldash /usr/local/bin/
+	wldash
+				</code></pre>
+			</p>
+			<p>
+				To use launcher functionality with <a href="https://github.com/kennylevinsen/dot-desktop"><code>dot-desktop</code></a>:
+				<pre><code>
+	git clone https://github.com/kennylevinsen/dot-desktop
+	cd dot-desktop
+	cargo build --release
+	cp ./target/release/dot-desktop /usr/local/bin/
+
+	eval "$(dot-desktop "$(dot-desktop | wldash)")"
+				</code></pre>
+				This pipes dot-desktop's selections into <code>wldash</code>, gives the selection back to dot-desktop, and finally evaluates it in a shell.
+			<p>
+				<ul>
+					<li>Github link: <a href="https://github.com/kennylevinsen/wldash">https://github.com/kennylevinsen/wldash</a></li>
+					<li>IRC: #wldash @ irc.freenode.net</li>
+				</ul>
+			</p>
+			<p>
+				Donate:
+				<ul>
+					<li><a href="https://en.liberapay.com/kennylevinsen/">LiberaPay</a></li>
+				</ul>
+			</p>
+			<p>
+				© 2019, Kenny Levinsen
+			</p>
+		</section>
+	</body>
+</html>

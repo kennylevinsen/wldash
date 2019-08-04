@@ -73,8 +73,8 @@ fn draw_month(
             3 => "WED",
             4 => "THU",
             5 => "FRI",
-            6 => "SUN",
-            7 => "SAT",
+            6 => "SAT",
+            7 => "SUN",
             _ => panic!("impossible value"),
         };
 

@@ -7,9 +7,8 @@ use std::cmp::Ordering;
 use std::io::Read;
 
 use atty::Stream;
-
 use chrono::{DateTime, Local};
-
+use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
 
 pub struct Launcher {
@@ -70,7 +69,9 @@ impl ModuleImpl for Launcher {
         if self.matches.len() == 0 && self.cur.len() > 0 {
             draw_text(
                 ROBOTO_REGULAR,
-                &mut buf.subdimensions((64, 0, width_remaining as u32, 32)).unwrap(),
+                &mut buf
+                    .subdimensions((64, 0, width_remaining as u32, 32))
+                    .unwrap(),
                 bg,
                 &Color::new(1.0, 0.5, 0.5, 1.0),
                 32.0,
@@ -84,11 +85,11 @@ impl ModuleImpl for Launcher {
                         Err(_) => break,
                     };
                 let size = if idx == self.offset && self.cur.len() > 0 {
-                    let l = self.cur.len();
-                    let off = m.to_lowercase().find(&self.cur.to_lowercase()).unwrap();
+                    let (_, indices) =
+                        fuzzy_indices(&m.to_lowercase(), &self.cur.to_lowercase()).unwrap();
                     let mut colors = Vec::with_capacity(m.len());
                     for pos in 0..m.len() {
-                        if pos >= off && pos < off + l {
+                        if indices.contains(&pos) {
                             colors.push(Color::new(1.0, 1.0, 1.0, 1.0));
                         } else {
                             colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
@@ -123,10 +124,10 @@ impl ModuleImpl for Launcher {
             let mut m = self
                 .options
                 .iter()
-                .map(|x| (x.to_lowercase().find(&self.cur.to_lowercase()), x))
+                .map(|x| (fuzzy_match(&x.to_lowercase(), &self.cur.to_lowercase()), x))
                 .filter(|(x, _)| x.is_some())
                 .map(|(x, y)| (x.unwrap(), y.to_string()))
-                .collect::<Vec<(usize, String)>>();
+                .collect::<Vec<(i64, String)>>();
 
             m.sort_by(|(x1, y1), (x2, y2)| {
                 if x1 < x2 {

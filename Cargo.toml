@@ -17,3 +17,4 @@ wayland-protocols = { version = "0.23", features = ["client", "unstable_protocol
 libpulse-binding = { version = "2.6.0"}
 dbus = "0.6"
 atty = "0.2"
+fuzzy-matcher = "0.2"

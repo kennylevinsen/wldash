@@ -4,6 +4,19 @@ A dashboard/launcher/control-panel thing for Wayland. Requires wlr-layer-shell-u
 
 Consider this alpha-quality: While it works, *everything* is subject to change with a moments notice. You may end up pulling in the latest changes, and *poof*, wldash suddenly turns into an artisan espresso machine.
 
+## How to use
+
+1. Checkout: `git clone https://github.com/kennylevinsen/wldash`
+2. Build: `cargo build --release`
+3. Put somewhere: `cp target/release/wldash /usr/local/bin/wldash`
+4. Run: `wldash`
+
+## How to use launcher
+
+Assuming https://github.com/kennylevinsen/dot-desktop is installed: `eval "$(dot-desktop "$(dot-desktop | wldash)")"`
+
+wldash simply takes a new-line separated list of strings, and returns the selection. dot-desktop generates this list, and afterwards processes the selection to return the proper instantiation string. Eval then executes it.
+
 ## Features
 
 ### Date and time

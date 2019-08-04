@@ -3,6 +3,7 @@ use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
+use std::cmp::max;
 
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
@@ -149,7 +150,10 @@ impl App {
         None
     }
 
-    fn new(dimensions: (u32, u32), tx: Sender<bool>) -> App {
+    fn new(tx: Sender<bool>) -> App {
+        //
+        // Set up modules
+        //
         let mut modules = vec![
             Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 720, 320)),
             Module::new(Box::new(Calendar::new()), (0, 368, 1280, 344)),
@@ -171,6 +175,19 @@ impl App {
         if let Ok(m) = PulseAudio::new(tx.clone()) {
             modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
         }
+
+        //
+        // Calculate window dimensions
+        //
+
+        let mut dimensions = (0, 0);
+        for m in modules.iter() {
+            let b = m.get_bounds();
+            dimensions = (max(dimensions.0, b.0 + b.2), max(dimensions.1, b.1 + b.3));
+        }
+
+        // Add padding
+        dimensions = (dimensions.0 + 40, dimensions.1 + 40);
 
         let cmd_queue = Arc::new(Mutex::new(VecDeque::new()));
 
@@ -412,7 +429,7 @@ fn main() {
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();
     let (tx_draw, rx_draw) = channel();
 
-    let mut app = App::new((1320u32, 848u32), tx_draw);
+    let mut app = App::new(tx_draw);
 
     let worker_queue = app.cmd_queue();
     std::thread::spawn(move || loop {

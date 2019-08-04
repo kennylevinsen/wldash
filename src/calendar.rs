@@ -230,7 +230,10 @@ impl ModuleImpl for Calendar {
                 self.offset += y;
                 self.dirty = true;
             }
-            Input::Click { pos: (x, _), button: _ } => {
+            Input::Click {
+                pos: (x, _),
+                button: _,
+            } => {
                 if x < 448 {
                     self.offset -= 100.0;
                 } else if x >= 896 {

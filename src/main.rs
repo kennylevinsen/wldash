@@ -1,17 +1,17 @@
+use std::cmp::max;
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
-use std::cmp::max;
 
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
 
-use chrono::{Local};
+use chrono::Local;
 
 use smithay_client_toolkit::keyboard::{
-    map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind, KeyState, keysyms,
+    keysyms, map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind, KeyState,
 };
 use smithay_client_toolkit::utils::DoubleMemPool;
 
@@ -22,25 +22,25 @@ use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
 };
 
 mod backlight;
+mod battery;
 mod buffer;
 mod calendar;
 mod clock;
 mod color;
 mod draw;
+mod launcher;
 mod module;
 mod sound;
-mod battery;
-mod launcher;
 
 use crate::backlight::Backlight;
+use crate::battery::UpowerBattery;
 use crate::buffer::Buffer;
 use crate::calendar::Calendar;
 use crate::clock::Clock;
 use crate::color::Color;
+use crate::launcher::Launcher;
 use crate::module::{Input, Module};
 use crate::sound::PulseAudio;
-use crate::battery::UpowerBattery;
-use crate::launcher::Launcher;
 
 enum Cmd {
     Exit,
@@ -257,10 +257,20 @@ impl App {
             &seat,
             KeyRepeatKind::System,
             move |event: KbEvent, _| match event {
-                KbEvent::Key { keysym, utf8, state, .. } => match state {
+                KbEvent::Key {
+                    keysym,
+                    utf8,
+                    state,
+                    ..
+                } => match state {
                     KeyState::Pressed => match keysym {
                         keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
-                        v => kbd_clone.lock().unwrap().push_back(Cmd::KeyboardInput{input: Input::Keypress{ key: v, interpreted: utf8 }}),
+                        v => kbd_clone.lock().unwrap().push_back(Cmd::KeyboardInput {
+                            input: Input::Keypress {
+                                key: v,
+                                interpreted: utf8,
+                            },
+                        }),
                     },
                     _ => (),
                 },
@@ -425,7 +435,6 @@ impl App {
 }
 
 fn main() {
-
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();
     let (tx_draw, rx_draw) = channel();
 

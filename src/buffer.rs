@@ -38,14 +38,21 @@ impl<'a> Buffer<'a> {
         }
     }
 
-    pub fn subdimensions(&mut self, subdimensions: (u32, u32, u32, u32)) -> Result<Buffer, ::std::io::Error> {
+    pub fn subdimensions(
+        &mut self,
+        subdimensions: (u32, u32, u32, u32),
+    ) -> Result<Buffer, ::std::io::Error> {
         let bounds = self.get_bounds();
         if subdimensions.0 + subdimensions.2 > bounds.2
             || subdimensions.1 + subdimensions.3 > bounds.3
         {
-            return Err(::std::io::Error::new(::std::io::ErrorKind::Other, format!("cannot create subdimensions larger than buffer: {:?} > {:?}",
-                subdimensions, bounds
-            )));
+            return Err(::std::io::Error::new(
+                ::std::io::ErrorKind::Other,
+                format!(
+                    "cannot create subdimensions larger than buffer: {:?} > {:?}",
+                    subdimensions, bounds
+                ),
+            ));
         }
 
         Ok(Buffer {
@@ -84,15 +91,24 @@ impl<'a> Buffer<'a> {
     pub fn put(&mut self, pos: (u32, u32), c: &Color) -> Result<(), ::std::io::Error> {
         let true_pos = if let Some(subdim) = self.subdimensions {
             if pos.0 > subdim.2 || pos.1 > subdim.3 {
-                return Err(::std::io::Error::new(::std::io::ErrorKind::Other, format!("put({:?}) is not within subdimensions of buffer ({:?})",
-                    pos, subdim)));
+                return Err(::std::io::Error::new(
+                    ::std::io::ErrorKind::Other,
+                    format!(
+                        "put({:?}) is not within subdimensions of buffer ({:?})",
+                        pos, subdim
+                    ),
+                ));
             }
             (pos.0 + subdim.0, pos.1 + subdim.1)
         } else {
             if pos.0 >= self.dimensions.0 || pos.1 >= self.dimensions.1 {
-                return Err(::std::io::Error::new(::std::io::ErrorKind::Other, format!("put({:?}) is not within dimensions of buffer ({:?})",
-                    pos, self.dimensions
-                )));
+                return Err(::std::io::Error::new(
+                    ::std::io::ErrorKind::Other,
+                    format!(
+                        "put({:?}) is not within dimensions of buffer ({:?})",
+                        pos, self.dimensions
+                    ),
+                ));
             }
             pos
         };

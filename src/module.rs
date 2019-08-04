@@ -7,9 +7,19 @@ use chrono::{DateTime, Local};
 
 #[derive(Clone)]
 pub enum Input {
-    Click { pos: (u32, u32), button: u32 },
-    Scroll { pos: (u32, u32), x: f64, y: f64 },
-    Keypress { key: u32, interpreted: Option<String> },
+    Click {
+        pos: (u32, u32),
+        button: u32,
+    },
+    Scroll {
+        pos: (u32, u32),
+        x: f64,
+        y: f64,
+    },
+    Keypress {
+        key: u32,
+        interpreted: Option<String>,
+    },
 }
 
 impl Input {
@@ -24,7 +34,10 @@ impl Input {
                 x: *x,
                 y: *y,
             },
-            Input::Keypress { key, interpreted } => Input::Keypress { key: *key, interpreted: interpreted.clone() }, 
+            Input::Keypress { key, interpreted } => Input::Keypress {
+                key: *key,
+                interpreted: interpreted.clone(),
+            },
         }
     }
 }

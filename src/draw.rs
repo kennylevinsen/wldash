@@ -166,11 +166,7 @@ pub fn draw_text_fixed_width(
     Ok(())
 }
 
-pub fn draw_box(
-    buf: &mut Buffer,
-    c: &Color,
-    dim: (u32, u32),
-) -> Result<(), ::std::io::Error> {
+pub fn draw_box(buf: &mut Buffer, c: &Color, dim: (u32, u32)) -> Result<(), ::std::io::Error> {
     let mut buf = buf.subdimensions((0, 0, dim.0, dim.1))?;
 
     for x in 0..dim.0 {

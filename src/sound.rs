@@ -1,6 +1,6 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_text, draw_box, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_box, draw_text, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::cell::RefCell;
@@ -258,19 +258,17 @@ impl PulseAudioClient {
     fn sink_info_callback(&mut self, result: ListResult<&SinkInfo>) {
         match result {
             ListResult::End | ListResult::Error => {}
-            ListResult::Item(sink_info) => {
-                match sink_info.name.clone() {
-                    None => {}
-                    Some(name) => {
-                        let info = PulseAudioSinkInfo {
-                            volume: sink_info.volume,
-                            mute: sink_info.mute,
-                        };
-                        self.sinks.insert(name.into(), info);
-                        self.listener.send(true).unwrap();
-                    }
+            ListResult::Item(sink_info) => match sink_info.name.clone() {
+                None => {}
+                Some(name) => {
+                    let info = PulseAudioSinkInfo {
+                        volume: sink_info.volume,
+                        mute: sink_info.mute,
+                    };
+                    self.sinks.insert(name.into(), info);
+                    self.listener.send(true).unwrap();
                 }
-            }
+            },
         }
     }
 
@@ -414,7 +412,7 @@ impl PulseAudio {
             dirty: true,
         }));
         let p = pa.clone();
-        std::thread::spawn(move|| loop {
+        std::thread::spawn(move || loop {
             rx.recv().unwrap();
             d.lock().unwrap().get_info().unwrap();
             p.lock().unwrap().dirty = true;
@@ -448,31 +446,15 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
             24.0,
             "volume",
         )?;
-        draw_bar(
-            &mut buf.subdimensions((128, 0, 432, 24))?,
-            &c,
-            432,
-            24,
-            vol,
-        )?;
+        draw_bar(&mut buf.subdimensions((128, 0, 432, 24))?, &c, 432, 24, vol)?;
         let mut iter = 1.0;
         while vol > 1.0 {
             let c = &Color::new(0.75 / iter, 0.25 / iter, 0.25 / iter, 1.0);
             vol -= 1.0;
             iter += 1.0;
-            draw_bar(
-                &mut buf.subdimensions((128, 0, 432, 24))?,
-                &c,
-                432,
-                24,
-                vol,
-            )?;
+            draw_bar(&mut buf.subdimensions((128, 0, 432, 24))?, &c, 432, 24, vol)?;
         }
-        draw_box(
-            &mut buf.subdimensions((128, 0, 432, 24))?,
-            &c,
-            (432, 24),
-        )?;
+        draw_box(&mut buf.subdimensions((128, 0, 432, 24))?, &c, (432, 24))?;
         Ok(vec![buf.get_signed_bounds()])
     }
 
@@ -493,8 +475,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
                 x: _x,
                 y,
             } => {
-                self
-                    .lock()
+                self.lock()
                     .unwrap()
                     .device
                     .lock()
@@ -504,7 +485,13 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
             }
             Input::Click { pos: _pos, button } => match button {
                 273 => {
-                    self.lock().unwrap().device.lock().unwrap().toggle().unwrap();
+                    self.lock()
+                        .unwrap()
+                        .device
+                        .lock()
+                        .unwrap()
+                        .toggle()
+                        .unwrap();
                 }
                 _ => {}
             },

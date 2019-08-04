@@ -1,6 +1,6 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_text, draw_box, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_box, draw_text, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::fs::OpenOptions;
@@ -118,11 +118,7 @@ impl ModuleImpl for Backlight {
             24,
             self.brightness(),
         )?;
-        draw_box(
-            &mut buf.subdimensions((128, 0, 432, 24))?,
-            &c,
-            (432, 24),
-        )?;
+        draw_box(&mut buf.subdimensions((128, 0, 432, 24))?, &c, (432, 24))?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

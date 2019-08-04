@@ -106,8 +106,8 @@ pub fn draw_text_individual_colors(
                 };
                 let _ = buf.put((x, y), &background_color.blend(&color[x_pos], o));
             });
-            x_pos += 1;
         }
+        x_pos += 1;
     }
 
     Ok((x_max, y_max))

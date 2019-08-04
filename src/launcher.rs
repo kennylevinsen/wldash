@@ -67,40 +67,51 @@ impl ModuleImpl for Launcher {
 
         let mut x_off: i32 = 0;
         let mut width_remaining: i32 = 1280 - 64;
-        for (idx, m) in self.matches.iter().enumerate() {
-            let mut b = match buf.subdimensions((64 + x_off as u32, 0, width_remaining as u32, 32))
-            {
-                Ok(b) => b,
-                Err(_) => break,
-            };
-            let size = if idx == self.offset && self.cur.len() > 0 {
-                let l = self.cur.len();
-                let off = m.to_lowercase().find(&self.cur.to_lowercase()).unwrap();
-                let mut colors = Vec::with_capacity(m.len());
-                for pos in 0..m.len() {
-                    if pos >= off && pos < off + l {
-                        colors.push(Color::new(1.0, 1.0, 1.0, 1.0));
-                    } else {
-                        colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
+        if self.matches.len() == 0 && self.cur.len() > 0 {
+            draw_text(
+                ROBOTO_REGULAR,
+                &mut buf.subdimensions((64, 0, width_remaining as u32, 32)).unwrap(),
+                bg,
+                &Color::new(1.0, 0.5, 0.5, 1.0),
+                32.0,
+                &self.cur,
+            )?;
+        } else {
+            for (idx, m) in self.matches.iter().enumerate() {
+                let mut b =
+                    match buf.subdimensions((64 + x_off as u32, 0, width_remaining as u32, 32)) {
+                        Ok(b) => b,
+                        Err(_) => break,
+                    };
+                let size = if idx == self.offset && self.cur.len() > 0 {
+                    let l = self.cur.len();
+                    let off = m.to_lowercase().find(&self.cur.to_lowercase()).unwrap();
+                    let mut colors = Vec::with_capacity(m.len());
+                    for pos in 0..m.len() {
+                        if pos >= off && pos < off + l {
+                            colors.push(Color::new(1.0, 1.0, 1.0, 1.0));
+                        } else {
+                            colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
+                        }
                     }
+                    draw_text_individual_colors(ROBOTO_REGULAR, &mut b, bg, &colors, 32.0, &m)?
+                } else {
+                    draw_text(
+                        ROBOTO_REGULAR,
+                        &mut b,
+                        bg,
+                        &Color::new(0.5, 0.5, 0.5, 1.0),
+                        32.0,
+                        m,
+                    )?
+                };
+
+                x_off += (size.0 + 8) as i32;
+                width_remaining -= (size.0 + 8) as i32;
+
+                if width_remaining < 0 {
+                    break;
                 }
-                draw_text_individual_colors(ROBOTO_REGULAR, &mut b, bg, &colors, 32.0, &m)?
-            } else {
-                draw_text(
-                    ROBOTO_REGULAR,
-                    &mut b,
-                    bg,
-                    &Color::new(0.5, 0.5, 0.5, 1.0),
-                    32.0,
-                    m,
-                )?
-            };
-
-            x_off += (size.0 + 8) as i32;
-            width_remaining -= (size.0 + 8) as i32;
-
-            if width_remaining < 0 {
-                break;
             }
         }
 
@@ -152,6 +163,9 @@ impl ModuleImpl for Launcher {
                 keysyms::XKB_KEY_Return => {
                     if self.matches.len() > self.offset {
                         println!("{}", self.matches[self.offset]);
+                        std::process::exit(0);
+                    } else {
+                        println!("{}", self.cur);
                         std::process::exit(0);
                     }
                 }

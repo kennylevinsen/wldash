@@ -154,40 +154,33 @@ impl App {
         //
         // Set up modules
         //
-        let mut modules = vec![
-            Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 720, 320)),
-            Module::new(Box::new(Calendar::new()), (0, 368, 1280, 344)),
-        ];
+        let (mod_tx, mod_rx) = channel();
+        std::thread::spawn(move || {
+            let mut modules = vec![
+                Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 720, 320)),
+                Module::new(Box::new(Calendar::new()), (0, 368, 1280, 344)),
+            ];
 
-        if let Ok(m) = Launcher::new() {
-            modules.push(Module::new(Box::new(m), (0, 768, 1280, 32)));
-        }
+            if let Ok(m) = Launcher::new() {
+                modules.push(Module::new(Box::new(m), (0, 768, 1280, 32)));
+            }
 
-        let mut vert_off = 0;
-        if let Ok(m) = UpowerBattery::new(tx.clone()) {
-            modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
-            vert_off += 32;
-        }
-        if let Ok(m) = Backlight::new() {
-            modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
-            vert_off += 32;
-        }
-        if let Ok(m) = PulseAudio::new(tx.clone()) {
-            modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
-        }
+            let mut vert_off = 0;
+            if let Ok(m) = UpowerBattery::new(tx.clone()) {
+                modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
+                vert_off += 32;
+            }
+            if let Ok(m) = Backlight::new() {
+                modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
+                vert_off += 32;
+            }
+            if let Ok(m) = PulseAudio::new(tx.clone()) {
+                modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
+            }
 
-        //
-        // Calculate window dimensions
-        //
+            mod_tx.send(modules).unwrap();
+        });
 
-        let mut dimensions = (0, 0);
-        for m in modules.iter() {
-            let b = m.get_bounds();
-            dimensions = (max(dimensions.0, b.0 + b.2), max(dimensions.1, b.1 + b.3));
-        }
-
-        // Add padding
-        dimensions = (dimensions.0 + 40, dimensions.1 + 40);
 
         let cmd_queue = Arc::new(Mutex::new(VecDeque::new()));
 
@@ -324,6 +317,20 @@ impl App {
                 },
             )
             .unwrap();
+
+        //
+        // Calculate window dimensions
+        //
+        let modules = mod_rx.recv().unwrap();
+
+        let mut dimensions = (0, 0);
+        for m in modules.iter() {
+            let b = m.get_bounds();
+            dimensions = (max(dimensions.0, b.0 + b.2), max(dimensions.1, b.1 + b.3));
+        }
+
+        // Add padding
+        dimensions = (dimensions.0 + 40, dimensions.1 + 40);
 
         shell_surface.set_keyboard_interactivity(1);
         shell_surface.set_size(dimensions.0, dimensions.1);

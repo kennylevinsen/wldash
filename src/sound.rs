@@ -399,39 +399,37 @@ impl PulseAudioSoundDevice {
 
 pub struct PulseAudio {
     device: Arc<Mutex<PulseAudioSoundDevice>>,
-    dirty: bool,
+    dirty: Arc<Mutex<bool>>,
 }
 
 impl PulseAudio {
-    pub fn new(listener: Sender<bool>) -> Result<Arc<Mutex<PulseAudio>>, ::std::io::Error> {
+    pub fn new(listener: Sender<bool>) -> Result<PulseAudio, ::std::io::Error> {
         let (tx, rx) = channel();
-        let device = PulseAudioSoundDevice::new(tx)?;
-        let d = device.clone();
-        let pa = Arc::new(Mutex::new(PulseAudio {
-            device: device,
-            dirty: true,
-        }));
-        let p = pa.clone();
+        let pa = PulseAudio {
+            device: PulseAudioSoundDevice::new(tx)?,
+            dirty: Arc::new(Mutex::new(true)),
+        };
+        let device = pa.device.clone();
+        let dirty = pa.dirty.clone();
         std::thread::spawn(move || loop {
             rx.recv().unwrap();
-            d.lock().unwrap().get_info().unwrap();
-            p.lock().unwrap().dirty = true;
+            device.lock().unwrap().get_info().unwrap();
+            *(dirty.lock().unwrap()) = true;
             listener.send(true).unwrap();
         });
         Ok(pa)
     }
 }
 
-impl ModuleImpl for Arc<Mutex<PulseAudio>> {
+impl ModuleImpl for PulseAudio {
     fn draw(
         &self,
         buf: &mut Buffer,
         bg: &Color,
         _time: &DateTime<Local>,
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
-        let s = self.lock().unwrap();
-        let muted = s.device.lock().unwrap().muted;
-        let mut vol = s.device.lock().unwrap().volume();
+        let muted = self.device.lock().unwrap().muted;
+        let mut vol = self.device.lock().unwrap().volume();
         buf.memset(bg);
         let c = if muted {
             Color::new(1.0, 1.0, 0.0, 1.0)
@@ -459,9 +457,9 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
     }
 
     fn update(&mut self, _time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
-        let mut s = self.lock().unwrap();
-        if s.dirty || force {
-            s.dirty = false;
+        let mut d = self.dirty.lock().unwrap();
+        if *d || force {
+            *d = false;
             Ok(true)
         } else {
             Ok(false)
@@ -475,9 +473,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
                 x: _x,
                 y,
             } => {
-                self.lock()
-                    .unwrap()
-                    .device
+                self.device
                     .lock()
                     .unwrap()
                     .set_volume(y as f32 / 800.0)
@@ -485,9 +481,7 @@ impl ModuleImpl for Arc<Mutex<PulseAudio>> {
             }
             Input::Click { pos: _pos, button } => match button {
                 273 => {
-                    self.lock()
-                        .unwrap()
-                        .device
+                    self.device
                         .lock()
                         .unwrap()
                         .toggle()

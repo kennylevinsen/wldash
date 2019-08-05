@@ -54,12 +54,12 @@ pub trait ModuleImpl {
 }
 
 pub struct Module {
-    m: Arc<Mutex<Box<dyn ModuleImpl>>>,
+    m: Arc<Mutex<Box<dyn ModuleImpl + Send>>>,
     pos: (u32, u32, u32, u32),
 }
 
 impl Module {
-    pub fn new(m: Box<dyn ModuleImpl>, pos: (u32, u32, u32, u32)) -> Module {
+    pub fn new(m: Box<dyn ModuleImpl + Send>, pos: (u32, u32, u32, u32)) -> Module {
         Module {
             m: Arc::new(Mutex::new(m)),
             pos: pos,

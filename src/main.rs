@@ -44,7 +44,6 @@ use crate::sound::PulseAudio;
 
 enum Cmd {
     Exit,
-    Configure,
     Draw,
     MouseInput { pos: (u32, u32), input: Input },
     KeyboardInput { input: Input },
@@ -272,7 +271,6 @@ impl App {
             |_, _| {},
         )
         .expect("Failed to map keyboard");
-        event_queue.sync_roundtrip().unwrap();
 
         //
         // Prepare shell so that we can create our shell surface
@@ -292,7 +290,6 @@ impl App {
             .create_surface(NewProxy::implement_dummy)
             .unwrap();
 
-        let event_clone = cmd_queue.clone();
         let shell_surface = shell
             .get_layer_surface(
                 &surface,
@@ -302,14 +299,7 @@ impl App {
                 move |layer| {
                     layer.implement_closure(
                         move |evt, layer| match evt {
-                            zwlr_layer_surface_v1::Event::Configure {
-                                serial,
-                                width: _,
-                                height: _,
-                            } => {
-                                layer.ack_configure(serial);
-                                event_clone.lock().unwrap().push_back(Cmd::Configure);
-                            }
+                            zwlr_layer_surface_v1::Event::Configure { serial, .. } => layer.ack_configure(serial),
                             _ => unreachable!(),
                         },
                         (),
@@ -350,40 +340,35 @@ impl App {
             ptr.implement_closure(
                 move |evt, _| match evt {
                     wl_pointer::Event::Enter {
-                        serial: _,
-                        surface: _,
                         surface_x,
                         surface_y,
+                        ..
                     } => {
                         pos = (surface_x as u32, surface_y as u32);
                     }
-                    wl_pointer::Event::Leave {
-                        serial: _,
-                        surface: _,
-                    } => {
+                    wl_pointer::Event::Leave { .. } => {
                         pos = (0, 0);
                     }
                     wl_pointer::Event::Motion {
-                        time: _,
                         surface_x,
                         surface_y,
+                        ..
                     } => {
                         pos = (surface_x as u32, surface_y as u32);
                     }
                     wl_pointer::Event::Axis {
-                        time: _,
                         axis,
                         value,
+                        ..
                     } => {
                         if axis == wl_pointer::Axis::VerticalScroll {
                             vert_scroll += value;
                         }
                     }
                     wl_pointer::Event::Button {
-                        serial: _,
-                        time: _,
                         button,
                         state,
+                        ..
                     } => match state {
                         wl_pointer::ButtonState::Released => {
                             btn = button;
@@ -427,7 +412,7 @@ impl App {
         })
         .unwrap();
 
-        event_queue.sync_roundtrip().unwrap();
+        display.flush().unwrap();
 
         App {
             surface: surface,
@@ -446,6 +431,7 @@ fn main() {
     let (tx_draw, rx_draw) = channel();
 
     let mut app = App::new(tx_draw);
+    app.wipe();
 
     let worker_queue = app.cmd_queue();
     std::thread::spawn(move || loop {
@@ -459,16 +445,13 @@ fn main() {
         PollFd::new(rx_pipe.as_raw_fd(), PollFlags::POLLIN),
     ];
 
+    app.cmd_queue().lock().unwrap().push_back(Cmd::Draw);
+
     let q = app.cmd_queue();
     loop {
         let cmd = q.lock().unwrap().pop_front();
         match cmd {
             Some(cmd) => match cmd {
-                Cmd::Configure => {
-                    app.wipe();
-                    app.redraw(true).expect("Failed to draw");
-                    app.flush_display();
-                }
                 Cmd::Draw => {
                     app.redraw(false).expect("Failed to draw");
                     app.flush_display();

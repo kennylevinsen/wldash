@@ -9,6 +9,7 @@ use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 
 pub struct Clock {
     cur_time: DateTime<Local>,
+    first_draw: bool,
 }
 
 impl Clock {
@@ -29,6 +30,7 @@ impl Clock {
 
         Clock {
             cur_time: Local::now(),
+            first_draw: true,
         }
     }
 }
@@ -74,9 +76,10 @@ impl ModuleImpl for Clock {
         if time.date() != self.cur_time.date()
             || time.hour() != self.cur_time.hour()
             || time.minute() != self.cur_time.minute()
-            || force
+            || force || self.first_draw
         {
             self.cur_time = time.clone();
+            self.first_draw = false;
             Ok(true)
         } else {
             Ok(false)

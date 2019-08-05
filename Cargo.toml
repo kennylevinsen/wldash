@@ -18,3 +18,4 @@ libpulse-binding = { version = "2.6.0"}
 dbus = "0.6"
 atty = "0.2"
 fuzzy-matcher = "0.2"
+lazy_static = "1.3.0"

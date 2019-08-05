@@ -17,8 +17,6 @@ fn draw_month(
     orig: &Date<Local>,
     time: &Date<Local>,
 ) -> Result<(i32, i32, i32, i32), ::std::io::Error> {
-    buf.memset(background_color);
-
     let mut time = time.clone();
     let mut y_off = 1;
     let mut done = false;
@@ -43,7 +41,7 @@ fn draw_month(
     // Draw the of the month
     //
     draw_text(
-        ROBOTO_REGULAR,
+        &ROBOTO_REGULAR,
         &mut buf.subdimensions((0, 0, 304, 72))?,
         background_color,
         &Color::new(1.0, 1.0, 1.0, 1.0),
@@ -53,7 +51,7 @@ fn draw_month(
 
     if time.year() != orig.year() {
         draw_text(
-            ROBOTO_REGULAR,
+            &ROBOTO_REGULAR,
             &mut buf.subdimensions((320, 0, 64, 32))?,
             background_color,
             &Color::new(0.8, 0.8, 0.8, 1.0),
@@ -79,7 +77,7 @@ fn draw_month(
         };
 
         draw_text(
-            DEJAVUSANS_MONO,
+            &DEJAVUSANS_MONO,
             &mut buf.subdimensions((idx * 48 + 4, (y_off * 32) + 64, 32, 16))?,
             background_color,
             &Color::new(1.0, 1.0, 1.0, 1.0),
@@ -107,7 +105,7 @@ fn draw_month(
         //
         let wk = time.iso_week();
         draw_text(
-            DEJAVUSANS_MONO,
+            &DEJAVUSANS_MONO,
             &mut buf.subdimensions((0 * 48, (y_off * 32) + 64, 38, 32))?,
             background_color,
             &Color::new(0.75, 0.75, 0.75, 1.0),
@@ -126,7 +124,7 @@ fn draw_month(
                 Color::new(0.5, 0.5, 0.5, 1.0)
             };
             draw_text(
-                DEJAVUSANS_MONO,
+                &DEJAVUSANS_MONO,
                 &mut buf.subdimensions((x_pos * 48, (y_off * 32) + 64, 38, 32))?,
                 background_color,
                 &c,
@@ -165,6 +163,7 @@ impl ModuleImpl for Calendar {
         background_color: &Color,
         time: &DateTime<Local>,
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
+        buf.memset(background_color);
         let time = time.date();
         let mut t = time.with_day(1).unwrap();
         let o = (self.offset / 100.0) as i32;
@@ -185,31 +184,30 @@ impl ModuleImpl for Calendar {
                 .with_month((month + 1) as u32)
                 .unwrap();
         }
-        let mut damage: Vec<(i32, i32, i32, i32)> = Vec::new();
-        damage.push(draw_month(
+        draw_month(
             &mut buf.subdimensions((0, 0, 384, 344))?,
             background_color,
             &time,
             &t.pred().with_day(1).unwrap(),
-        )?);
-        damage.push(draw_month(
+        )?;
+        draw_month(
             &mut buf.subdimensions((448, 0, 384, 344))?,
             background_color,
             &time,
             &t,
-        )?);
+        )?;
         let n = if t.month() == 12 {
             t.with_year(t.year() + 1).unwrap().with_month(1).unwrap()
         } else {
             t.with_month(t.month() + 1).unwrap()
         };
-        damage.push(draw_month(
+        draw_month(
             &mut buf.subdimensions((896, 0, 384, 344))?,
             background_color,
             &time,
             &n,
-        )?);
-        Ok(damage)
+        )?;
+        Ok(vec![buf.get_signed_bounds()])
     }
 
     fn update(&mut self, time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {

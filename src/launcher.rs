@@ -56,7 +56,7 @@ impl ModuleImpl for Launcher {
         buf.memset(bg);
 
         draw_text(
-            ROBOTO_REGULAR,
+            &ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 32))?,
             bg,
             &Color::new(0.75, 0.75, 0.75, 1.0),
@@ -68,7 +68,7 @@ impl ModuleImpl for Launcher {
         let mut width_remaining: i32 = 1280 - 64;
         if self.matches.len() == 0 && self.cur.len() > 0 {
             draw_text(
-                ROBOTO_REGULAR,
+                &ROBOTO_REGULAR,
                 &mut buf
                     .subdimensions((64, 0, width_remaining as u32, 32))
                     .unwrap(),
@@ -95,10 +95,10 @@ impl ModuleImpl for Launcher {
                             colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
                         }
                     }
-                    draw_text_individual_colors(ROBOTO_REGULAR, &mut b, bg, &colors, 32.0, &m)?
+                    draw_text_individual_colors(&ROBOTO_REGULAR, &mut b, bg, &colors, 32.0, &m)?
                 } else {
                     draw_text(
-                        ROBOTO_REGULAR,
+                        &ROBOTO_REGULAR,
                         &mut b,
                         bg,
                         &Color::new(0.5, 0.5, 0.5, 1.0),

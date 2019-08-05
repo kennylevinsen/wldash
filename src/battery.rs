@@ -196,7 +196,7 @@ impl ModuleImpl for UpowerBattery {
 
         let inner = self.inner.lock().unwrap();
         draw_text(
-            ROBOTO_REGULAR,
+            &ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &text_color,

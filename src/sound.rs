@@ -437,7 +437,7 @@ impl ModuleImpl for PulseAudio {
             Color::new(1.0, 1.0, 1.0, 1.0)
         };
         draw_text(
-            ROBOTO_REGULAR,
+            &ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),

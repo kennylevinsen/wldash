@@ -104,7 +104,7 @@ impl ModuleImpl for Backlight {
         buf.memset(bg);
         let c = Color::new(1.0, 1.0, 1.0, 1.0);
         draw_text(
-            ROBOTO_REGULAR,
+            &ROBOTO_REGULAR,
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &c,

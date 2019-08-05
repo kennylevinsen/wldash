@@ -1,28 +1,30 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
 use rusttype::{point, Font, Scale};
+use lazy_static::lazy_static;
 
-pub static DEJAVUSANS_MONO: &'static [u8] = include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
-pub static ROBOTO_REGULAR: &'static [u8] = include_bytes!("../fonts/Roboto-Regular.ttf");
+pub static DEJAVUSANS_MONO_FONT_DATA: &'static [u8] = include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
+pub static ROBOTO_REGULAR_FONT_DATA: &'static [u8] = include_bytes!("../fonts/Roboto-Regular.ttf");
+
+lazy_static! {
+    pub static ref DEJAVUSANS_MONO: Font<'static> = Font::from_bytes(DEJAVUSANS_MONO_FONT_DATA as &[u8]).expect("error constructing DejaVuSansMono");
+    pub static ref ROBOTO_REGULAR: Font<'static> = Font::from_bytes(ROBOTO_REGULAR_FONT_DATA as &[u8]).expect("error constructing Roboto-Regular");
+}
 
 pub fn draw_text(
-    font_data: &'static [u8],
+    font: &Font,
     buf: &mut Buffer,
     background_color: &Color,
     color: &Color,
     size: f32,
     s: &str,
 ) -> Result<(u32, u32), ::std::io::Error> {
-    // Load the font
-    // This only succeeds if collection consists of one font
-    let font = Font::from_bytes(font_data as &[u8]).expect("Error constructing Font");
 
     // The font size to use
     let scale = Scale::uniform(size);
 
     let v_metrics = font.v_metrics(scale);
 
-    // layout the glyphs in a line with 20 pixels padding
     let glyphs: Vec<_> = font
         .layout(s, scale, point(0.0, v_metrics.ascent))
         .collect();
@@ -59,23 +61,19 @@ pub fn draw_text(
 }
 
 pub fn draw_text_individual_colors(
-    font_data: &'static [u8],
+    font: &Font,
     buf: &mut Buffer,
     background_color: &Color,
     color: &[Color],
     size: f32,
     s: &str,
 ) -> Result<(u32, u32), ::std::io::Error> {
-    // Load the font
-    // This only succeeds if collection consists of one font
-    let font = Font::from_bytes(font_data as &[u8]).expect("Error constructing Font");
 
     // The font size to use
     let scale = Scale::uniform(size);
 
     let v_metrics = font.v_metrics(scale);
 
-    // layout the glyphs in a line with 20 pixels padding
     let glyphs: Vec<_> = font
         .layout(s, scale, point(0.0, v_metrics.ascent))
         .collect();
@@ -114,7 +112,7 @@ pub fn draw_text_individual_colors(
 }
 
 pub fn draw_text_fixed_width(
-    font_data: &'static [u8],
+    font: &Font,
     buf: &mut Buffer,
     background_color: &Color,
     color: &Color,
@@ -122,16 +120,12 @@ pub fn draw_text_fixed_width(
     distances: &[u32],
     s: &str,
 ) -> Result<(), ::std::io::Error> {
-    // Load the font
-    // This only succeeds if collection consists of one font
-    let font = Font::from_bytes(font_data as &[u8]).expect("Error constructing Font");
 
     // The font size to use
     let scale = Scale::uniform(size);
 
     let v_metrics = font.v_metrics(scale);
 
-    // layout the glyphs in a line with 20 pixels padding
     let glyphs: Vec<_> = font
         .layout(s, scale, point(0.0, v_metrics.ascent))
         .collect();

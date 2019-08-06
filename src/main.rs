@@ -11,7 +11,7 @@ use os_pipe::pipe;
 use chrono::Local;
 
 use smithay_client_toolkit::keyboard::{
-    keysyms, map_keyboard_auto_with_repeat, Event as KbEvent, KeyRepeatKind, KeyState,
+    keysyms, map_keyboard_auto, Event as KbEvent, KeyState,
 };
 use smithay_client_toolkit::utils::DoubleMemPool;
 
@@ -244,9 +244,8 @@ impl App {
         // Keyboard processing
         //
         let kbd_clone = cmd_queue.clone();
-        map_keyboard_auto_with_repeat(
+        map_keyboard_auto(
             &seat,
-            KeyRepeatKind::System,
             move |event: KbEvent, _| match event {
                 KbEvent::Key {
                     keysym,
@@ -267,7 +266,6 @@ impl App {
                 },
                 _ => (),
             },
-            |_, _| {},
         )
         .expect("Failed to map keyboard");
 

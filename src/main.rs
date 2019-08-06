@@ -4,7 +4,6 @@ use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;

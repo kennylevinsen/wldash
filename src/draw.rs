@@ -57,7 +57,7 @@ impl CachedGlyph {
         let mut x = 0;
         let mut y = 0;
         for v in &self.render {
-            buf.put(((x + pos.0 + self.origin.0) as u32, (y + pos.1 + self.origin.1) as u32), &bg.blend(&c, *v)).unwrap();
+            let _ = buf.put(((x + pos.0 + self.origin.0) as u32, (y + pos.1 + self.origin.1) as u32), &bg.blend(&c, *v));
 
             if x == self.dimensions.0 as i32 -1 {
                 y += 1;

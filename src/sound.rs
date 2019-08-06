@@ -446,15 +446,15 @@ impl ModuleImpl for PulseAudio {
             &Color::new(1.0, 1.0, 1.0, 1.0),
             "volume",
         )?;
-        draw_bar(&mut buf.subdimensions((128, 0, 432, 24))?, &c, 432, 24, vol)?;
+        draw_bar(&mut buf.subdimensions((128, 0, 464, 24))?, &c, 464, 24, vol)?;
         let mut iter = 1.0;
         while vol > 1.0 {
             let c = &Color::new(0.75 / iter, 0.25 / iter, 0.25 / iter, 1.0);
             vol -= 1.0;
             iter += 1.0;
-            draw_bar(&mut buf.subdimensions((128, 0, 432, 24))?, &c, 432, 24, vol)?;
+            draw_bar(&mut buf.subdimensions((128, 0, 464, 24))?, &c, 464, 24, vol)?;
         }
-        draw_box(&mut buf.subdimensions((128, 0, 432, 24))?, &c, (432, 24))?;
+        draw_box(&mut buf.subdimensions((128, 0, 464, 24))?, &c, (464, 24))?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

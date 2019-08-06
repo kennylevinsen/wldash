@@ -114,13 +114,13 @@ impl ModuleImpl for Backlight {
             "backlight",
         )?;
         draw_bar(
-            &mut buf.subdimensions((128, 0, 432, 24))?,
+            &mut buf.subdimensions((128, 0, 464, 24))?,
             &c,
-            432,
+            464,
             24,
             self.brightness(),
         )?;
-        draw_box(&mut buf.subdimensions((128, 0, 432, 24))?, &c, (432, 24))?;
+        draw_box(&mut buf.subdimensions((128, 0, 464, 24))?, &c, (464, 24))?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

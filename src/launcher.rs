@@ -66,7 +66,7 @@ impl ModuleImpl for Launcher {
         )?;
 
         let mut x_off: i32 = 0;
-        let mut width_remaining: i32 = 1280 - 64;
+        let mut width_remaining: i32 = 1232 - 64;
         if self.matches.len() == 0 && self.cur.len() > 0 {
             self.font.borrow_mut().auto_draw_text(
                 &mut buf

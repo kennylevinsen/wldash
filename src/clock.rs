@@ -55,7 +55,7 @@ impl ModuleImpl for Clock {
         buf.memset(bg);
 
         self.date_cache.draw_text(
-            &mut buf.subdimensions((0, 0, 448, 64))?,
+            &mut buf.subdimensions((0, 0, 240 * 2 + 56, 64))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             &format!(
@@ -68,10 +68,10 @@ impl ModuleImpl for Clock {
         )?;
 
         self.clock_cache.draw_text_fixed_width(
-            &mut buf.subdimensions((0, 64, 288 * 2 + 64, 256))?,
+            &mut buf.subdimensions((0, 64, 240 * 2 + 56, 256))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
-            &[120, 120, 64, 120, 120],
+            &[120, 120, 56, 120, 120],
             &format!("{:02}:{:02}", time.hour(), time.minute()),
         )?;
 

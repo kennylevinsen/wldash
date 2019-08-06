@@ -79,7 +79,7 @@ impl Calendar {
             };
 
             self.day_cache.draw_text(
-                &mut buf.subdimensions((idx * 48 + 4, (y_off * 32) + 64, 32, 16))?,
+                &mut buf.subdimensions((idx * 48 + 4, (y_off * 32) + 64, 24, 16))?,
                 background_color,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &wk_chr,
@@ -105,7 +105,7 @@ impl Calendar {
             //
             let wk = time.iso_week();
             self.calendar_cache.draw_text(
-                &mut buf.subdimensions((0 * 48, (y_off * 32) + 64, 38, 32))?,
+                &mut buf.subdimensions((0 * 48, (y_off * 32) + 64, 32, 32))?,
                 background_color,
                 &Color::new(0.75, 0.75, 0.75, 1.0),
                 &format!("{:02}", wk.week()),
@@ -123,11 +123,12 @@ impl Calendar {
                 };
 
                 self.calendar_cache.draw_text(
-                    &mut buf.subdimensions((x_pos * 48, (y_off * 32) + 64, 38, 32))?,
+                    &mut buf.subdimensions((x_pos * 48, (y_off * 32) + 64, 32, 32))?,
                     background_color,
                     &c,
                     &format!("{:02}", time.day()),
                 )?;
+
                 let t = time.with_day(time.day() + 1);
                 if t.is_none() {
                     done = true;
@@ -139,7 +140,6 @@ impl Calendar {
 
             y_off += 1;
         }
-
         Ok(buf.get_signed_bounds())
     }
 }
@@ -195,13 +195,13 @@ impl ModuleImpl for Calendar {
                 .unwrap();
         }
         self.draw_month(
-            &mut buf.subdimensions((0, 0, 384, 344))?,
+            &mut buf.subdimensions((0, 0, 368, 320))?,
             background_color,
             &time,
             &t.pred().with_day(1).unwrap(),
         )?;
         self.draw_month(
-            &mut buf.subdimensions((448, 0, 384, 344))?,
+            &mut buf.subdimensions((432, 0, 368, 320))?,
             background_color,
             &time,
             &t,
@@ -212,7 +212,7 @@ impl ModuleImpl for Calendar {
             t.with_month(t.month() + 1).unwrap()
         };
         self.draw_month(
-            &mut buf.subdimensions((896, 0, 384, 344))?,
+            &mut buf.subdimensions((864, 0, 368, 320))?,
             background_color,
             &time,
             &n,

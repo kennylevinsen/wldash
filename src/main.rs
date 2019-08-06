@@ -154,25 +154,25 @@ impl App {
         let (mod_tx, mod_rx) = channel();
         std::thread::spawn(move || {
             let mut modules = vec![
-                Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 720, 320)),
-                Module::new(Box::new(Calendar::new()), (0, 368, 1280, 344)),
+                Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 536, 320)),
+                Module::new(Box::new(Calendar::new()), (0, 368, 1232, 344)),
             ];
 
             if let Ok(m) = Launcher::new() {
-                modules.push(Module::new(Box::new(m), (0, 768, 1280, 32)));
+                modules.push(Module::new(Box::new(m), (0, 728, 1232, 32)));
             }
 
             let mut vert_off = 0;
             if let Ok(m) = UpowerBattery::new(tx.clone()) {
-                modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
+                modules.push(Module::new(Box::new(m), (640, vert_off, 592, 32)));
                 vert_off += 32;
             }
             if let Ok(m) = Backlight::new() {
-                modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
+                modules.push(Module::new(Box::new(m), (640, vert_off, 592, 32)));
                 vert_off += 32;
             }
             if let Ok(m) = PulseAudio::new(tx.clone()) {
-                modules.push(Module::new(Box::new(m), (720, vert_off, 560, 32)));
+                modules.push(Module::new(Box::new(m), (640, vert_off, 592, 32)));
             }
 
             mod_tx.send(modules).unwrap();

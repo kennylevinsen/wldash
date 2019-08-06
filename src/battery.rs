@@ -3,10 +3,10 @@ use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
+use std::cell::RefCell;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::cell::RefCell;
 
 use chrono::{DateTime, Local};
 use dbus;
@@ -192,9 +192,15 @@ impl ModuleImpl for UpowerBattery {
         buf.memset(bg);
         let text_color = Color::new(1.0, 1.0, 1.0, 1.0);
         let bar_color = match self.inner.lock().unwrap().state {
-            UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => Color::new(1.0, 1.0, 1.0, 1.0),
-            UpowerBatteryState::Charging | UpowerBatteryState::Full => Color::new(0.5, 1.0, 0.5, 1.0),
-            UpowerBatteryState::NotCharging | UpowerBatteryState::Empty => Color::new(1.0, 0.5, 0.5, 1.0),
+            UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => {
+                Color::new(1.0, 1.0, 1.0, 1.0)
+            }
+            UpowerBatteryState::Charging | UpowerBatteryState::Full => {
+                Color::new(0.5, 1.0, 0.5, 1.0)
+            }
+            UpowerBatteryState::NotCharging | UpowerBatteryState::Empty => {
+                Color::new(1.0, 0.5, 0.5, 1.0)
+            }
         };
 
         let inner = self.inner.lock().unwrap();
@@ -212,7 +218,11 @@ impl ModuleImpl for UpowerBattery {
             (inner.capacity as f32) / 100.0,
         )?;
 
-        draw_box(&mut buf.subdimensions((128, 0, 432, 24))?, &bar_color, (432, 24))?;
+        draw_box(
+            &mut buf.subdimensions((128, 0, 432, 24))?,
+            &bar_color,
+            (432, 24),
+        )?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

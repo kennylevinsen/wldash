@@ -77,7 +77,8 @@ impl ModuleImpl for Clock {
         if time.date() != self.cur_time.date()
             || time.hour() != self.cur_time.hour()
             || time.minute() != self.cur_time.minute()
-            || force || self.first_draw
+            || force
+            || self.first_draw
         {
             self.cur_time = time.clone();
             self.first_draw = false;

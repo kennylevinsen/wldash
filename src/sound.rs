@@ -481,11 +481,7 @@ impl ModuleImpl for PulseAudio {
             }
             Input::Click { pos: _pos, button } => match button {
                 273 => {
-                    self.device
-                        .lock()
-                        .unwrap()
-                        .toggle()
-                        .unwrap();
+                    self.device.lock().unwrap().toggle().unwrap();
                 }
                 _ => {}
             },

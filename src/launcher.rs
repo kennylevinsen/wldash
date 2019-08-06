@@ -3,9 +3,9 @@ use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
+use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::io::Read;
-use std::cell::RefCell;
 
 use atty::Stream;
 use chrono::{DateTime, Local};
@@ -94,7 +94,9 @@ impl ModuleImpl for Launcher {
                             colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
                         }
                     }
-                    self.font.borrow_mut().draw_text_individual_colors(&mut b, bg, &colors, &m)?
+                    self.font
+                        .borrow_mut()
+                        .draw_text_individual_colors(&mut b, bg, &colors, &m)?
                 } else {
                     self.font.borrow_mut().draw_text(
                         &mut b,

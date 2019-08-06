@@ -3,11 +3,11 @@ use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
+use std::cell::RefCell;
 use std::fs::OpenOptions;
 use std::io::{Error, ErrorKind};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::cell::RefCell;
 
 use chrono::{DateTime, Local};
 

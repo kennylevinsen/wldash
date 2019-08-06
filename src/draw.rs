@@ -3,15 +3,20 @@ use crate::color::Color;
 
 use std::collections::HashMap;
 
-use rusttype::{point, Font as RustFont, Scale};
 use lazy_static::lazy_static;
+use rusttype::{point, Font as RustFont, Scale};
 
-pub static DEJAVUSANS_MONO_FONT_DATA: &'static [u8] = include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
+pub static DEJAVUSANS_MONO_FONT_DATA: &'static [u8] =
+    include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
 pub static ROBOTO_REGULAR_FONT_DATA: &'static [u8] = include_bytes!("../fonts/Roboto-Regular.ttf");
 
 lazy_static! {
-    pub static ref DEJAVUSANS_MONO: RustFont<'static> = RustFont::from_bytes(DEJAVUSANS_MONO_FONT_DATA as &[u8]).expect("error constructing DejaVuSansMono");
-    pub static ref ROBOTO_REGULAR: RustFont<'static> = RustFont::from_bytes(ROBOTO_REGULAR_FONT_DATA as &[u8]).expect("error constructing Roboto-Regular");
+    pub static ref DEJAVUSANS_MONO: RustFont<'static> =
+        RustFont::from_bytes(DEJAVUSANS_MONO_FONT_DATA as &[u8])
+            .expect("error constructing DejaVuSansMono");
+    pub static ref ROBOTO_REGULAR: RustFont<'static> =
+        RustFont::from_bytes(ROBOTO_REGULAR_FONT_DATA as &[u8])
+            .expect("error constructing Roboto-Regular");
 }
 
 struct CachedGlyph {
@@ -29,25 +34,27 @@ impl CachedGlyph {
             .scaled(scale)
             .positioned(point(0.0, v_metrics.ascent));
 
-
         if let Some(bounding_box) = glyph.pixel_bounding_box() {
             let origin = (bounding_box.min.x, bounding_box.min.y);
 
-            let dimensions = ((bounding_box.max.x - bounding_box.min.x) as u32, (bounding_box.max.y - bounding_box.min.y) as u32);
+            let dimensions = (
+                (bounding_box.max.x - bounding_box.min.x) as u32,
+                (bounding_box.max.y - bounding_box.min.y) as u32,
+            );
             let mut render = vec![0.0; (dimensions.0 * dimensions.1) as usize];
             glyph.draw(|x, y, o| {
                 let pos = x + (y * dimensions.0);
                 render[pos as usize] = o;
             });
-            CachedGlyph{
+            CachedGlyph {
                 origin: origin,
                 dimensions: dimensions,
                 render: render,
             }
         } else {
-            CachedGlyph{
-                origin: (0,0),
-                dimensions: ((size/4.0) as u32, 0),
+            CachedGlyph {
+                origin: (0, 0),
+                dimensions: ((size / 4.0) as u32, 0),
                 render: Vec::new(),
             }
         }
@@ -57,16 +64,21 @@ impl CachedGlyph {
         let mut x = 0;
         let mut y = 0;
         for v in &self.render {
-            let _ = buf.put(((x + pos.0 + self.origin.0) as u32, (y + pos.1 + self.origin.1) as u32), &bg.blend(&c, *v));
+            let _ = buf.put(
+                (
+                    (x + pos.0 + self.origin.0) as u32,
+                    (y + pos.1 + self.origin.1) as u32,
+                ),
+                &bg.blend(&c, *v),
+            );
 
-            if x == self.dimensions.0 as i32 -1 {
+            if x == self.dimensions.0 as i32 - 1 {
                 y += 1;
                 x = 0;
             } else {
                 x += 1;
             }
         }
-
     }
 }
 
@@ -78,14 +90,20 @@ pub struct Font {
 
 impl Font {
     pub fn new(font: &'static RustFont, size: f32) -> Font {
-        Font{
+        Font {
             glyphs: HashMap::new(),
             font: font,
             size: size,
         }
     }
 
-    pub fn draw_text(&mut self, buf: &mut Buffer, bg: &Color, c: &Color, s: &str) -> Result<(u32, u32), ::std::io::Error> {
+    pub fn draw_text(
+        &mut self,
+        buf: &mut Buffer,
+        bg: &Color,
+        c: &Color,
+        s: &str,
+    ) -> Result<(u32, u32), ::std::io::Error> {
         let mut x_off = 0;
         let mut off = 0;
         for ch in s.chars() {
@@ -110,7 +128,14 @@ impl Font {
         Ok((x_off as u32, self.size as u32))
     }
 
-    pub fn draw_text_fixed_width(&mut self, buf: &mut Buffer, bg: &Color, c: &Color, distances: &[u32], s: &str) -> Result<(u32, u32), ::std::io::Error> {
+    pub fn draw_text_fixed_width(
+        &mut self,
+        buf: &mut Buffer,
+        bg: &Color,
+        c: &Color,
+        distances: &[u32],
+        s: &str,
+    ) -> Result<(u32, u32), ::std::io::Error> {
         let mut x_off = 0;
         let mut off = 0;
         for ch in s.chars() {
@@ -135,7 +160,13 @@ impl Font {
         Ok((x_off as u32, self.size as u32))
     }
 
-    pub fn draw_text_individual_colors(&mut self, buf: &mut Buffer, bg: &Color, color: &[Color], s: &str) -> Result<(u32, u32), ::std::io::Error> {
+    pub fn draw_text_individual_colors(
+        &mut self,
+        buf: &mut Buffer,
+        bg: &Color,
+        color: &[Color],
+        s: &str,
+    ) -> Result<(u32, u32), ::std::io::Error> {
         let mut x_off = 0;
         let mut off = 0;
         for ch in s.chars() {

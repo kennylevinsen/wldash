@@ -180,7 +180,6 @@ impl App {
             mod_tx.send(modules).unwrap();
         });
 
-
         let cmd_queue = Arc::new(Mutex::new(VecDeque::new()));
 
         let (display, mut event_queue) = Display::connect_to_env().unwrap();
@@ -299,7 +298,9 @@ impl App {
                 move |layer| {
                     layer.implement_closure(
                         move |evt, layer| match evt {
-                            zwlr_layer_surface_v1::Event::Configure { serial, .. } => layer.ack_configure(serial),
+                            zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
+                                layer.ack_configure(serial)
+                            }
                             _ => unreachable!(),
                         },
                         (),
@@ -356,20 +357,12 @@ impl App {
                     } => {
                         pos = (surface_x as u32, surface_y as u32);
                     }
-                    wl_pointer::Event::Axis {
-                        axis,
-                        value,
-                        ..
-                    } => {
+                    wl_pointer::Event::Axis { axis, value, .. } => {
                         if axis == wl_pointer::Axis::VerticalScroll {
                             vert_scroll += value;
                         }
                     }
-                    wl_pointer::Event::Button {
-                        button,
-                        state,
-                        ..
-                    } => match state {
+                    wl_pointer::Event::Button { button, state, .. } => match state {
                         wl_pointer::ButtonState::Released => {
                             btn = button;
                             btn_clicked = true;

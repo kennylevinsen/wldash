@@ -130,9 +130,9 @@ impl ModuleImpl for Launcher {
                 .collect::<Vec<(i64, String)>>();
 
             m.sort_by(|(x1, y1), (x2, y2)| {
-                if x1 < x2 {
+                if x1 > x2 {
                     Ordering::Less
-                } else if x1 > x2 {
+                } else if x1 < x2 {
                     Ordering::Greater
                 } else if y1.len() < y2.len() {
                     Ordering::Less

@@ -3,18 +3,16 @@ use crate::color::Color;
 use crate::draw::{Font, DEJAVUSANS_MONO, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
-use std::cell::RefCell;
-
 use chrono::{Date, DateTime, Datelike, Local};
 
 pub struct Calendar {
     cur_date: Date<Local>,
     dirty: bool,
     offset: f64,
-    calendar_numeral_cache: RefCell<Font>,
-    month_cache: RefCell<Font>,
-    year_cache: RefCell<Font>,
-    day_cache: RefCell<Font>,
+    calendar_cache: Font,
+    month_cache: Font,
+    year_cache: Font,
+    day_cache: Font,
 }
 
 impl Calendar {
@@ -49,14 +47,14 @@ impl Calendar {
         // Draw the of the month
         //
 
-        self.month_cache.borrow_mut().draw_text(
+        self.month_cache.draw_text(
             &mut buf.subdimensions((0, 0, 304, 72))?,
             background_color,
             &Color::new(1.0, 1.0, 1.0, 1.0),
             month_str,
         )?;
         if time.year() != orig.year() {
-            self.year_cache.borrow_mut().draw_text(
+            self.year_cache.draw_text(
                 &mut buf.subdimensions((320, 0, 64, 32))?,
                 background_color,
                 &Color::new(0.8, 0.8, 0.8, 1.0),
@@ -80,7 +78,7 @@ impl Calendar {
                 _ => panic!("impossible value"),
             };
 
-            self.day_cache.borrow_mut().draw_text(
+            self.day_cache.draw_text(
                 &mut buf.subdimensions((idx * 48 + 4, (y_off * 32) + 64, 32, 16))?,
                 background_color,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
@@ -106,7 +104,7 @@ impl Calendar {
             // Draw the week number
             //
             let wk = time.iso_week();
-            self.calendar_numeral_cache.borrow_mut().draw_text(
+            self.calendar_cache.draw_text(
                 &mut buf.subdimensions((0 * 48, (y_off * 32) + 64, 38, 32))?,
                 background_color,
                 &Color::new(0.75, 0.75, 0.75, 1.0),
@@ -124,7 +122,7 @@ impl Calendar {
                     Color::new(0.5, 0.5, 0.5, 1.0)
                 };
 
-                self.calendar_numeral_cache.borrow_mut().draw_text(
+                self.calendar_cache.draw_text(
                     &mut buf.subdimensions((x_pos * 48, (y_off * 32) + 64, 38, 32))?,
                     background_color,
                     &c,
@@ -148,14 +146,22 @@ impl Calendar {
 
 impl Calendar {
     pub fn new() -> Calendar {
+        let mut calendar_cache = Font::new(&DEJAVUSANS_MONO, 32.0);
+        calendar_cache.add_str_to_cache("0123456789");
+        let mut month_cache = Font::new(&ROBOTO_REGULAR, 64.0);
+        month_cache.add_str_to_cache("JanuryFebMchApilJgstSmOoNvD");
+        let mut year_cache = Font::new(&DEJAVUSANS_MONO, 24.0);
+        year_cache.add_str_to_cache("-0123456789");
+        let mut day_cache = Font::new(&DEJAVUSANS_MONO, 16.0);
+        day_cache.add_str_to_cache("MONTUEWDHFRISA");
         Calendar {
             cur_date: Local::now().date(),
             dirty: true,
             offset: 0.0,
-            calendar_numeral_cache: RefCell::new(Font::new(&DEJAVUSANS_MONO, 32.0)),
-            month_cache: RefCell::new(Font::new(&ROBOTO_REGULAR, 64.0)),
-            year_cache: RefCell::new(Font::new(&DEJAVUSANS_MONO, 24.0)),
-            day_cache: RefCell::new(Font::new(&DEJAVUSANS_MONO, 16.0)),
+            calendar_cache: calendar_cache,
+            month_cache: month_cache,
+            year_cache: year_cache,
+            day_cache: day_cache,
         }
     }
 }

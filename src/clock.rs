@@ -3,7 +3,6 @@ use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
-use std::cell::RefCell;
 use std::sync::mpsc::Sender;
 
 use chrono::{DateTime, Datelike, Duration, Local, Timelike};
@@ -11,8 +10,8 @@ use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 pub struct Clock {
     cur_time: DateTime<Local>,
     first_draw: bool,
-    clock_cache: RefCell<Font>,
-    date_cache: RefCell<Font>,
+    clock_cache: Font,
+    date_cache: Font,
 }
 
 impl Clock {
@@ -31,11 +30,17 @@ impl Clock {
             ch.send(true).unwrap();
         });
 
+        let mut date_cache = Font::new(&ROBOTO_REGULAR, 64.0);
+        date_cache
+            .add_str_to_cache("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,/ ");
+        let mut clock_cache = Font::new(&ROBOTO_REGULAR, 256.0);
+        clock_cache.add_str_to_cache("0123456789:");
+
         Clock {
             cur_time: Local::now(),
             first_draw: true,
-            date_cache: RefCell::new(Font::new(&ROBOTO_REGULAR, 64.0)),
-            clock_cache: RefCell::new(Font::new(&ROBOTO_REGULAR, 256.0)),
+            date_cache: date_cache,
+            clock_cache: clock_cache,
         }
     }
 }
@@ -49,7 +54,7 @@ impl ModuleImpl for Clock {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
-        self.date_cache.borrow_mut().draw_text(
+        self.date_cache.draw_text(
             &mut buf.subdimensions((0, 0, 448, 64))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
@@ -62,7 +67,7 @@ impl ModuleImpl for Clock {
             ),
         )?;
 
-        self.clock_cache.borrow_mut().draw_text_fixed_width(
+        self.clock_cache.draw_text_fixed_width(
             &mut buf.subdimensions((0, 64, 288 * 2 + 64, 256))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),

@@ -10,9 +10,7 @@ use os_pipe::pipe;
 
 use chrono::Local;
 
-use smithay_client_toolkit::keyboard::{
-    keysyms, map_keyboard_auto, Event as KbEvent, KeyState,
-};
+use smithay_client_toolkit::keyboard::{keysyms, map_keyboard_auto, Event as KbEvent, KeyState};
 use smithay_client_toolkit::utils::DoubleMemPool;
 
 use wayland_client::protocol::{wl_compositor, wl_pointer, wl_shm, wl_surface};
@@ -244,29 +242,26 @@ impl App {
         // Keyboard processing
         //
         let kbd_clone = cmd_queue.clone();
-        map_keyboard_auto(
-            &seat,
-            move |event: KbEvent, _| match event {
-                KbEvent::Key {
-                    keysym,
-                    utf8,
-                    state,
-                    ..
-                } => match state {
-                    KeyState::Pressed => match keysym {
-                        keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
-                        v => kbd_clone.lock().unwrap().push_back(Cmd::KeyboardInput {
-                            input: Input::Keypress {
-                                key: v,
-                                interpreted: utf8,
-                            },
-                        }),
-                    },
-                    _ => (),
+        map_keyboard_auto(&seat, move |event: KbEvent, _| match event {
+            KbEvent::Key {
+                keysym,
+                utf8,
+                state,
+                ..
+            } => match state {
+                KeyState::Pressed => match keysym {
+                    keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
+                    v => kbd_clone.lock().unwrap().push_back(Cmd::KeyboardInput {
+                        input: Input::Keypress {
+                            key: v,
+                            interpreted: utf8,
+                        },
+                    }),
                 },
                 _ => (),
             },
-        )
+            _ => (),
+        })
         .expect("Failed to map keyboard");
 
         //

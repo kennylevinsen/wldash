@@ -58,7 +58,7 @@ impl ModuleImpl for Launcher {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
-        self.font.borrow_mut().draw_text(
+        self.font.borrow_mut().auto_draw_text(
             &mut buf.subdimensions((0, 0, 128, 32))?,
             bg,
             &Color::new(0.75, 0.75, 0.75, 1.0),
@@ -68,7 +68,7 @@ impl ModuleImpl for Launcher {
         let mut x_off: i32 = 0;
         let mut width_remaining: i32 = 1280 - 64;
         if self.matches.len() == 0 && self.cur.len() > 0 {
-            self.font.borrow_mut().draw_text(
+            self.font.borrow_mut().auto_draw_text(
                 &mut buf
                     .subdimensions((64, 0, width_remaining as u32, 32))
                     .unwrap(),
@@ -96,9 +96,9 @@ impl ModuleImpl for Launcher {
                     }
                     self.font
                         .borrow_mut()
-                        .draw_text_individual_colors(&mut b, bg, &colors, &m)?
+                        .auto_draw_text_individual_colors(&mut b, bg, &colors, &m)?
                 } else {
-                    self.font.borrow_mut().draw_text(
+                    self.font.borrow_mut().auto_draw_text(
                         &mut b,
                         bg,
                         &Color::new(0.5, 0.5, 0.5, 1.0),

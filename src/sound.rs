@@ -399,16 +399,18 @@ impl PulseAudioSoundDevice {
 
 pub struct PulseAudio {
     device: Arc<Mutex<PulseAudioSoundDevice>>,
-    font: RefCell<Font>,
+    font: Font,
     dirty: Arc<Mutex<bool>>,
 }
 
 impl PulseAudio {
     pub fn new(listener: Sender<bool>) -> Result<PulseAudio, ::std::io::Error> {
         let (tx, rx) = channel();
+        let mut font = Font::new(&ROBOTO_REGULAR, 24.0);
+        font.add_str_to_cache("volume");
         let pa = PulseAudio {
             device: PulseAudioSoundDevice::new(tx)?,
-            font: RefCell::new(Font::new(&ROBOTO_REGULAR, 24.0)),
+            font: font,
             dirty: Arc::new(Mutex::new(true)),
         };
         let device = pa.device.clone();
@@ -438,7 +440,7 @@ impl ModuleImpl for PulseAudio {
         } else {
             Color::new(1.0, 1.0, 1.0, 1.0)
         };
-        self.font.borrow_mut().draw_text(
+        self.font.draw_text(
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),

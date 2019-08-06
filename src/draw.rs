@@ -97,8 +97,17 @@ impl Font {
         }
     }
 
+    pub fn add_str_to_cache(&mut self, s: &str) {
+        for ch in s.chars() {
+            if self.glyphs.get(&ch).is_none() {
+                let glyph = CachedGlyph::new(self.font, self.size, ch);
+                self.glyphs.insert(ch, glyph);
+            }
+        }
+    }
+
     pub fn draw_text(
-        &mut self,
+        &self,
         buf: &mut Buffer,
         bg: &Color,
         c: &Color,
@@ -106,21 +115,23 @@ impl Font {
     ) -> Result<(u32, u32), ::std::io::Error> {
         let mut x_off = 0;
         let mut off = 0;
+        let mut glyphs = Vec::with_capacity(s.len());
         for ch in s.chars() {
             let glyph = match self.glyphs.get(&ch) {
                 Some(glyph) => glyph,
                 None => {
-                    let glyph = CachedGlyph::new(self.font, self.size, ch);
-                    self.glyphs.insert(ch, glyph);
-                    self.glyphs.get(&ch).unwrap()
+                    return Err(::std::io::Error::new(
+                        ::std::io::ErrorKind::Other,
+                        format!("glyph for {:} not in cache", ch),
+                    ))
                 }
             };
+            glyphs.push(glyph);
             if glyph.origin.1 < off {
                 off = glyph.origin.1
             }
         }
-        for ch in s.chars() {
-            let glyph = &self.glyphs[&ch];
+        for glyph in glyphs {
             glyph.draw(buf, (x_off, -off), bg, c);
             x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
         }
@@ -128,8 +139,19 @@ impl Font {
         Ok((x_off as u32, self.size as u32))
     }
 
-    pub fn draw_text_fixed_width(
+    pub fn auto_draw_text(
         &mut self,
+        buf: &mut Buffer,
+        bg: &Color,
+        c: &Color,
+        s: &str,
+    ) -> Result<(u32, u32), ::std::io::Error> {
+        self.add_str_to_cache(s);
+        self.draw_text(buf, bg, c, s)
+    }
+
+    pub fn draw_text_fixed_width(
+        &self,
         buf: &mut Buffer,
         bg: &Color,
         c: &Color,
@@ -138,21 +160,23 @@ impl Font {
     ) -> Result<(u32, u32), ::std::io::Error> {
         let mut x_off = 0;
         let mut off = 0;
+        let mut glyphs = Vec::with_capacity(s.len());
         for ch in s.chars() {
             let glyph = match self.glyphs.get(&ch) {
                 Some(glyph) => glyph,
                 None => {
-                    let glyph = CachedGlyph::new(self.font, self.size, ch);
-                    self.glyphs.insert(ch, glyph);
-                    self.glyphs.get(&ch).unwrap()
+                    return Err(::std::io::Error::new(
+                        ::std::io::ErrorKind::Other,
+                        format!("glyph for {:} not in cache", ch),
+                    ))
                 }
             };
+            glyphs.push(glyph);
             if glyph.origin.1 < off {
                 off = glyph.origin.1
             }
         }
-        for (idx, ch) in s.chars().enumerate() {
-            let glyph = &self.glyphs[&ch];
+        for (idx, glyph) in glyphs.into_iter().enumerate() {
             glyph.draw(buf, (x_off, -off), bg, c);
             x_off += distances[idx] as i32;
         }
@@ -161,7 +185,7 @@ impl Font {
     }
 
     pub fn draw_text_individual_colors(
-        &mut self,
+        &self,
         buf: &mut Buffer,
         bg: &Color,
         color: &[Color],
@@ -169,26 +193,39 @@ impl Font {
     ) -> Result<(u32, u32), ::std::io::Error> {
         let mut x_off = 0;
         let mut off = 0;
+        let mut glyphs = Vec::with_capacity(s.len());
         for ch in s.chars() {
             let glyph = match self.glyphs.get(&ch) {
                 Some(glyph) => glyph,
                 None => {
-                    let glyph = CachedGlyph::new(self.font, self.size, ch);
-                    self.glyphs.insert(ch, glyph);
-                    self.glyphs.get(&ch).unwrap()
+                    return Err(::std::io::Error::new(
+                        ::std::io::ErrorKind::Other,
+                        format!("glyph for {:} not in cache", ch),
+                    ))
                 }
             };
+            glyphs.push(glyph);
             if glyph.origin.1 < off {
                 off = glyph.origin.1
             }
         }
-        for (idx, ch) in s.chars().enumerate() {
-            let glyph = &self.glyphs[&ch];
+        for (idx, glyph) in glyphs.into_iter().enumerate() {
             glyph.draw(buf, (x_off, -off), bg, &color[idx]);
             x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
         }
 
         Ok((x_off as u32, self.size as u32))
+    }
+
+    pub fn auto_draw_text_individual_colors(
+        &mut self,
+        buf: &mut Buffer,
+        bg: &Color,
+        color: &[Color],
+        s: &str,
+    ) -> Result<(u32, u32), ::std::io::Error> {
+        self.add_str_to_cache(s);
+        self.draw_text_individual_colors(buf, bg, color, s)
     }
 }
 

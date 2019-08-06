@@ -1,11 +1,12 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, draw_text, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::cell::RefCell;
 
 use chrono::{DateTime, Local};
 use dbus;
@@ -39,6 +40,7 @@ fn get_upower_property(
 
 pub struct UpowerBattery {
     device_path: String,
+    font: RefCell<Font>,
     inner: Arc<Mutex<UpowerBatteryInner>>,
 }
 
@@ -116,6 +118,7 @@ impl UpowerBattery {
 
         Ok(UpowerBattery {
             device_path,
+            font: RefCell::new(Font::new(&ROBOTO_REGULAR, 24.0)),
             inner: Arc::new(Mutex::new(UpowerBatteryInner {
                 capacity: capacity,
                 state: state,
@@ -195,12 +198,10 @@ impl ModuleImpl for UpowerBattery {
         };
 
         let inner = self.inner.lock().unwrap();
-        draw_text(
-            &ROBOTO_REGULAR,
+        self.font.borrow_mut().draw_text(
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &text_color,
-            24.0,
             "battery",
         )?;
         draw_bar(

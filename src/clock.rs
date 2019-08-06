@@ -1,8 +1,9 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_text, draw_text_fixed_width, ROBOTO_REGULAR};
+use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
+use std::cell::RefCell;
 use std::sync::mpsc::Sender;
 
 use chrono::{DateTime, Datelike, Duration, Local, Timelike};
@@ -10,6 +11,8 @@ use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 pub struct Clock {
     cur_time: DateTime<Local>,
     first_draw: bool,
+    clock_cache: RefCell<Font>,
+    date_cache: RefCell<Font>,
 }
 
 impl Clock {
@@ -31,6 +34,8 @@ impl Clock {
         Clock {
             cur_time: Local::now(),
             first_draw: true,
+            date_cache: RefCell::new(Font::new(&ROBOTO_REGULAR, 64.0)),
+            clock_cache: RefCell::new(Font::new(&ROBOTO_REGULAR, 256.0)),
         }
     }
 }
@@ -44,12 +49,10 @@ impl ModuleImpl for Clock {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
-        draw_text(
-            &ROBOTO_REGULAR,
+        self.date_cache.borrow_mut().draw_text(
             &mut buf.subdimensions((0, 0, 448, 64))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
-            64.0,
             &format!(
                 "{:?}, {:02}/{:02}/{:4}",
                 time.weekday(),
@@ -59,12 +62,10 @@ impl ModuleImpl for Clock {
             ),
         )?;
 
-        draw_text_fixed_width(
-            &ROBOTO_REGULAR,
+        self.clock_cache.borrow_mut().draw_text_fixed_width(
             &mut buf.subdimensions((0, 64, 288 * 2 + 64, 256))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
-            256.0,
             &[120, 120, 64, 120, 120],
             &format!("{:02}:{:02}", time.hour(), time.minute()),
         )?;

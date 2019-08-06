@@ -1,12 +1,13 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, draw_text, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::fs::OpenOptions;
 use std::io::{Error, ErrorKind};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::cell::RefCell;
 
 use chrono::{DateTime, Local};
 
@@ -14,6 +15,7 @@ pub struct Backlight {
     device_path: PathBuf,
     cur_brightness: u64,
     max_brightness: u64,
+    font: RefCell<Font>,
     dirty: bool,
 }
 
@@ -85,6 +87,7 @@ impl Backlight {
             device_path: first_device.path(),
             cur_brightness: 0,
             max_brightness: 0,
+            font: RefCell::new(Font::new(&ROBOTO_REGULAR, 24.0)),
             dirty: true,
         };
 
@@ -103,12 +106,10 @@ impl ModuleImpl for Backlight {
     ) -> Result<Vec<(i32, i32, i32, i32)>, Error> {
         buf.memset(bg);
         let c = Color::new(1.0, 1.0, 1.0, 1.0);
-        draw_text(
-            &ROBOTO_REGULAR,
+        self.font.borrow_mut().draw_text(
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &c,
-            24.0,
             "backlight",
         )?;
         draw_bar(

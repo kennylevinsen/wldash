@@ -1,10 +1,11 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_text, draw_text_individual_colors, ROBOTO_REGULAR};
+use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::cmp::Ordering;
 use std::io::Read;
+use std::cell::RefCell;
 
 use atty::Stream;
 use chrono::{DateTime, Local};
@@ -16,6 +17,7 @@ pub struct Launcher {
     matches: Vec<String>,
     cur: String,
     offset: usize,
+    font: RefCell<Font>,
     dirty: bool,
 }
 
@@ -35,6 +37,7 @@ impl Launcher {
                 matches: vec![],
                 cur: "".to_string(),
                 offset: 0,
+                font: RefCell::new(Font::new(&ROBOTO_REGULAR, 32.0)),
                 dirty: true,
             })
         } else {
@@ -55,26 +58,22 @@ impl ModuleImpl for Launcher {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
-        draw_text(
-            &ROBOTO_REGULAR,
+        self.font.borrow_mut().draw_text(
             &mut buf.subdimensions((0, 0, 128, 32))?,
             bg,
             &Color::new(0.75, 0.75, 0.75, 1.0),
-            32.0,
             "Run: ",
         )?;
 
         let mut x_off: i32 = 0;
         let mut width_remaining: i32 = 1280 - 64;
         if self.matches.len() == 0 && self.cur.len() > 0 {
-            draw_text(
-                &ROBOTO_REGULAR,
+            self.font.borrow_mut().draw_text(
                 &mut buf
                     .subdimensions((64, 0, width_remaining as u32, 32))
                     .unwrap(),
                 bg,
                 &Color::new(1.0, 0.5, 0.5, 1.0),
-                32.0,
                 &self.cur,
             )?;
         } else {
@@ -95,14 +94,12 @@ impl ModuleImpl for Launcher {
                             colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
                         }
                     }
-                    draw_text_individual_colors(&ROBOTO_REGULAR, &mut b, bg, &colors, 32.0, &m)?
+                    self.font.borrow_mut().draw_text_individual_colors(&mut b, bg, &colors, &m)?
                 } else {
-                    draw_text(
-                        &ROBOTO_REGULAR,
+                    self.font.borrow_mut().draw_text(
                         &mut b,
                         bg,
                         &Color::new(0.5, 0.5, 0.5, 1.0),
-                        32.0,
                         m,
                     )?
                 };

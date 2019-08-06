@@ -1,163 +1,164 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use rusttype::{point, Font, Scale};
+
+use std::collections::HashMap;
+
+use rusttype::{point, Font as RustFont, Scale};
 use lazy_static::lazy_static;
 
 pub static DEJAVUSANS_MONO_FONT_DATA: &'static [u8] = include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
 pub static ROBOTO_REGULAR_FONT_DATA: &'static [u8] = include_bytes!("../fonts/Roboto-Regular.ttf");
 
 lazy_static! {
-    pub static ref DEJAVUSANS_MONO: Font<'static> = Font::from_bytes(DEJAVUSANS_MONO_FONT_DATA as &[u8]).expect("error constructing DejaVuSansMono");
-    pub static ref ROBOTO_REGULAR: Font<'static> = Font::from_bytes(ROBOTO_REGULAR_FONT_DATA as &[u8]).expect("error constructing Roboto-Regular");
+    pub static ref DEJAVUSANS_MONO: RustFont<'static> = RustFont::from_bytes(DEJAVUSANS_MONO_FONT_DATA as &[u8]).expect("error constructing DejaVuSansMono");
+    pub static ref ROBOTO_REGULAR: RustFont<'static> = RustFont::from_bytes(ROBOTO_REGULAR_FONT_DATA as &[u8]).expect("error constructing Roboto-Regular");
 }
 
-pub fn draw_text(
-    font: &Font,
-    buf: &mut Buffer,
-    background_color: &Color,
-    color: &Color,
-    size: f32,
-    s: &str,
-) -> Result<(u32, u32), ::std::io::Error> {
+struct CachedGlyph {
+    dimensions: (u32, u32),
+    origin: (i32, i32),
+    render: Vec<f32>,
+}
 
-    // The font size to use
-    let scale = Scale::uniform(size);
+impl CachedGlyph {
+    fn new(font: &RustFont, size: f32, ch: char) -> CachedGlyph {
+        let scale = Scale::uniform(size);
+        let v_metrics = font.v_metrics(scale);
+        let glyph = font
+            .glyph(ch)
+            .scaled(scale)
+            .positioned(point(0.0, v_metrics.ascent));
 
-    let v_metrics = font.v_metrics(scale);
 
-    let glyphs: Vec<_> = font
-        .layout(s, scale, point(0.0, v_metrics.ascent))
-        .collect();
-
-    let mut x_max: u32 = 0;
-    let mut y_max: u32 = 0;
-
-    // Loop through the glyphs in the text, positing each one on a line
-    for glyph in glyphs {
         if let Some(bounding_box) = glyph.pixel_bounding_box() {
-            if bounding_box.max.x > x_max as i32 {
-                x_max = bounding_box.max.x as u32;
-            }
-            if bounding_box.max.y > y_max as i32 {
-                y_max = bounding_box.max.y as u32;
-            }
-            // Draw the glyph into the image per-pixel by using the draw closure
+            let origin = (bounding_box.min.x, bounding_box.min.y);
+
+            let dimensions = ((bounding_box.max.x - bounding_box.min.x) as u32, (bounding_box.max.y - bounding_box.min.y) as u32);
+            let mut render = vec![0.0; (dimensions.0 * dimensions.1) as usize];
             glyph.draw(|x, y, o| {
-                let x = x + bounding_box.min.x as u32;
-                let y = y + bounding_box.min.y as u32;
-                let o = if o > 1.0 {
-                    1.0
-                } else if o < 0.0 {
-                    0.0
-                } else {
-                    o
-                };
-                let _ = buf.put((x, y), &background_color.blend(color, o));
+                let pos = x + (y * dimensions.0);
+                render[pos as usize] = o;
             });
+            CachedGlyph{
+                origin: origin,
+                dimensions: dimensions,
+                render: render,
+            }
+        } else {
+            CachedGlyph{
+                origin: (0,0),
+                dimensions: ((size/4.0) as u32, 0),
+                render: Vec::new(),
+            }
         }
     }
 
-    Ok((x_max, y_max))
-}
+    fn draw(&self, buf: &mut Buffer, pos: (i32, i32), bg: &Color, c: &Color) {
+        let mut x = 0;
+        let mut y = 0;
+        for v in &self.render {
+            buf.put(((x + pos.0 + self.origin.0) as u32, (y + pos.1 + self.origin.1) as u32), &bg.blend(&c, *v)).unwrap();
 
-pub fn draw_text_individual_colors(
-    font: &Font,
-    buf: &mut Buffer,
-    background_color: &Color,
-    color: &[Color],
-    size: f32,
-    s: &str,
-) -> Result<(u32, u32), ::std::io::Error> {
-
-    // The font size to use
-    let scale = Scale::uniform(size);
-
-    let v_metrics = font.v_metrics(scale);
-
-    let glyphs: Vec<_> = font
-        .layout(s, scale, point(0.0, v_metrics.ascent))
-        .collect();
-
-    let mut x_max: u32 = 0;
-    let mut y_max: u32 = 0;
-    let mut x_pos: usize = 0;
-
-    // Loop through the glyphs in the text, positing each one on a line
-    for glyph in glyphs {
-        if let Some(bounding_box) = glyph.pixel_bounding_box() {
-            if bounding_box.max.x > x_max as i32 {
-                x_max = bounding_box.max.x as u32;
+            if x == self.dimensions.0 as i32 -1 {
+                y += 1;
+                x = 0;
+            } else {
+                x += 1;
             }
-            if bounding_box.max.y > y_max as i32 {
-                y_max = bounding_box.max.y as u32;
-            }
-            // Draw the glyph into the image per-pixel by using the draw closure
-            glyph.draw(|x, y, o| {
-                let x = x + bounding_box.min.x as u32;
-                let y = y + bounding_box.min.y as u32;
-                let o = if o > 1.0 {
-                    1.0
-                } else if o < 0.0 {
-                    0.0
-                } else {
-                    o
-                };
-                let _ = buf.put((x, y), &background_color.blend(&color[x_pos], o));
-            });
         }
-        x_pos += 1;
-    }
 
-    Ok((x_max, y_max))
+    }
 }
 
-pub fn draw_text_fixed_width(
-    font: &Font,
-    buf: &mut Buffer,
-    background_color: &Color,
-    color: &Color,
+pub struct Font {
+    glyphs: HashMap<char, CachedGlyph>,
+    font: &'static RustFont<'static>,
     size: f32,
-    distances: &[u32],
-    s: &str,
-) -> Result<(), ::std::io::Error> {
+}
 
-    // The font size to use
-    let scale = Scale::uniform(size);
-
-    let v_metrics = font.v_metrics(scale);
-
-    let glyphs: Vec<_> = font
-        .layout(s, scale, point(0.0, v_metrics.ascent))
-        .collect();
-
-    // Loop through the glyphs in the text, positing each one on a line
-    let mut x_pos: usize = 0;
-    let mut x_off: u32 = 0;
-    for glyph in glyphs {
-        if let Some(bounding_box) = glyph.pixel_bounding_box() {
-            let x_dist = distances[x_pos];
-            let width = (bounding_box.max.x - bounding_box.min.x) as u32;
-            let offset = (x_dist - width) / 2;
-            // Draw the glyph into the image per-pixel by using the draw closure
-            glyph.draw(|x, y, o| {
-                let off = x_off + offset + 20;
-                let x = x + off as u32;
-                let y = y + bounding_box.min.y as u32;
-                let o = if o > 1.0 {
-                    1.0
-                } else if o < 0.0 {
-                    0.0
-                } else {
-                    o
-                };
-                let _ = buf.put((x, y), &background_color.blend(color, o));
-            });
-            x_pos += 1;
-            x_off += x_dist;
+impl Font {
+    pub fn new(font: &'static RustFont, size: f32) -> Font {
+        Font{
+            glyphs: HashMap::new(),
+            font: font,
+            size: size,
         }
     }
 
-    Ok(())
+    pub fn draw_text(&mut self, buf: &mut Buffer, bg: &Color, c: &Color, s: &str) -> Result<(u32, u32), ::std::io::Error> {
+        let mut x_off = 0;
+        let mut off = 0;
+        for ch in s.chars() {
+            let glyph = match self.glyphs.get(&ch) {
+                Some(glyph) => glyph,
+                None => {
+                    let glyph = CachedGlyph::new(self.font, self.size, ch);
+                    self.glyphs.insert(ch, glyph);
+                    self.glyphs.get(&ch).unwrap()
+                }
+            };
+            if glyph.origin.1 < off {
+                off = glyph.origin.1
+            }
+        }
+        for ch in s.chars() {
+            let glyph = &self.glyphs[&ch];
+            glyph.draw(buf, (x_off, -off), bg, c);
+            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
+        }
+
+        Ok((x_off as u32, self.size as u32))
+    }
+
+    pub fn draw_text_fixed_width(&mut self, buf: &mut Buffer, bg: &Color, c: &Color, distances: &[u32], s: &str) -> Result<(u32, u32), ::std::io::Error> {
+        let mut x_off = 0;
+        let mut off = 0;
+        for ch in s.chars() {
+            let glyph = match self.glyphs.get(&ch) {
+                Some(glyph) => glyph,
+                None => {
+                    let glyph = CachedGlyph::new(self.font, self.size, ch);
+                    self.glyphs.insert(ch, glyph);
+                    self.glyphs.get(&ch).unwrap()
+                }
+            };
+            if glyph.origin.1 < off {
+                off = glyph.origin.1
+            }
+        }
+        for (idx, ch) in s.chars().enumerate() {
+            let glyph = &self.glyphs[&ch];
+            glyph.draw(buf, (x_off, -off), bg, c);
+            x_off += distances[idx] as i32;
+        }
+
+        Ok((x_off as u32, self.size as u32))
+    }
+
+    pub fn draw_text_individual_colors(&mut self, buf: &mut Buffer, bg: &Color, color: &[Color], s: &str) -> Result<(u32, u32), ::std::io::Error> {
+        let mut x_off = 0;
+        let mut off = 0;
+        for ch in s.chars() {
+            let glyph = match self.glyphs.get(&ch) {
+                Some(glyph) => glyph,
+                None => {
+                    let glyph = CachedGlyph::new(self.font, self.size, ch);
+                    self.glyphs.insert(ch, glyph);
+                    self.glyphs.get(&ch).unwrap()
+                }
+            };
+            if glyph.origin.1 < off {
+                off = glyph.origin.1
+            }
+        }
+        for (idx, ch) in s.chars().enumerate() {
+            let glyph = &self.glyphs[&ch];
+            glyph.draw(buf, (x_off, -off), bg, &color[idx]);
+            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
+        }
+
+        Ok((x_off as u32, self.size as u32))
+    }
 }
 
 pub fn draw_box(buf: &mut Buffer, c: &Color, dim: (u32, u32)) -> Result<(), ::std::io::Error> {

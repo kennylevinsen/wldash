@@ -1,6 +1,6 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, draw_text, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::module::{Input, ModuleImpl};
 
 use std::cell::RefCell;
@@ -399,6 +399,7 @@ impl PulseAudioSoundDevice {
 
 pub struct PulseAudio {
     device: Arc<Mutex<PulseAudioSoundDevice>>,
+    font: RefCell<Font>,
     dirty: Arc<Mutex<bool>>,
 }
 
@@ -407,6 +408,7 @@ impl PulseAudio {
         let (tx, rx) = channel();
         let pa = PulseAudio {
             device: PulseAudioSoundDevice::new(tx)?,
+            font: RefCell::new(Font::new(&ROBOTO_REGULAR, 24.0)),
             dirty: Arc::new(Mutex::new(true)),
         };
         let device = pa.device.clone();
@@ -436,12 +438,10 @@ impl ModuleImpl for PulseAudio {
         } else {
             Color::new(1.0, 1.0, 1.0, 1.0)
         };
-        draw_text(
-            &ROBOTO_REGULAR,
+        self.font.borrow_mut().draw_text(
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,
             &Color::new(1.0, 1.0, 1.0, 1.0),
-            24.0,
             "volume",
         )?;
         draw_bar(&mut buf.subdimensions((128, 0, 432, 24))?, &c, 432, 24, vol)?;

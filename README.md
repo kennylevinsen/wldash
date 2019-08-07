@@ -8,6 +8,7 @@ Consider this alpha-quality: While it works, *everything* is subject to change w
 
 1. Checkout: `git clone https://github.com/kennylevinsen/wldash`
 2. Build: `cargo build --release`
+   If you want the Ivy calculator feature enabled (requires a Go toolchain): `cargo build --release --features ivy`
 3. Put somewhere: `cp target/release/wldash /usr/local/bin/wldash`
 4. Run: `wldash`
 

@@ -4,6 +4,10 @@ version = "0.1.0"
 authors = ["Kenny Levinsen <kl@kl.wtf>"]
 edition = "2018"
 
+[features]
+ivy = [ "libivy" ]
+default = []
+
 [dependencies]
 smithay-client-toolkit = "0.6.3"
 byteorder = "1.0"
@@ -19,3 +23,4 @@ dbus = "0.6"
 atty = "0.2"
 fuzzy-matcher = "0.2"
 lazy_static = "1.3.0"
+libivy = { git = "https://github.com/kennylevinsen/libivy.git", optional = true }

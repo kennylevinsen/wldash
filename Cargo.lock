@@ -120,6 +120,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "libivy"
+version = "0.1.0"
+source = "git+https://github.com/kennylevinsen/libivy.git#f0c58a9ee57fa42a79b05e73021ccc91311aa690"
+
+[[package]]
 name = "libloading"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -414,6 +419,7 @@ dependencies = [
  "dbus 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "fuzzy-matcher 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libivy 0.1.0 (git+https://github.com/kennylevinsen/libivy.git)",
  "libpulse-binding 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "memmap 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nix 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -452,6 +458,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum lazy_static 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bc5729f27f159ddd61f4df6228e827e86643d4d3e7c32183cb30a1c08f604a14"
 "checksum libc 0.2.60 (registry+https://github.com/rust-lang/crates.io-index)" = "d44e80633f007889c7eff624b709ab43c92d708caad982295768a7b13ca3b5eb"
 "checksum libdbus-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "69382cb3be797cfe62ba89ac5e594a0e3022914ff44867ffbcfc03daa24eebd7"
+"checksum libivy 0.1.0 (git+https://github.com/kennylevinsen/libivy.git)" = "<none>"
 "checksum libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
 "checksum libpulse-binding 2.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "49e7378bffd76492e876a0afb9a016359379a6b5a859fecd039248f76ce719fb"
 "checksum libpulse-sys 1.5.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8dcac117c7e9fb50fe162d5fbc6b3818819bd173922f648fae017f913de68520"

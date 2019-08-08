@@ -64,7 +64,11 @@ impl Launcher {
         buf.memset(bg);
 
         let mut x_off = if self.input.len() > 0 {
-            let c = if self.matches.len() == 0 { Color::new(1.0, 0.5, 0.5, 1.0) } else { Color::new(1.0, 1.0, 1.0, 1.0) };
+            let c = if self.matches.len() == 0 {
+                Color::new(1.0, 0.5, 0.5, 1.0)
+            } else {
+                Color::new(1.0, 1.0, 1.0, 1.0)
+            };
             let dim = self.font.borrow_mut().auto_draw_text(
                 &mut buf.subdimensions((0, 0, 1232, 32))?,
                 bg,
@@ -77,14 +81,12 @@ impl Launcher {
             0
         };
 
-
         let mut width_remaining: i32 = 1232 - x_off as i32;
         for (idx, m) in self.matches.iter().enumerate() {
-            let mut b =
-                match buf.subdimensions((x_off, 0, width_remaining as u32, 32)) {
-                    Ok(b) => b,
-                    Err(_) => break,
-                };
+            let mut b = match buf.subdimensions((x_off, 0, width_remaining as u32, 32)) {
+                Ok(b) => b,
+                Err(_) => break,
+            };
             let size = if idx == self.offset && self.input.len() > 0 {
                 let (_, indices) =
                     fuzzy_indices(&m.to_lowercase(), &self.input.to_lowercase()).unwrap();
@@ -141,7 +143,7 @@ impl Launcher {
 
         if let Some(result) = &self.result {
             self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((x_off, 0, 1232-x_off, 32))?,
+                &mut buf.subdimensions((x_off, 0, 1232 - x_off, 32))?,
                 bg,
                 &Color::new(0.75, 0.75, 0.75, 1.0),
                 &format!(" = {:}", result),
@@ -207,13 +209,18 @@ impl ModuleImpl for Launcher {
                             Err(_) => self.result = None,
                         }
                     }
-                },
+                }
                 Some('!') => (),
                 _ => {
                     let mut m = self
                         .options
                         .iter()
-                        .map(|x| (fuzzy_match(&x.to_lowercase(), &self.input.to_lowercase()), x))
+                        .map(|x| {
+                            (
+                                fuzzy_match(&x.to_lowercase(), &self.input.to_lowercase()),
+                                x,
+                            )
+                        })
                         .filter(|(x, _)| x.is_some())
                         .map(|(x, y)| (x.unwrap(), y.to_string()))
                         .collect::<Vec<(i64, String)>>();
@@ -261,9 +268,11 @@ impl ModuleImpl for Launcher {
                             println!("{}", self.input.chars().skip(1).collect::<String>());
                             std::process::exit(0);
                         }
-                        _ => if self.matches.len() > self.offset {
-                            println!("{}", self.matches[self.offset]);
-                            std::process::exit(0);
+                        _ => {
+                            if self.matches.len() > self.offset {
+                                println!("{}", self.matches[self.offset]);
+                                std::process::exit(0);
+                            }
                         }
                     };
                 }

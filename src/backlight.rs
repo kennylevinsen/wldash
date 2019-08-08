@@ -140,7 +140,7 @@ impl ModuleImpl for Backlight {
                 x: _x,
                 y,
             } => {
-                self.add(y as f32 / 800.0).unwrap();
+                self.add(y as f32 / -800.0).unwrap();
                 match self.sync() {
                     Ok(val) => val,
                     Err(err) => {

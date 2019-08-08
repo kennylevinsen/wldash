@@ -478,7 +478,7 @@ impl ModuleImpl for PulseAudio {
                 self.device
                     .lock()
                     .unwrap()
-                    .set_volume(y as f32 / 800.0)
+                    .set_volume(y as f32 / -800.0)
                     .unwrap();
             }
             Input::Click { pos: _pos, button } => match button {

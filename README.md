@@ -44,6 +44,10 @@ Using backlight sys file, only visible of backlight is detected. Scroll to adjus
 
 Works like bemenu: pipe a list into wldash, and it will print out the selection made. Use https://github.com/kennylevinsen/dot-desktop if you want to launch using desktop files.
 
+The launcher also accepts prefix operators to change its mode:
+- `!`: Arbitrary command
+- `=`: Calculator, currently requires the `ivy` feature. See https://godoc.org/robpike.io/ivy for documentation on the syntax and features.
+
 ## Notable missing features:
 
 - Scaling of any kind - all sizes are currently hardcoded in pixels

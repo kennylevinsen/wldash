@@ -122,7 +122,7 @@ dependencies = [
 [[package]]
 name = "libivy"
 version = "0.1.0"
-source = "git+https://github.com/kennylevinsen/libivy.git#f0c58a9ee57fa42a79b05e73021ccc91311aa690"
+source = "git+https://github.com/kennylevinsen/libivy.git#3e772a06020cfa6d2d324cfc637128f55453ba43"
 
 [[package]]
 name = "libloading"

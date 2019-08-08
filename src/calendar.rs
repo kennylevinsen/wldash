@@ -55,7 +55,7 @@ impl Calendar {
         )?;
         if time.year() != orig.year() {
             self.year_cache.draw_text(
-                &mut buf.subdimensions((320, 0, 64, 32))?,
+                &mut buf.subdimensions((320, 0, 48, 32))?,
                 background_color,
                 &Color::new(0.8, 0.8, 0.8, 1.0),
                 &format!("{:}", time.year()),

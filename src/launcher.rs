@@ -176,9 +176,37 @@ fn calc(s: &str) -> Result<String, String> {
     libivy::eval(s)
 }
 
-#[cfg(not(feature = "ivy"))]
+#[cfg(feature = "bc")]
+fn calc(s: &str) -> Result<String, String> {
+    use std::io::Write;
+    let mut child = std::process::Command::new("bc")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .arg("--mathlib")
+        .spawn()
+        .map_err(|_| "bc not available".to_string())?;
+    {
+        let stdin = child.stdin.as_mut().unwrap();
+        stdin
+            .write_all(s.as_bytes())
+            .map_err(|_| "unable to write to stdin".to_string())?;
+        stdin
+            .write_all("\n".as_bytes())
+            .map_err(|_| "unable to write to stdin".to_string())?;
+    }
+    let output = child
+        .wait_with_output()
+        .map_err(|_| "unable to run bc".to_string())?;
+    Ok(std::str::from_utf8(&output.stdout)
+        .map_err(|_| "unable to read from bc")?
+        .trim()
+        .to_string())
+}
+
+#[cfg(not(any(feature = "ivy", feature = "bc")))]
 fn calc(_s: &str) -> Result<String, String> {
-    Err("ivy not enabled".to_string())
+    Err("no calculator implementation available".to_string())
 }
 
 impl ModuleImpl for Launcher {

@@ -9,6 +9,7 @@ lto = "fat"
 
 [features]
 ivy = [ "libivy" ]
+bc = []
 default = []
 
 [dependencies]

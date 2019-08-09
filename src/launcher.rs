@@ -209,6 +209,20 @@ fn calc(_s: &str) -> Result<String, String> {
     Err("no calculator implementation available".to_string())
 }
 
+fn wlcopy(s: &str) -> Result<(), String> {
+    let mut child = std::process::Command::new("wl-copy")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .arg(s)
+        .spawn()
+        .map_err(|_| "wl-copy not available".to_string())?;
+    child
+        .wait()
+        .map_err(|_| "unable to run wl-copy".to_string())?;
+    Ok(())
+}
+
 impl ModuleImpl for Launcher {
     fn draw(
         &self,
@@ -291,7 +305,12 @@ impl ModuleImpl for Launcher {
                 }
                 keysyms::XKB_KEY_Return => {
                     match self.input.chars().next() {
-                        Some('=') => (),
+                        Some('=') => match self.result {
+                            Some(ref v) => {
+                                let _ = wlcopy(&v);
+                            }
+                            None => (),
+                        },
                         Some('!') => {
                             println!("{}", self.input.chars().skip(1).collect::<String>());
                             std::process::exit(0);

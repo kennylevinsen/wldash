@@ -13,7 +13,7 @@ use chrono::Local;
 use smithay_client_toolkit::keyboard::{keysyms, map_keyboard_auto, Event as KbEvent, KeyState};
 use smithay_client_toolkit::utils::DoubleMemPool;
 
-use wayland_client::protocol::{wl_compositor, wl_pointer, wl_shm, wl_surface};
+use wayland_client::protocol::{wl_compositor, wl_pointer, wl_shm, wl_surface, wl_output};
 use wayland_client::{Display, EventQueue, GlobalEvent, GlobalManager, NewProxy};
 use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
     zwlr_layer_shell_v1, zwlr_layer_surface_v1,
@@ -43,30 +43,151 @@ use crate::sound::PulseAudio;
 enum Cmd {
     Exit,
     Draw,
+    ForceDraw,
     MouseInput { pos: (u32, u32), input: Input },
     KeyboardInput { input: Input },
+}
+
+struct AppInner {
+    compositor: Option<wl_compositor::WlCompositor>,
+    surfaces: Vec<wl_surface::WlSurface>,
+    shell_surfaces: Vec<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
+    configured_surfaces: Arc<Mutex<usize>>,
+    outputs: Vec<(u32, wl_output::WlOutput)>,
+    shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
+    dimensions: (u32, u32),
+    draw_tx: Sender<bool>,
+}
+
+impl AppInner {
+    fn new(tx: Sender<bool>) -> AppInner{
+        AppInner{
+            compositor: None,
+            surfaces: Vec::new(),
+            shell_surfaces: Vec::new(),
+            configured_surfaces: Arc::new(Mutex::new(0)),
+            outputs: Vec::new(),
+            shell: None,
+            dimensions: (0, 0),
+            draw_tx: tx,
+        }
+    }
+
+    fn outputs_changed(&mut self) {
+        let shell = match self.shell {
+            Some(ref shell) => shell.to_owned(),
+            None => return,
+        };
+        let compositor = match self.compositor {
+            Some(ref c) => c.to_owned(),
+            None => return,
+        };
+
+        for shell_surface in self.shell_surfaces.iter() {
+            shell_surface.destroy();
+        }
+        for surface in self.surfaces.iter() {
+            surface.destroy();
+        }
+
+        let mut surfaces = Vec::new();
+        let mut shell_surfaces = Vec::new();
+        self.configured_surfaces = Arc::new(Mutex::new(0));
+        for output in self.outputs.iter() {
+            let surface = compositor
+                .create_surface(NewProxy::implement_dummy)
+                .unwrap();
+
+            let configured = self.configured_surfaces.clone();
+            let tx = self.draw_tx.clone();
+            let shell_surface = shell
+                .get_layer_surface(
+                    &surface,
+                    Some(&output.1),
+                    zwlr_layer_shell_v1::Layer::Overlay,
+                    "".to_string(),
+                    move |layer| {
+                        layer.implement_closure(
+                            move |evt, layer| match evt {
+                                zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
+                                    *(configured.lock().unwrap()) += 1;
+                                    layer.ack_configure(serial);
+                                    tx.send(false).unwrap();
+                                }
+                                _ => unreachable!(),
+                            },
+                            (),
+                        )
+                    },
+                )
+                .unwrap();
+
+            shell_surface.set_keyboard_interactivity(1);
+            shell_surface.set_size(self.dimensions.0, self.dimensions.1);
+            surface.commit();
+            shell_surfaces.push(shell_surface);
+            surfaces.push(surface);
+        }
+        self.surfaces = surfaces;
+        self.shell_surfaces = shell_surfaces;
+        self.draw_tx.send(false).unwrap();
+    }
+
+    fn add_output(&mut self, id: u32, output: wl_output::WlOutput) {
+        self.outputs.push((id, output));
+        self.outputs_changed();
+    }
+
+    fn remove_output(&mut self, id: u32) {
+        let old_output = self.outputs.iter().find(|(output_id, _)| *output_id == id);
+        if let Some(output) = old_output {
+            let new_outputs = self.outputs.iter().filter(|(output_id, _)| *output_id != id).map(|(x, y)| (x.clone(), y.clone())).collect();
+            if output.1.as_ref().version() >= 3 {
+                output.1.release()
+            }
+            self.outputs = new_outputs;
+            self.outputs_changed();
+        }
+    }
+
+    fn set_compositor(&mut self, compositor: Option<wl_compositor::WlCompositor>) {
+        self.compositor = compositor
+    }
+
+    fn set_shell(&mut self, shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>) {
+        self.shell = shell
+    }
+
+    fn set_dimensions(&mut self, dimensions: (u32, u32)) {
+        self.dimensions = dimensions
+    }
 }
 
 struct App {
     pools: DoubleMemPool,
     display: Display,
     event_queue: EventQueue,
-    surface: wl_surface::WlSurface,
     cmd_queue: Arc<Mutex<VecDeque<Cmd>>>,
-    dimensions: (u32, u32),
     modules: Vec<Module>,
+    inner: Arc<Mutex<AppInner>>,
 }
 
 impl App {
     fn redraw(&mut self, force: bool) -> Result<(), ::std::io::Error> {
+        let inner = self.inner.lock().unwrap();
         let time = Local::now();
+
+        if inner.shell_surfaces.len() != *inner.configured_surfaces.lock().unwrap() {
+            // Not ready yet
+            return Ok(());
+        }
 
         let pool = match self.pools.pool() {
             Some(pool) => pool,
             None => return Ok(()),
         };
 
-        let (buf_x, buf_y) = self.dimensions;
+        let (buf_x, buf_y) = inner.dimensions;
 
         let bg = Color::new(0.0, 0.0, 0.0, 0.9);
 
@@ -76,7 +197,7 @@ impl App {
             .expect("Failed to resize the memory pool.");
 
         let mmap = pool.mmap();
-        let mut buf = Buffer::new(mmap, self.dimensions);
+        let mut buf = Buffer::new(mmap, inner.dimensions);
         let mut damage = vec![];
 
         {
@@ -105,11 +226,13 @@ impl App {
             4 * buf_x as i32,
             wl_shm::Format::Argb8888,
         );
-        self.surface.attach(Some(&new_buffer), 0, 0);
-        for d in damage {
-            self.surface.damage(d.0, d.1, d.2, d.3);
+        for surface in inner.surfaces.iter() {
+            surface.attach(Some(&new_buffer), 0, 0);
+            for d in damage.iter() {
+                surface.damage(d.0, d.1, d.2, d.3);
+            }
+            surface.commit();
         }
-        self.surface.commit();
         Ok(())
     }
 
@@ -126,14 +249,15 @@ impl App {
     }
 
     fn wipe(&mut self) {
+        let inner = self.inner.lock().unwrap();
         let pool = match self.pools.pool() {
             Some(pool) => pool,
             None => return,
         };
-        pool.resize((4 * self.dimensions.0 * self.dimensions.1) as usize)
+        pool.resize((4 * inner.dimensions.0 * inner.dimensions.1) as usize)
             .expect("Failed to resize the memory pool.");
         let mmap = pool.mmap();
-        let mut buf = Buffer::new(mmap, self.dimensions);
+        let mut buf = Buffer::new(mmap, inner.dimensions);
         let bg = Color::new(0.0, 0.0, 0.0, 0.9);
         buf.memset(&bg);
     }
@@ -148,6 +272,8 @@ impl App {
     }
 
     fn new(tx: Sender<bool>) -> App {
+        let inner = Arc::new(Mutex::new(AppInner::new(tx.clone())));
+
         //
         // Set up modules
         //
@@ -182,25 +308,36 @@ impl App {
 
         let (display, mut event_queue) = Display::connect_to_env().unwrap();
 
+
         let display_wrapper = display
             .as_ref()
             .make_wrapper(&event_queue.get_token())
             .unwrap()
             .into();
 
+
         //
         // Set up global manager
         //
-        let manager = GlobalManager::new_with_cb(&display_wrapper, move |event, _| match event {
+        let inner_global = inner.clone();
+        let manager = GlobalManager::new_with_cb(&display_wrapper, move |event, registry| match event {
             GlobalEvent::New {
-                id: _,
-                interface: _,
-                version: _,
-            } => {}
-            GlobalEvent::Removed {
-                id: _,
-                interface: _,
-            } => {}
+                id,
+                ref interface,
+                version,
+            } => {
+                if let "wl_output" = &interface[..] {
+                    let output = registry.bind(version, id, move |output| {
+                        output.implement_closure (move |_, _| {}, ())
+                    }).unwrap();
+                    inner_global.lock().unwrap().add_output(id, output);
+                }
+            }
+            GlobalEvent::Removed { id, ref interface } => {
+                if let "wl_output" = &interface[..] {
+                    inner_global.lock().unwrap().remove_output(id);
+                }
+            }
         });
 
         // double sync to retrieve the global list
@@ -212,6 +349,8 @@ impl App {
         let compositor: wl_compositor::WlCompositor = manager
             .instantiate_range(1, 4, NewProxy::implement_dummy)
             .expect("server didn't advertise `wl_compositor`");
+
+        inner.lock().unwrap().set_compositor(Some(compositor));
 
         // wl_shm
         let shm_formats = Arc::new(Mutex::new(Vec::new()));
@@ -267,7 +406,7 @@ impl App {
         //
         // Prepare shell so that we can create our shell surface
         //
-        let shell = if let Ok(layer) = manager.instantiate_exact(
+        inner.lock().unwrap().set_shell(Some(if let Ok(layer) = manager.instantiate_exact(
             1,
             |layer: NewProxy<zwlr_layer_shell_v1::ZwlrLayerShellV1>| {
                 layer.implement_closure(|_, _| {}, ())
@@ -276,31 +415,7 @@ impl App {
             layer
         } else {
             panic!("server didn't advertise `zwlr_layer_shell_v1`");
-        };
-
-        let surface = compositor
-            .create_surface(NewProxy::implement_dummy)
-            .unwrap();
-
-        let shell_surface = shell
-            .get_layer_surface(
-                &surface,
-                None,
-                zwlr_layer_shell_v1::Layer::Overlay,
-                "".to_string(),
-                move |layer| {
-                    layer.implement_closure(
-                        move |evt, layer| match evt {
-                            zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
-                                layer.ack_configure(serial)
-                            }
-                            _ => unreachable!(),
-                        },
-                        (),
-                    )
-                },
-            )
-            .unwrap();
+        }));
 
         //
         // Calculate window dimensions
@@ -314,11 +429,8 @@ impl App {
         }
 
         // Add padding
-        dimensions = (dimensions.0 + 40, dimensions.1 + 40);
-
-        shell_surface.set_keyboard_interactivity(1);
-        shell_surface.set_size(dimensions.0, dimensions.1);
-        surface.commit();
+        inner.lock().unwrap().set_dimensions((dimensions.0 + 40, dimensions.1 + 40));
+        inner.lock().unwrap().outputs_changed();
         event_queue.sync_roundtrip().unwrap();
 
         //
@@ -401,13 +513,12 @@ impl App {
         display.flush().unwrap();
 
         App {
-            surface: surface,
             display: display,
             event_queue: event_queue,
             cmd_queue: cmd_queue,
             pools: pools,
-            dimensions: dimensions,
             modules: modules,
+            inner: inner,
         }
     }
 }
@@ -421,8 +532,11 @@ fn main() {
 
     let worker_queue = app.cmd_queue();
     std::thread::spawn(move || loop {
-        rx_draw.recv().unwrap();
-        worker_queue.lock().unwrap().push_back(Cmd::Draw);
+        if rx_draw.recv().unwrap() {
+            worker_queue.lock().unwrap().push_back(Cmd::Draw);
+        } else {
+            worker_queue.lock().unwrap().push_back(Cmd::ForceDraw);
+        }
         tx_pipe.write_all(&[0x1]).unwrap();
     });
 
@@ -440,6 +554,10 @@ fn main() {
             Some(cmd) => match cmd {
                 Cmd::Draw => {
                     app.redraw(false).expect("Failed to draw");
+                    app.flush_display();
+                }
+                Cmd::ForceDraw => {
+                    app.redraw(true).expect("Failed to draw");
                     app.flush_display();
                 }
                 Cmd::MouseInput { pos, input } => {

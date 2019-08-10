@@ -1,7 +1,7 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{Font, DEJAVUSANS_MONO, ROBOTO_REGULAR};
-use crate::module::{Input, ModuleImpl};
+use crate::modules::module::{Input, ModuleImpl};
 
 use chrono::{Date, DateTime, Datelike, Local};
 

@@ -19,26 +19,23 @@ use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
     zwlr_layer_shell_v1, zwlr_layer_surface_v1,
 };
 
-mod backlight;
-mod battery;
+
+
 mod buffer;
-mod calendar;
-mod clock;
 mod color;
 mod draw;
-mod launcher;
-mod module;
-mod sound;
+mod modules;
 
-use crate::backlight::Backlight;
-use crate::battery::UpowerBattery;
-use crate::buffer::Buffer;
-use crate::calendar::Calendar;
-use crate::clock::Clock;
 use crate::color::Color;
-use crate::launcher::Launcher;
-use crate::module::{Input, Module};
-use crate::sound::PulseAudio;
+use crate::buffer::Buffer;
+
+use crate::modules::backlight::Backlight;
+use crate::modules::battery::UpowerBattery;
+use crate::modules::calendar::Calendar;
+use crate::modules::clock::Clock;
+use crate::modules::launcher::Launcher;
+use crate::modules::module::{Input, Module};
+use crate::modules::sound::PulseAudio;
 
 enum Cmd {
     Exit,

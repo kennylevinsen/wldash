@@ -1,7 +1,7 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
-use crate::module::{Input, ModuleImpl};
+use crate::modules::module::{Input, ModuleImpl};
 
 use std::cell::RefCell;
 use std::cmp::{max, min};

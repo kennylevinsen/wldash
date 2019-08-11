@@ -192,10 +192,15 @@ impl ModuleImpl for UpowerBattery {
         _time: &DateTime<Local>,
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
+        let inner = self.inner.lock().unwrap();
         let text_color = Color::new(1.0, 1.0, 1.0, 1.0);
-        let bar_color = match self.inner.lock().unwrap().state {
+        let bar_color = match inner.state {
             UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => {
-                Color::new(1.0, 1.0, 1.0, 1.0)
+                if inner.capacity > 10.0 {
+                    Color::new(1.0, 1.0, 1.0, 1.0)
+                } else {
+                    Color::new(1.0, 0.5, 0.0, 1.0)
+                }
             }
             UpowerBatteryState::Charging | UpowerBatteryState::Full => {
                 Color::new(0.5, 1.0, 0.5, 1.0)
@@ -205,7 +210,6 @@ impl ModuleImpl for UpowerBattery {
             }
         };
 
-        let inner = self.inner.lock().unwrap();
         self.font.draw_text(
             &mut buf.subdimensions((0, 0, 128, 24))?,
             bg,

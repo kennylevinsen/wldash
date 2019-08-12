@@ -11,7 +11,7 @@ mod draw;
 mod modules;
 mod app;
 
-use app::{App, Cmd};
+use crate::app::{App, Cmd};
 
 fn main() {
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();

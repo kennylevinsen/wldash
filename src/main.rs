@@ -1,6 +1,7 @@
 use std::io::{Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::channel;
+use std::env;
 
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
@@ -17,7 +18,12 @@ fn main() {
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();
     let (tx_draw, rx_draw) = channel();
 
-    let mut app = App::new(tx_draw);
+    let all_outputs = match env::var("WLDASH_ALL_OUTPUTS") {
+        Ok(_) => true,
+        Err(_) => false,
+    };
+
+    let mut app = App::new(tx_draw, all_outputs);
     app.wipe();
 
     let worker_queue = app.cmd_queue();

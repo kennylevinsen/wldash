@@ -42,10 +42,11 @@ struct AppInner {
     shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
     dimensions: (u32, u32),
     draw_tx: Sender<bool>,
+    all_outputs: bool,
 }
 
 impl AppInner {
-    fn new(tx: Sender<bool>) -> AppInner{
+    fn new(tx: Sender<bool>, all_outputs: bool) -> AppInner{
         AppInner{
             compositor: None,
             surfaces: Vec::new(),
@@ -55,7 +56,52 @@ impl AppInner {
             shell: None,
             dimensions: (0, 0),
             draw_tx: tx,
+            all_outputs: all_outputs,
         }
+    }
+
+    fn add_shell_surface(
+        compositor: &wl_compositor::WlCompositor,
+        shell: &zwlr_layer_shell_v1::ZwlrLayerShellV1,
+        dimensions: (u32, u32),
+        configured_surfaces: Arc<Mutex<usize>>,
+        tx: Sender<bool>,
+        output: Option<&wl_output::WlOutput>
+    ) -> (
+        wl_surface::WlSurface,
+        zwlr_layer_surface_v1::ZwlrLayerSurfaceV1
+    ) {
+        let surface = compositor
+            .create_surface(NewProxy::implement_dummy)
+            .unwrap();
+
+        let shell_surface = shell
+            .get_layer_surface(
+                &surface,
+                output,
+                zwlr_layer_shell_v1::Layer::Overlay,
+                "".to_string(),
+                move |layer| {
+                    layer.implement_closure(
+                        move |evt, layer| match evt {
+                            zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
+                                *(configured_surfaces.lock().unwrap()) += 1;
+                                layer.ack_configure(serial);
+                                tx.send(false).unwrap();
+                            }
+                            _ => unreachable!(),
+                        },
+                        (),
+                    )
+                },
+            )
+            .unwrap();
+
+        shell_surface.set_keyboard_interactivity(1);
+        shell_surface.set_size(dimensions.0, dimensions.1);
+
+        surface.commit();
+        (surface, shell_surface)
     }
 
     fn outputs_changed(&mut self) {
@@ -68,6 +114,10 @@ impl AppInner {
             None => return,
         };
 
+        if !self.all_outputs && self.shell_surfaces.len() > 0 {
+            return;
+        }
+
         for shell_surface in self.shell_surfaces.iter() {
             shell_surface.destroy();
         }
@@ -75,46 +125,24 @@ impl AppInner {
             surface.destroy();
         }
 
-        let mut surfaces = Vec::new();
-        let mut shell_surfaces = Vec::new();
         self.configured_surfaces = Arc::new(Mutex::new(0));
-        for output in self.outputs.iter() {
-            let surface = compositor
-                .create_surface(NewProxy::implement_dummy)
-                .unwrap();
 
-            let configured = self.configured_surfaces.clone();
-            let tx = self.draw_tx.clone();
-            let shell_surface = shell
-                .get_layer_surface(
-                    &surface,
-                    Some(&output.1),
-                    zwlr_layer_shell_v1::Layer::Overlay,
-                    "".to_string(),
-                    move |layer| {
-                        layer.implement_closure(
-                            move |evt, layer| match evt {
-                                zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
-                                    *(configured.lock().unwrap()) += 1;
-                                    layer.ack_configure(serial);
-                                    tx.send(false).unwrap();
-                                }
-                                _ => unreachable!(),
-                            },
-                            (),
-                        )
-                    },
-                )
-                .unwrap();
-
-            shell_surface.set_keyboard_interactivity(1);
-            shell_surface.set_size(self.dimensions.0, self.dimensions.1);
-            surface.commit();
-            shell_surfaces.push(shell_surface);
-            surfaces.push(surface);
+        if self.all_outputs {
+            let mut surfaces = Vec::new();
+            let mut shell_surfaces = Vec::new();
+            for output in self.outputs.iter() {
+                let (surface, shell_surface) = AppInner::add_shell_surface(&compositor, &shell, self.dimensions, self.configured_surfaces.clone(), self.draw_tx.clone(), Some(&output.1));
+                surfaces.push(surface);
+                shell_surfaces.push(shell_surface);
+            }
+            self.surfaces = surfaces;
+            self.shell_surfaces = shell_surfaces;
+        } else {
+            let (surface, shell_surface) = AppInner::add_shell_surface(&compositor, &shell, self.dimensions, self.configured_surfaces.clone(), self.draw_tx.clone(), None);
+            self.surfaces = vec![surface];
+            self.shell_surfaces = vec![shell_surface];
         }
-        self.surfaces = surfaces;
-        self.shell_surfaces = shell_surfaces;
+
         self.draw_tx.send(false).unwrap();
     }
 
@@ -263,8 +291,8 @@ impl App {
         None
     }
 
-    pub fn new(tx: Sender<bool>) -> App {
-        let inner = Arc::new(Mutex::new(AppInner::new(tx.clone())));
+    pub fn new(tx: Sender<bool>, all_outputs: bool) -> App {
+        let inner = Arc::new(Mutex::new(AppInner::new(tx.clone(), all_outputs)));
 
         //
         // Set up modules

@@ -2,6 +2,7 @@ use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::modules::module::{Input, ModuleImpl};
+use crate::cmd::Cmd;
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -129,7 +130,7 @@ impl UpowerBattery {
         })
     }
 
-    pub fn new(listener: Sender<bool>) -> Result<Self, ::std::io::Error> {
+    pub fn new(listener: Sender<Cmd>) -> Result<Self, ::std::io::Error> {
         let d = UpowerBattery::from_device("BAT0")?;
         let path = d.device_path.clone();
         let inner = d.inner.clone();
@@ -175,7 +176,7 @@ impl UpowerBattery {
                     inner.state = state;
                     inner.capacity = capacity;
                     inner.dirty = true;
-                    listener.send(true).unwrap();
+                    listener.send(Cmd::Draw).unwrap();
                 }
             }
         });

@@ -2,7 +2,9 @@ use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::modules::module::{Input, ModuleImpl};
+use crate::cmd::Cmd;
 
+use std::sync::mpsc::Sender;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::io::Read;
@@ -20,10 +22,11 @@ pub struct Launcher {
     offset: usize,
     font: RefCell<Font>,
     dirty: bool,
+    tx: Sender<Cmd>,
 }
 
 impl Launcher {
-    pub fn new() -> Result<Launcher, ::std::io::Error> {
+    pub fn new(listener: Sender<Cmd>) -> Result<Launcher, ::std::io::Error> {
         if !atty::is(Stream::Stdin) {
             let mut inbuf = String::new();
             std::io::stdin().read_to_string(&mut inbuf)?;
@@ -42,6 +45,7 @@ impl Launcher {
                 offset: 0,
                 font: RefCell::new(Font::new(&ROBOTO_REGULAR, 32.0)),
                 dirty: true,
+                tx: listener,
             })
         } else {
             Ok(Launcher {
@@ -52,6 +56,7 @@ impl Launcher {
                 offset: 0,
                 font: RefCell::new(Font::new(&ROBOTO_REGULAR, 32.0)),
                 dirty: true,
+                tx: listener,
             })
         }
     }
@@ -313,12 +318,12 @@ impl ModuleImpl for Launcher {
                         },
                         Some('!') => {
                             println!("{}", self.input.chars().skip(1).collect::<String>());
-                            std::process::exit(0);
+                            self.tx.send(Cmd::Exit).unwrap();
                         }
                         _ => {
                             if self.matches.len() > self.offset {
                                 println!("{}", self.matches[self.offset]);
-                                std::process::exit(0);
+                                self.tx.send(Cmd::Exit).unwrap();
                             }
                         }
                     };

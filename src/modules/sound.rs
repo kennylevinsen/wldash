@@ -2,6 +2,7 @@ use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::modules::module::{Input, ModuleImpl};
+use crate::cmd::Cmd;
 
 use std::cell::RefCell;
 use std::cmp::{max, min};
@@ -404,7 +405,7 @@ pub struct PulseAudio {
 }
 
 impl PulseAudio {
-    pub fn new(listener: Sender<bool>) -> Result<PulseAudio, ::std::io::Error> {
+    pub fn new(listener: Sender<Cmd>) -> Result<PulseAudio, ::std::io::Error> {
         let (tx, rx) = channel();
         let mut font = Font::new(&ROBOTO_REGULAR, 24.0);
         font.add_str_to_cache("volume");
@@ -419,7 +420,7 @@ impl PulseAudio {
             rx.recv().unwrap();
             device.lock().unwrap().get_info().unwrap();
             *(dirty.lock().unwrap()) = true;
-            listener.send(true).unwrap();
+            listener.send(Cmd::Draw).unwrap();
         });
         Ok(pa)
     }

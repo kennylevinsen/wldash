@@ -63,16 +63,11 @@
 				</code></pre>
 			</p>
 			<p>
-				To use launcher functionality with <a href="https://github.com/kennylevinsen/dot-desktop"><code>dot-desktop</code></a>:
-				<pre><code>
-	git clone https://github.com/kennylevinsen/dot-desktop
-	cd dot-desktop
-	cargo build --release
-	cp ./target/release/dot-desktop /usr/local/bin/
-
-	eval "$(dot-desktop "$(dot-desktop | wldash)")"
-				</code></pre>
-				This pipes dot-desktop's selections into <code>wldash</code>, gives the selection back to dot-desktop, and finally evaluates it in a shell.
+				To make wldash toggle itself every time it is started, instantiate with <code>wldash start-or-kill</code>.
+			</p>
+			<p>
+				To run arbitrary command, type <code>!</code>. To use built-in calculator, type <code>=</code>.
+			</p>
 			<p>
 				<ul>
 					<li>Github link: <a href="https://github.com/kennylevinsen/wldash">https://github.com/kennylevinsen/wldash</a></li>

@@ -133,15 +133,22 @@ impl Launcher {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
+        let x_off = self.font.borrow_mut().auto_draw_text(
+            &mut buf.subdimensions((0, 0, 1232, 32))?,
+            bg,
+            &Color::new(1.0, 1.0, 0.0, 1.0),
+            "=",
+        )?.0 + 8;
+
         let x_off = if self.input.len() > 0 {
             let dim = self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((0, 0, 1232, 32))?,
+                &mut buf.subdimensions((x_off, 0, 1232-x_off, 32))?,
                 bg,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
-                &self.input,
+                &self.input[1..],
             )?;
 
-            dim.0 + 16
+            x_off + dim.0 + 8
         } else {
             0
         };
@@ -165,12 +172,22 @@ impl Launcher {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
-        self.font.borrow_mut().auto_draw_text(
+
+        let x_off = self.font.borrow_mut().auto_draw_text(
             &mut buf.subdimensions((0, 0, 1232, 32))?,
             bg,
-            &Color::new(1.0, 1.0, 1.0, 1.0),
-            &self.input,
-        )?;
+            &Color::new(1.0, 1.0, 0.0, 1.0),
+            "!",
+        )?.0 + 8;
+
+        if self.input.len() > 0 {
+            self.font.borrow_mut().auto_draw_text(
+                &mut buf.subdimensions((x_off, 0, 1232-x_off, 32))?,
+                bg,
+                &Color::new(1.0, 1.0, 1.0, 1.0),
+                &self.input[1..],
+            )?;
+        };
 
         Ok(vec![buf.get_signed_bounds()])
     }

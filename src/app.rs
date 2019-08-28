@@ -219,6 +219,9 @@ impl App {
 
         let mmap = pool.mmap();
         let mut buf = Buffer::new(mmap, inner.dimensions);
+        if force {
+            buf.memset(&bg);
+        }
         let mut damage = vec![];
 
         {
@@ -249,8 +252,12 @@ impl App {
         );
         for surface in inner.surfaces.iter() {
             surface.attach(Some(&new_buffer), 0, 0);
-            for d in damage.iter() {
-                surface.damage(d.0, d.1, d.2, d.3);
+            if force {
+                surface.damage(0, 0, buf_x as i32, buf_y as i32);
+            } else {
+                for d in damage.iter() {
+                    surface.damage(d.0, d.1, d.2, d.3);
+                }
             }
             surface.commit();
         }

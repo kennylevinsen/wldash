@@ -8,9 +8,10 @@ edition = "2018"
 lto = "fat"
 
 [features]
+default = [ "rcalc" ]
 ivy = [ "libivy" ]
 bc = []
-default = []
+rcalc = [ "rcalc_lib" ]
 
 [dependencies]
 smithay-client-toolkit = "0.6.3"
@@ -28,3 +29,4 @@ atty = "0.2"
 fuzzy-matcher = "0.2"
 lazy_static = "1.3.0"
 libivy = { git = "https://github.com/kennylevinsen/libivy.git", optional = true }
+rcalc_lib = { version = "0.9.3", optional = true }

@@ -181,6 +181,13 @@ fn calc(s: &str) -> Result<String, String> {
     libivy::eval(s)
 }
 
+#[cfg(feature = "rcalc")]
+fn calc(s: &str) -> Result<String, String> {
+    rcalc_lib::parse::eval(s, &mut rcalc_lib::parse::CalcState::new())
+        .map(|x| format!("{}", x).to_string())
+        .map_err(|x| format!("{}", x).to_string())
+}
+
 #[cfg(feature = "bc")]
 fn calc(s: &str) -> Result<String, String> {
     use std::io::Write;
@@ -209,7 +216,7 @@ fn calc(s: &str) -> Result<String, String> {
         .to_string())
 }
 
-#[cfg(not(any(feature = "ivy", feature = "bc")))]
+#[cfg(not(any(feature = "ivy", feature = "bc", feature = "rcalc")))]
 fn calc(_s: &str) -> Result<String, String> {
     Err("no calculator implementation available".to_string())
 }

@@ -8,10 +8,10 @@ Consider this alpha-quality: While it works, *everything* is subject to change w
 
 1. Checkout: `git clone https://github.com/kennylevinsen/wldash`
 2. Build: `cargo build --release`
-   If you want the Ivy calculator feature enabled (requires a Go toolchain): `cargo build --release --features ivy`
-   If you want the bc calculator feature enabled: `cargo build --release --features bc`
 3. Put somewhere: `cp target/release/wldash /usr/local/bin/wldash`
 4. Run: `wldash`
+
+To display wldash on all outputs, set `WLDASH_ALL_OUTPUTS=1`.
 
 ## How to use launcher
 
@@ -47,9 +47,7 @@ Works like bemenu: pipe a list into wldash, and it will print out the selection 
 
 The launcher also accepts prefix operators to change its mode:
 - `!`: Arbitrary command
-- `=`: Calculator, currently requires the `ivy` feature. See https://godoc.org/robpike.io/ivy for documentation on the syntax and features.
-
-To display the launcher on all outputs export `WLDASH_ALL_OUTPUTS=1`
+- `=`: Calculator based on rcalc_lib. See https://docs.rs/rcalc_lib/0.9.3/rcalc_lib/
 
 ## Notable missing features:
 

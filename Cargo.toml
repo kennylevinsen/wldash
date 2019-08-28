@@ -14,21 +14,20 @@ bc = []
 rcalc = [ "rcalc_lib" ]
 
 [dependencies]
-smithay-client-toolkit = "0.6.3"
-byteorder = "1.0"
-rusttype = "0.7.7"
+smithay-client-toolkit = "0.6.4"
+byteorder = "1.3"
+rusttype = "0.7"
 chrono = "0.4"
-nix = "0.14"
+nix = "0.15"
 memmap = "0.7"
-os_pipe = "0.8.1"
+os_pipe = "0.8"
 wayland-client = { version = "0.23", features = ["dlopen"] }
 wayland-protocols = { version = "0.23", features = ["client", "unstable_protocols"] }
-libpulse-binding = { version = "2.6.0"}
+libpulse-binding = { version = "2.11"}
 dbus = "0.6"
-atty = "0.2"
 fuzzy-matcher = "0.2"
-lazy_static = "1.3.0"
+lazy_static = "1.4"
 libivy = { git = "https://github.com/kennylevinsen/libivy.git", optional = true }
-rcalc_lib = { version = "0.9.3", optional = true }
+rcalc_lib = { version = "0.9", optional = true }
 rust-ini = "0.13"
-shlex = "0.1.1"
+shlex = "0.1"

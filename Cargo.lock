@@ -401,6 +401,11 @@ version = "0.1.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "rust-ini"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "rusttype"
 version = "0.7.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -429,6 +434,11 @@ dependencies = [
  "fake-simd 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "opaque-debug 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
+
+[[package]]
+name = "shlex"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "smithay-client-toolkit"
@@ -599,7 +609,9 @@ dependencies = [
  "nix 0.14.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "os_pipe 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rcalc_lib 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rust-ini 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rusttype 0.7.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "shlex 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "smithay-client-toolkit 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "wayland-client 0.23.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "wayland-protocols 0.23.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -667,9 +679,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum quote 0.6.13 (registry+https://github.com/rust-lang/crates.io-index)" = "6ce23b6b870e8f94f81fb0a363d65d86675884b34a09043c81e5562f11c1f8e1"
 "checksum rcalc_lib 0.9.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2497fc2d7578e75282922918d96de8d4790714312900d95b6d5f577168f2656e"
 "checksum redox_syscall 0.1.56 (registry+https://github.com/rust-lang/crates.io-index)" = "2439c63f3f6139d1b57529d16bc3b8bb855230c8efcc5d3a896c8bea7c3b1e84"
+"checksum rust-ini 0.13.0 (registry+https://github.com/rust-lang/crates.io-index)" = "3e52c148ef37f8c375d49d5a73aa70713125b7f19095948a923f80afdeb22ec2"
 "checksum rusttype 0.7.7 (registry+https://github.com/rust-lang/crates.io-index)" = "654103d61a05074b268a107cf6581ce120f0fc0115f2610ed9dfea363bb81139"
 "checksum same-file 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "585e8ddcedc187886a30fa705c47985c3fa88d06624095856b36ca0b82ff4421"
 "checksum sha-1 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "23962131a91661d643c98940b20fcaffe62d776a823247be80a48fcb8b6fce68"
+"checksum shlex 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "7fdf1b9db47230893d76faad238fd6097fd6d6a9245cd7a4d90dbd639536bbd2"
 "checksum smithay-client-toolkit 0.6.3 (registry+https://github.com/rust-lang/crates.io-index)" = "8c23093ebdaac1ad67558c7aef153522c6b3be7e0257820909e3a25c4519e78d"
 "checksum stb_truetype 0.2.6 (registry+https://github.com/rust-lang/crates.io-index)" = "69b7df505db8e81d54ff8be4693421e5b543e08214bd8d99eb761fcb4d5668ba"
 "checksum syn 0.15.44 (registry+https://github.com/rust-lang/crates.io-index)" = "9ca4b3b69a77cbe1ffc9e198781b7acb0c7365a883670e8f1c1bc66fba79a5c5"

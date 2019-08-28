@@ -15,9 +15,13 @@ To display wldash on all outputs, set `WLDASH_ALL_OUTPUTS=1`.
 
 ## How to use launcher
 
-Assuming https://github.com/kennylevinsen/dot-desktop is installed: `eval "$(dot-desktop "$(dot-desktop | wldash)")"`
+The launcher for wldash is built-in, based on https://github.com/kennylevinsen/dot-desktop. Pluggable systems may come back in the future.
 
-wldash simply takes a new-line separated list of strings, and returns the selection. dot-desktop generates this list, and afterwards processes the selection to return the proper instantiation string. Eval then executes it.
+Configuration currently happen through environment variables:
+
+- WLDASH_APP_OPENER: The command used to open normal applications. For sway, the recommended value is "swaymsg exec".
+- WLDASH_TERM_OPENER: The command used to open terminal applications.
+- WLDASH_URL_OPENER: The command used to open a URL.
 
 ## Features
 
@@ -43,7 +47,7 @@ Using backlight sys file, only visible of backlight is detected. Scroll to adjus
 
 ### Launcher
 
-Works like bemenu: pipe a list into wldash, and it will print out the selection made. Use https://github.com/kennylevinsen/dot-desktop if you want to launch using desktop files.
+Loads desktop files from the usual locations.
 
 The launcher also accepts prefix operators to change its mode:
 - `!`: Arbitrary command
@@ -54,3 +58,4 @@ The launcher also accepts prefix operators to change its mode:
 - Scaling of any kind - all sizes are currently hardcoded in pixels
 - Configurability
 - Cleanup and reorganization
+- Proper line editor for the launcher

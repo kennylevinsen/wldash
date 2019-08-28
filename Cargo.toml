@@ -30,3 +30,5 @@ fuzzy-matcher = "0.2"
 lazy_static = "1.3.0"
 libivy = { git = "https://github.com/kennylevinsen/libivy.git", optional = true }
 rcalc_lib = { version = "0.9.3", optional = true }
+rust-ini = "0.13"
+shlex = "0.1.1"

@@ -3,20 +3,24 @@ use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::modules::module::{Input, ModuleImpl};
+use crate::desktop::{Desktop, load_desktop_files};
 
+use std::env;
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::io::Read;
 use std::sync::mpsc::Sender;
+use std::process::Command;
 
-use atty::Stream;
 use chrono::{DateTime, Local};
 use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
 
 pub struct Launcher {
-    options: Vec<String>,
-    matches: Vec<String>,
+    options: Vec<Desktop>,
+    term_opener: String,
+    app_opener: String,
+    url_opener: String,
+    matches: Vec<Desktop>,
     input: String,
     result: Option<String>,
     offset: usize,
@@ -27,38 +31,32 @@ pub struct Launcher {
 
 impl Launcher {
     pub fn new(listener: Sender<Cmd>) -> Result<Launcher, ::std::io::Error> {
-        if !atty::is(Stream::Stdin) {
-            let mut inbuf = String::new();
-            std::io::stdin().read_to_string(&mut inbuf)?;
-            let options = inbuf
-                .split("\n")
-                .into_iter()
-                .filter(|s| s.len() > 0)
-                .map(|s| s.to_string())
-                .collect();
+        let term = match env::var_os("WLDASH_TERM_OPENER") {
+            Some(s) => format!("{:} ", s.into_string().unwrap()).to_string(),
+            None => "".to_string(),
+        };
+        let app = match env::var_os("WLDASH_APP_OPENER") {
+            Some(s) => format!("{:} ", s.into_string().unwrap()).to_string(),
+            None => "".to_string(),
+        };
+        let url = match env::var_os("WLDASH_URL_OPENER") {
+            Some(s) => format!("{:} ", s.into_string().unwrap()).to_string(),
+            None => "xdg-open ".to_string(),
+        };
 
-            Ok(Launcher {
-                options: options,
-                matches: vec![],
-                input: "".to_string(),
-                result: None,
-                offset: 0,
-                font: RefCell::new(Font::new(&ROBOTO_REGULAR, 32.0)),
-                dirty: true,
-                tx: listener,
-            })
-        } else {
-            Ok(Launcher {
-                options: vec![],
-                matches: vec![],
-                input: "".to_string(),
-                result: None,
-                offset: 0,
-                font: RefCell::new(Font::new(&ROBOTO_REGULAR, 32.0)),
-                dirty: true,
-                tx: listener,
-            })
-        }
+        Ok(Launcher {
+            options: load_desktop_files(),
+            term_opener: term,
+            app_opener: app,
+            url_opener: url,
+            matches: vec![],
+            input: "".to_string(),
+            result: None,
+            offset: 0,
+            font: RefCell::new(Font::new(&ROBOTO_REGULAR, 32.0)),
+            dirty: true,
+            tx: listener,
+        })
     }
 
     fn draw_launcher(
@@ -94,9 +92,9 @@ impl Launcher {
             };
             let size = if idx == self.offset && self.input.len() > 0 {
                 let (_, indices) =
-                    fuzzy_indices(&m.to_lowercase(), &self.input.to_lowercase()).unwrap();
-                let mut colors = Vec::with_capacity(m.len());
-                for pos in 0..m.len() {
+                    fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase()).unwrap();
+                let mut colors = Vec::with_capacity(m.name.len());
+                for pos in 0..m.name.len() {
                     if indices.contains(&pos) {
                         colors.push(Color::new(1.0, 1.0, 1.0, 1.0));
                     } else {
@@ -105,13 +103,13 @@ impl Launcher {
                 }
                 self.font
                     .borrow_mut()
-                    .auto_draw_text_individual_colors(&mut b, bg, &colors, &m)?
+                    .auto_draw_text_individual_colors(&mut b, bg, &colors, &m.name)?
             } else {
                 self.font.borrow_mut().auto_draw_text(
                     &mut b,
                     bg,
                     &Color::new(0.5, 0.5, 0.5, 1.0),
-                    m,
+                    &m.name,
                 )?
             };
 
@@ -297,22 +295,22 @@ impl ModuleImpl for Launcher {
                         .iter()
                         .map(|x| {
                             (
-                                fuzzy_match(&x.to_lowercase(), &self.input.to_lowercase()),
+                                fuzzy_match(&x.name.to_lowercase(), &self.input.to_lowercase()),
                                 x,
                             )
                         })
                         .filter(|(x, _)| x.is_some())
-                        .map(|(x, y)| (x.unwrap(), y.to_string()))
-                        .collect::<Vec<(i64, String)>>();
+                        .map(|(x, y)| (x.unwrap(), y.clone()))
+                        .collect::<Vec<(i64, Desktop)>>();
 
                     m.sort_by(|(x1, y1), (x2, y2)| {
                         if x1 > x2 {
                             Ordering::Less
                         } else if x1 < x2 {
                             Ordering::Greater
-                        } else if y1.len() < y2.len() {
+                        } else if y1.name.len() < y2.name.len() {
                             Ordering::Less
-                        } else if y1.len() > y2.len() {
+                        } else if y1.name.len() > y2.name.len() {
                             Ordering::Greater
                         } else {
                             y1.cmp(y2)
@@ -350,13 +348,53 @@ impl ModuleImpl for Launcher {
                             None => (),
                         },
                         Some('!') => {
-                            println!("{}", self.input.chars().skip(1).collect::<String>());
+                            let _ = Command::new("sh")
+                                    .arg("-c")
+                                    .arg(self.input.chars().skip(1).collect::<String>())
+                                    .spawn();
                             self.tx.send(Cmd::Exit).unwrap();
                         }
                         _ => {
                             if self.matches.len() > self.offset {
-                                println!("{}", self.matches[self.offset]);
-                                self.tx.send(Cmd::Exit).unwrap();
+                                let d = &self.matches[self.offset];
+                                if let Some(exec) = &d.exec {
+                                    let exec = exec
+                                        .replace("%f", "")
+                                        .replace("%F", "")
+                                        .replace("%u", "")
+                                        .replace("%U", "");
+                                    let prefix = if d.term {
+                                        &self.term_opener
+                                    } else {
+                                        &self.app_opener
+                                    };
+
+                                    let lexed = if prefix.len() > 0 {
+                                        let mut prefix = shlex::split(prefix).unwrap();
+                                        prefix.push(exec);
+                                        prefix
+                                    } else {
+                                        shlex::split(&exec).unwrap()
+                                    };
+                                    if lexed.len() > 0 {
+                                        let _ = Command::new(lexed[0].clone())
+                                            .args(&lexed[1..])
+                                            .spawn();
+                                        self.tx.send(Cmd::Exit).unwrap();
+                                    }
+                                }
+                                if let Some(url) = &d.url {
+                                    if self.url_opener.len() > 0 {
+                                        let mut lexed = shlex::split(&self.url_opener).unwrap();
+                                        lexed.push(url.to_string());
+                                        if lexed.len() > 0 {
+                                            let _ = Command::new(lexed[0].clone())
+                                                .args(&lexed[1..])
+                                                .spawn();
+                                            self.tx.send(Cmd::Exit).unwrap();
+                                        }
+                                    }
+                                }
                             }
                         }
                     };

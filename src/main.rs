@@ -13,6 +13,7 @@ mod cmd;
 mod color;
 mod draw;
 mod modules;
+mod desktop;
 
 use app::{App, OutputMode};
 use cmd::Cmd;

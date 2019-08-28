@@ -1,8 +1,8 @@
 use crate::buffer::Buffer;
+use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
 use crate::modules::module::{Input, ModuleImpl};
-use crate::cmd::Cmd;
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -134,52 +134,54 @@ impl UpowerBattery {
         let d = UpowerBattery::from_device("BAT0")?;
         let path = d.device_path.clone();
         let inner = d.inner.clone();
-        thread::spawn(move || {
-            let con = dbus::Connection::get_private(dbus::BusType::System)
-                .expect("Failed to establish D-Bus connection.");
-            let rule = format!(
-                "type='signal',\
-                 path='{}',\
-                 interface='org.freedesktop.DBus.Properties',\
-                 member='PropertiesChanged'",
-                path
-            );
+        let _ = thread::Builder::new()
+            .name("battery_monitor".to_string())
+            .spawn(move || {
+                let con = dbus::Connection::get_private(dbus::BusType::System)
+                    .expect("Failed to establish D-Bus connection.");
+                let rule = format!(
+                    "type='signal',\
+                     path='{}',\
+                     interface='org.freedesktop.DBus.Properties',\
+                     member='PropertiesChanged'",
+                    path
+                );
 
-            // First we're going to get an (irrelevant) NameAcquired event.
-            con.incoming(10_000).next();
+                // First we're going to get an (irrelevant) NameAcquired event.
+                con.incoming(10_000).next();
 
-            con.add_match(&rule)
-                .expect("Failed to add D-Bus match rule.");
+                con.add_match(&rule)
+                    .expect("Failed to add D-Bus match rule.");
 
-            loop {
-                if con.incoming(10_000).next().is_some() {
-                    let capacity = get_upower_property(&con, &path, "Percentage")
-                        .unwrap()
-                        .get1::<dbus::arg::Variant<f64>>()
-                        .unwrap()
-                        .0;
-                    let state = match get_upower_property(&con, &path, "State")
-                        .unwrap()
-                        .get1::<dbus::arg::Variant<u32>>()
-                        .unwrap()
-                        .0
-                    {
-                        1 => UpowerBatteryState::Charging,
-                        2 => UpowerBatteryState::Discharging,
-                        3 => UpowerBatteryState::Empty,
-                        4 => UpowerBatteryState::Full,
-                        5 => UpowerBatteryState::NotCharging,
-                        6 => UpowerBatteryState::Discharging,
-                        _ => UpowerBatteryState::Unknown,
-                    };
-                    let mut inner = inner.lock().unwrap();
-                    inner.state = state;
-                    inner.capacity = capacity;
-                    inner.dirty = true;
-                    listener.send(Cmd::Draw).unwrap();
+                loop {
+                    if con.incoming(10_000).next().is_some() {
+                        let capacity = get_upower_property(&con, &path, "Percentage")
+                            .unwrap()
+                            .get1::<dbus::arg::Variant<f64>>()
+                            .unwrap()
+                            .0;
+                        let state = match get_upower_property(&con, &path, "State")
+                            .unwrap()
+                            .get1::<dbus::arg::Variant<u32>>()
+                            .unwrap()
+                            .0
+                        {
+                            1 => UpowerBatteryState::Charging,
+                            2 => UpowerBatteryState::Discharging,
+                            3 => UpowerBatteryState::Empty,
+                            4 => UpowerBatteryState::Full,
+                            5 => UpowerBatteryState::NotCharging,
+                            6 => UpowerBatteryState::Discharging,
+                            _ => UpowerBatteryState::Unknown,
+                        };
+                        let mut inner = inner.lock().unwrap();
+                        inner.state = state;
+                        inner.capacity = capacity;
+                        inner.dirty = true;
+                        listener.send(Cmd::Draw).unwrap();
+                    }
                 }
-            }
-        });
+            });
 
         Ok(d)
     }

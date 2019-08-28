@@ -1,8 +1,8 @@
 use crate::buffer::Buffer;
+use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::modules::module::{Input, ModuleImpl};
-use crate::cmd::Cmd;
 
 use std::sync::mpsc::Sender;
 
@@ -17,19 +17,21 @@ pub struct Clock {
 
 impl Clock {
     pub fn new(ch: Sender<Cmd>) -> Clock {
-        std::thread::spawn(move || loop {
-            let n = Local::now();
-            let target = (n + Duration::seconds(60))
-                .with_second(0)
-                .unwrap()
-                .with_nanosecond(0)
-                .unwrap();
+        let _ = std::thread::Builder::new()
+            .name("clock_ticker".to_string())
+            .spawn(move || loop {
+                let n = Local::now();
+                let target = (n + Duration::seconds(60))
+                    .with_second(0)
+                    .unwrap()
+                    .with_nanosecond(0)
+                    .unwrap();
 
-            let d = target - n;
+                let d = target - n;
 
-            std::thread::sleep(d.to_std().unwrap());
-            ch.send(Cmd::Draw).unwrap();
-        });
+                std::thread::sleep(d.to_std().unwrap());
+                ch.send(Cmd::Draw).unwrap();
+            });
 
         let mut date_cache = Font::new(&ROBOTO_REGULAR, 64.0);
         date_cache

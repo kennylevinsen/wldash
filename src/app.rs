@@ -8,14 +8,14 @@ use chrono::Local;
 use smithay_client_toolkit::keyboard::{keysyms, map_keyboard_auto, Event as KbEvent, KeyState};
 use smithay_client_toolkit::utils::DoubleMemPool;
 
-use wayland_client::protocol::{wl_compositor, wl_pointer, wl_shm, wl_surface, wl_output};
+use wayland_client::protocol::{wl_compositor, wl_output, wl_pointer, wl_shm, wl_surface};
 use wayland_client::{Display, EventQueue, GlobalEvent, GlobalManager, NewProxy};
 use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
     zwlr_layer_shell_v1, zwlr_layer_surface_v1,
 };
 
-use crate::color::Color;
 use crate::buffer::Buffer;
+use crate::color::Color;
 
 use crate::cmd::Cmd;
 
@@ -46,8 +46,8 @@ struct AppInner {
 }
 
 impl AppInner {
-    fn new(tx: Sender<Cmd>, output_mode: OutputMode) -> AppInner{
-        AppInner{
+    fn new(tx: Sender<Cmd>, output_mode: OutputMode) -> AppInner {
+        AppInner {
             compositor: None,
             surfaces: Vec::new(),
             shell_surfaces: Vec::new(),
@@ -67,10 +67,10 @@ impl AppInner {
         dimensions: (u32, u32),
         configured_surfaces: Arc<Mutex<usize>>,
         tx: Sender<Cmd>,
-        output: Option<&wl_output::WlOutput>
+        output: Option<&wl_output::WlOutput>,
     ) -> (
         wl_surface::WlSurface,
-        zwlr_layer_surface_v1::ZwlrLayerSurfaceV1
+        zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
     ) {
         let surface = compositor
             .create_surface(NewProxy::implement_dummy)
@@ -130,16 +130,29 @@ impl AppInner {
                     if self.shell_surfaces.len() > 0 {
                         return;
                     }
-                    let (surface, shell_surface) = AppInner::add_shell_surface(&compositor, &shell, self.dimensions, self.configured_surfaces.clone(), self.draw_tx.clone(), None);
+                    let (surface, shell_surface) = AppInner::add_shell_surface(
+                        &compositor,
+                        &shell,
+                        self.dimensions,
+                        self.configured_surfaces.clone(),
+                        self.draw_tx.clone(),
+                        None,
+                    );
                     self.surfaces = vec![surface];
                     self.shell_surfaces = vec![shell_surface];
-
-                },
+                }
                 OutputMode::All => {
                     let mut surfaces = Vec::new();
                     let mut shell_surfaces = Vec::new();
                     for output in self.outputs.iter() {
-                        let (surface, shell_surface) = AppInner::add_shell_surface(&compositor, &shell, self.dimensions, self.configured_surfaces.clone(), self.draw_tx.clone(), Some(&output.1));
+                        let (surface, shell_surface) = AppInner::add_shell_surface(
+                            &compositor,
+                            &shell,
+                            self.dimensions,
+                            self.configured_surfaces.clone(),
+                            self.draw_tx.clone(),
+                            Some(&output.1),
+                        );
                         surfaces.push(surface);
                         shell_surfaces.push(shell_surface);
                     }
@@ -162,7 +175,12 @@ impl AppInner {
     fn remove_output(&mut self, id: u32) {
         let old_output = self.outputs.iter().find(|(output_id, _)| *output_id == id);
         if let Some(output) = old_output {
-            let new_outputs = self.outputs.iter().filter(|(output_id, _)| *output_id != id).map(|(x, y)| (x.clone(), y.clone())).collect();
+            let new_outputs = self
+                .outputs
+                .iter()
+                .filter(|(output_id, _)| *output_id != id)
+                .map(|(x, y)| (x.clone(), y.clone()))
+                .collect();
             if output.1.as_ref().version() >= 3 {
                 output.1.release()
             }
@@ -297,7 +315,9 @@ impl App {
     }
 
     pub fn with_modules<F>(&self, f: F)
-        where F: Fn(&Module) {
+    where
+        F: Fn(&Module),
+    {
         for m in self.modules.iter() {
             f(m);
         }
@@ -349,37 +369,38 @@ impl App {
 
         let (display, mut event_queue) = Display::connect_to_env().unwrap();
 
-
         let display_wrapper = display
             .as_ref()
             .make_wrapper(&event_queue.get_token())
             .unwrap()
             .into();
 
-
         //
         // Set up global manager
         //
         let inner_global = inner.clone();
-        let manager = GlobalManager::new_with_cb(&display_wrapper, move |event, registry| match event {
-            GlobalEvent::New {
-                id,
-                ref interface,
-                version,
-            } => {
-                if let "wl_output" = &interface[..] {
-                    let output = registry.bind(version, id, move |output| {
-                        output.implement_closure (move |_, _| {}, ())
-                    }).unwrap();
-                    inner_global.lock().unwrap().add_output(id, output);
+        let manager =
+            GlobalManager::new_with_cb(&display_wrapper, move |event, registry| match event {
+                GlobalEvent::New {
+                    id,
+                    ref interface,
+                    version,
+                } => {
+                    if let "wl_output" = &interface[..] {
+                        let output = registry
+                            .bind(version, id, move |output| {
+                                output.implement_closure(move |_, _| {}, ())
+                            })
+                            .unwrap();
+                        inner_global.lock().unwrap().add_output(id, output);
+                    }
                 }
-            }
-            GlobalEvent::Removed { id, ref interface } => {
-                if let "wl_output" = &interface[..] {
-                    inner_global.lock().unwrap().remove_output(id);
+                GlobalEvent::Removed { id, ref interface } => {
+                    if let "wl_output" = &interface[..] {
+                        inner_global.lock().unwrap().remove_output(id);
+                    }
                 }
-            }
-        });
+            });
 
         // double sync to retrieve the global list
         // and the globals metadata
@@ -447,16 +468,18 @@ impl App {
         //
         // Prepare shell so that we can create our shell surface
         //
-        inner.lock().unwrap().set_shell(Some(if let Ok(layer) = manager.instantiate_exact(
-            1,
-            |layer: NewProxy<zwlr_layer_shell_v1::ZwlrLayerShellV1>| {
-                layer.implement_closure(|_, _| {}, ())
+        inner.lock().unwrap().set_shell(Some(
+            if let Ok(layer) = manager.instantiate_exact(
+                1,
+                |layer: NewProxy<zwlr_layer_shell_v1::ZwlrLayerShellV1>| {
+                    layer.implement_closure(|_, _| {}, ())
+                },
+            ) {
+                layer
+            } else {
+                panic!("server didn't advertise `zwlr_layer_shell_v1`");
             },
-        ) {
-            layer
-        } else {
-            panic!("server didn't advertise `zwlr_layer_shell_v1`");
-        }));
+        ));
 
         //
         // Calculate window dimensions
@@ -470,7 +493,10 @@ impl App {
         }
 
         // Add padding
-        inner.lock().unwrap().set_dimensions((dimensions.0 + 40, dimensions.1 + 40));
+        inner
+            .lock()
+            .unwrap()
+            .set_dimensions((dimensions.0 + 40, dimensions.1 + 40));
         inner.lock().unwrap().outputs_changed();
         event_queue.sync_roundtrip().unwrap();
 

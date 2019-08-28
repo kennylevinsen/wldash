@@ -1,18 +1,18 @@
-use std::io::{Read, Write, BufRead, BufReader};
-use std::os::unix::io::AsRawFd;
-use std::sync::mpsc::channel;
 use std::env;
-use std::os::unix::net::{UnixStream, UnixListener};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::os::unix::io::AsRawFd;
+use std::os::unix::net::{UnixListener, UnixStream};
+use std::sync::mpsc::channel;
 
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
 
+mod app;
 mod buffer;
+mod cmd;
 mod color;
 mod draw;
 mod modules;
-mod app;
-mod cmd;
 
 use app::{App, OutputMode};
 use cmd::Cmd;
@@ -87,38 +87,49 @@ fn main() {
     app.wipe();
 
     let worker_queue = app.cmd_queue();
-    std::thread::spawn(move || loop {
-        let cmd = rx_draw.recv().unwrap();
-        worker_queue.lock().unwrap().push_back(cmd);
-        tx_pipe.write_all(&[0x1]).unwrap();
-    });
+    let _ = std::thread::Builder::new()
+        .name("cmd_proxy".to_string())
+        .spawn(move || loop {
+            let cmd = rx_draw.recv().unwrap();
+            worker_queue.lock().unwrap().push_back(cmd);
+            tx_pipe.write_all(&[0x1]).unwrap();
+        });
 
     let ipc_queue = app.cmd_queue();
-    std::thread::spawn(move || loop {
-        for stream in listener.incoming() {
-            match stream {
-                Ok(stream) => {
-                    let client_queue = ipc_queue.clone();
-                    let mut client_pipe = ipc_pipe.try_clone().unwrap();
-                    std::thread::spawn(move || {
-                        let r = BufReader::new(stream);
-                        for line in r.lines() {
-                            match line {
-                                Ok(v) => match v.as_str() {
-                                    "kill" => client_queue.lock().unwrap().push_back(Cmd::Exit),
-                                    "toggle_visible" => client_queue.lock().unwrap().push_back(Cmd::ToggleVisible),
-                                    v => eprintln!("unknown command: {}", v),
-                                },
-                                Err(_) => return,
-                            }
-                            client_pipe.write_all(&[0x1]).unwrap();
-                        }
-                    });
+    let _ = std::thread::Builder::new()
+        .name("ipc_server".to_string())
+        .spawn(move || loop {
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                        let client_queue = ipc_queue.clone();
+                        let mut client_pipe = ipc_pipe.try_clone().unwrap();
+                        let _ = std::thread::Builder::new()
+                            .name("ipc_client".to_string())
+                            .spawn(move || {
+                                let r = BufReader::new(stream);
+                                for line in r.lines() {
+                                    match line {
+                                        Ok(v) => match v.as_str() {
+                                            "kill" => {
+                                                client_queue.lock().unwrap().push_back(Cmd::Exit)
+                                            }
+                                            "toggle_visible" => client_queue
+                                                .lock()
+                                                .unwrap()
+                                                .push_back(Cmd::ToggleVisible),
+                                            v => eprintln!("unknown command: {}", v),
+                                        },
+                                        Err(_) => return,
+                                    }
+                                    client_pipe.write_all(&[0x1]).unwrap();
+                                }
+                            });
+                    }
+                    Err(_) => break,
                 }
-                Err(_) => break,
             }
-        }
-    });
+        });
 
     let mut fds = [
         PollFd::new(app.event_queue().get_connection_fd(), PollFlags::POLLIN),

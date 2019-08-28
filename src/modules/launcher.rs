@@ -1,13 +1,13 @@
 use crate::buffer::Buffer;
+use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::modules::module::{Input, ModuleImpl};
-use crate::cmd::Cmd;
 
-use std::sync::mpsc::Sender;
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::io::Read;
+use std::sync::mpsc::Sender;
 
 use atty::Stream;
 use chrono::{DateTime, Local};
@@ -133,16 +133,21 @@ impl Launcher {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
-        let x_off = self.font.borrow_mut().auto_draw_text(
-            &mut buf.subdimensions((0, 0, 1232, 32))?,
-            bg,
-            &Color::new(1.0, 1.0, 0.0, 1.0),
-            "=",
-        )?.0 + 8;
+        let x_off = self
+            .font
+            .borrow_mut()
+            .auto_draw_text(
+                &mut buf.subdimensions((0, 0, 1232, 32))?,
+                bg,
+                &Color::new(1.0, 1.0, 0.0, 1.0),
+                "=",
+            )?
+            .0
+            + 8;
 
         let x_off = if self.input.len() > 0 {
             let dim = self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((x_off, 0, 1232-x_off, 32))?,
+                &mut buf.subdimensions((x_off, 0, 1232 - x_off, 32))?,
                 bg,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &self.input[1..],
@@ -172,17 +177,21 @@ impl Launcher {
     ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
         buf.memset(bg);
 
-
-        let x_off = self.font.borrow_mut().auto_draw_text(
-            &mut buf.subdimensions((0, 0, 1232, 32))?,
-            bg,
-            &Color::new(1.0, 1.0, 0.0, 1.0),
-            "!",
-        )?.0 + 8;
+        let x_off = self
+            .font
+            .borrow_mut()
+            .auto_draw_text(
+                &mut buf.subdimensions((0, 0, 1232, 32))?,
+                bg,
+                &Color::new(1.0, 1.0, 0.0, 1.0),
+                "!",
+            )?
+            .0
+            + 8;
 
         if self.input.len() > 0 {
             self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((x_off, 0, 1232-x_off, 32))?,
+                &mut buf.subdimensions((x_off, 0, 1232 - x_off, 32))?,
                 bg,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &self.input[1..],

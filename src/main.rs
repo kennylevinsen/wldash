@@ -29,6 +29,10 @@ fn main() {
         Ok(dir) => dir + "/wldash",
         Err(_) => "/tmp/wldash".to_string(),
     };
+    let scale = match env::var("WLDASH_SCALE") {
+        Ok(s) => s.parse().unwrap(),
+        Err(_) => 1,
+    };
 
     let args: Vec<String> = env::args().collect();
     let mode = match args.len() {
@@ -84,7 +88,7 @@ fn main() {
         Err(_) => OutputMode::Active,
     };
 
-    let mut app = App::new(tx_draw, output_mode);
+    let mut app = App::new(tx_draw, output_mode, scale);
     app.wipe();
 
     let worker_queue = app.cmd_queue();

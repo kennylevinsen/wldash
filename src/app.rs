@@ -43,10 +43,11 @@ struct AppInner {
     draw_tx: Sender<Cmd>,
     output_mode: OutputMode,
     visible: bool,
+    scale: u32,
 }
 
 impl AppInner {
-    fn new(tx: Sender<Cmd>, output_mode: OutputMode) -> AppInner {
+    fn new(tx: Sender<Cmd>, output_mode: OutputMode, scale: u32) -> AppInner {
         AppInner {
             compositor: None,
             surfaces: Vec::new(),
@@ -58,6 +59,7 @@ impl AppInner {
             draw_tx: tx,
             output_mode: output_mode,
             visible: true,
+            scale: scale,
         }
     }
 
@@ -65,6 +67,7 @@ impl AppInner {
         compositor: &wl_compositor::WlCompositor,
         shell: &zwlr_layer_shell_v1::ZwlrLayerShellV1,
         dimensions: (u32, u32),
+        scale: u32,
         configured_surfaces: Arc<Mutex<usize>>,
         tx: Sender<Cmd>,
         output: Option<&wl_output::WlOutput>,
@@ -99,8 +102,8 @@ impl AppInner {
             .unwrap();
 
         shell_surface.set_keyboard_interactivity(1);
-        shell_surface.set_size(dimensions.0, dimensions.1);
-
+        shell_surface.set_size(dimensions.0/scale, dimensions.1/scale);
+        surface.set_buffer_scale(scale as i32);
         surface.commit();
         (surface, shell_surface)
     }
@@ -134,6 +137,7 @@ impl AppInner {
                         &compositor,
                         &shell,
                         self.dimensions,
+                        self.scale,
                         self.configured_surfaces.clone(),
                         self.draw_tx.clone(),
                         None,
@@ -149,6 +153,7 @@ impl AppInner {
                             &compositor,
                             &shell,
                             self.dimensions,
+                            self.scale,
                             self.configured_surfaces.clone(),
                             self.draw_tx.clone(),
                             Some(&output.1),
@@ -271,10 +276,10 @@ impl App {
         for surface in inner.surfaces.iter() {
             surface.attach(Some(&new_buffer), 0, 0);
             if force {
-                surface.damage(0, 0, buf_x as i32, buf_y as i32);
+                surface.damage_buffer(0, 0, buf_x as i32, buf_y as i32);
             } else {
                 for d in damage.iter() {
-                    surface.damage(d.0, d.1, d.2, d.3);
+                    surface.damage_buffer(d.0, d.1, d.2, d.3);
                 }
             }
             surface.commit();
@@ -332,8 +337,8 @@ impl App {
         None
     }
 
-    pub fn new(tx: Sender<Cmd>, output_mode: OutputMode) -> App {
-        let inner = Arc::new(Mutex::new(AppInner::new(tx.clone(), output_mode)));
+    pub fn new(tx: Sender<Cmd>, output_mode: OutputMode, scale: u32) -> App {
+        let inner = Arc::new(Mutex::new(AppInner::new(tx.clone(), output_mode, scale)));
 
         //
         // Set up modules
@@ -527,7 +532,7 @@ impl App {
                         surface_y,
                         ..
                     } => {
-                        pos = (surface_x as u32, surface_y as u32);
+                        pos = (surface_x as u32 * scale, surface_y as u32 * scale);
                     }
                     wl_pointer::Event::Axis { axis, value, .. } => {
                         if axis == wl_pointer::Axis::VerticalScroll {

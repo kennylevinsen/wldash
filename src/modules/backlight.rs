@@ -108,19 +108,19 @@ impl ModuleImpl for Backlight {
         buf.memset(bg);
         let c = Color::new(1.0, 1.0, 1.0, 1.0);
         self.font.draw_text(
-            &mut buf.subdimensions((0, 0, 128, 24))?,
+            buf,
             bg,
             &c,
             "backlight",
         )?;
         draw_bar(
-            &mut buf.subdimensions((128, 0, 464, 24))?,
+            &mut buf.offset((128, 0))?,
             &c,
             464,
             24,
             self.brightness(),
         )?;
-        draw_box(&mut buf.subdimensions((128, 0, 464, 24))?, &c, (464, 24))?;
+        draw_box(&mut buf.offset((128, 0))?, &c, (464, 24))?;
         Ok(vec![buf.get_signed_bounds()])
     }
 

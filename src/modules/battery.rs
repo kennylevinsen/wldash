@@ -214,13 +214,13 @@ impl ModuleImpl for UpowerBattery {
         };
 
         self.font.draw_text(
-            &mut buf.subdimensions((0, 0, 128, 24))?,
+            &mut buf.offset((0, 0))?,
             bg,
             &text_color,
             "battery",
         )?;
         draw_bar(
-            &mut buf.subdimensions((128, 0, 464, 24))?,
+            &mut buf.offset((128, 0))?,
             &bar_color,
             464,
             24,
@@ -228,7 +228,7 @@ impl ModuleImpl for UpowerBattery {
         )?;
 
         draw_box(
-            &mut buf.subdimensions((128, 0, 464, 24))?,
+            &mut buf.offset((128, 0))?,
             &bar_color,
             (464, 24),
         )?;

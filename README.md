@@ -11,7 +11,7 @@ Consider this alpha-quality: While it works, *everything* is subject to change w
 3. Put somewhere: `cp target/release/wldash /usr/local/bin/wldash`
 4. Run: `wldash`
 
-To display wldash on all outputs, set `WLDASH_ALL_OUTPUTS=1`.
+To display wldash on all outputs, set `WLDASH_ALL_OUTPUTS=1`. To cut size in half, set `WLDASH_SCALE=2`.
 
 ## How to use launcher
 

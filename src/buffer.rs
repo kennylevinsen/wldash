@@ -67,6 +67,35 @@ impl<'a> Buffer<'a> {
         })
     }
 
+    pub fn offset(
+        &mut self,
+        offset: (u32, u32),
+    ) -> Result<Buffer, ::std::io::Error> {
+        let bounds = self.get_bounds();
+        if offset.0 > bounds.2
+            || offset.1 > bounds.3
+        {
+            return Err(::std::io::Error::new(
+                ::std::io::ErrorKind::Other,
+                format!(
+                    "cannot create offset outside buffer: {:?} > {:?}",
+                    offset, bounds
+                ),
+            ));
+        }
+
+        Ok(Buffer {
+            buf: self.buf,
+            dimensions: self.dimensions,
+            subdimensions: Some((
+                offset.0 + bounds.0,
+                offset.1 + bounds.1,
+                bounds.2 - offset.0,
+                bounds.3 - offset.1,
+            )),
+        })
+    }
+
     pub fn memset(&mut self, c: &Color) {
         if let Some(subdim) = self.subdimensions {
             unsafe {

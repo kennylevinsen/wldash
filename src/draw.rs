@@ -230,8 +230,6 @@ impl Font {
 }
 
 pub fn draw_box(buf: &mut Buffer, c: &Color, dim: (u32, u32)) -> Result<(), ::std::io::Error> {
-    let mut buf = buf.subdimensions((0, 0, dim.0, dim.1))?;
-
     for x in 0..dim.0 {
         let _ = buf.put((x, 0), c);
         let _ = buf.put((x, dim.1 - 1), c);
@@ -251,8 +249,6 @@ pub fn draw_bar(
     height: u32,
     fill: f32,
 ) -> Result<(), ::std::io::Error> {
-    let mut buf = buf.subdimensions((0, 0, length, height))?;
-
     let mut fill_pos = ((length as f32) * fill) as u32;
     if fill_pos > length {
         fill_pos = length;

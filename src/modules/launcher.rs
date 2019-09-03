@@ -73,7 +73,7 @@ impl Launcher {
                 Color::new(1.0, 1.0, 1.0, 1.0)
             };
             let dim = self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((0, 0, 1232, 32))?,
+                buf,
                 bg,
                 &c,
                 &self.input,
@@ -86,7 +86,7 @@ impl Launcher {
 
         let mut width_remaining: i32 = 1232 - x_off as i32;
         for (idx, m) in self.matches.iter().enumerate() {
-            let mut b = match buf.subdimensions((x_off, 0, width_remaining as u32, 32)) {
+            let mut b = match buf.offset((x_off, 0)) {
                 Ok(b) => b,
                 Err(_) => break,
             };
@@ -135,7 +135,7 @@ impl Launcher {
             .font
             .borrow_mut()
             .auto_draw_text(
-                &mut buf.subdimensions((0, 0, 1232, 32))?,
+                buf,
                 bg,
                 &Color::new(1.0, 1.0, 0.0, 1.0),
                 "=",
@@ -145,7 +145,7 @@ impl Launcher {
 
         let x_off = if self.input.len() > 0 {
             let dim = self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((x_off, 0, 1232 - x_off, 32))?,
+                &mut buf.offset((x_off, 0))?,
                 bg,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &self.input[1..],
@@ -158,7 +158,7 @@ impl Launcher {
 
         if let Some(result) = &self.result {
             self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((x_off, 0, 1232 - x_off, 32))?,
+                &mut buf.offset((x_off, 0))?,
                 bg,
                 &Color::new(0.75, 0.75, 0.75, 1.0),
                 &format!(" = {:}", result),
@@ -179,7 +179,7 @@ impl Launcher {
             .font
             .borrow_mut()
             .auto_draw_text(
-                &mut buf.subdimensions((0, 0, 1232, 32))?,
+                &mut buf.offset((0, 0))?,
                 bg,
                 &Color::new(1.0, 1.0, 0.0, 1.0),
                 "!",
@@ -189,7 +189,7 @@ impl Launcher {
 
         if self.input.len() > 0 {
             self.font.borrow_mut().auto_draw_text(
-                &mut buf.subdimensions((x_off, 0, 1232 - x_off, 32))?,
+                &mut buf.offset((x_off, 0))?,
                 bg,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &self.input[1..],

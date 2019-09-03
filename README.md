@@ -22,6 +22,7 @@ Configuration currently happen through environment variables:
 - WLDASH_APP_OPENER: The command used to open normal applications. For sway, the recommended value is "swaymsg exec".
 - WLDASH_TERM_OPENER: The command used to open terminal applications.
 - WLDASH_URL_OPENER: The command used to open a URL.
+- XDG_DATA_DIRS and XDG_DATA_HOME: Used to find the many `applications` folders that contain `desktop` files.
 
 ## Features
 

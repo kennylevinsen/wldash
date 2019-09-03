@@ -73,17 +73,19 @@ impl PartialEq for Desktop {
 
 pub fn load_desktop_files() -> Vec<Desktop> {
     let home = env::var_os("HOME").unwrap().into_string().unwrap();
-    let paths = [
-        "/usr/share/applications".to_string(),
-        "/usr/local/share/applications".to_string(),
-        "/var/lib/flatpak/exports/share/applications".to_string(),
-        format!("{}/.local/share/applications", home).to_string(),
-        format!("{}/.local/share/flatpak/exports/share/applications", home).to_string(),
-    ];
 
-    paths
-        .into_iter()
-        .map(|p| Desktop::parse_dir(&p))
+    let xdg_data_home = match env::var_os("XDG_DATA_HOME") {
+        Some(s) => s.into_string().unwrap(),
+        None => format!("{}/.local/share", home).to_string(),
+    };
+    let xdg_data_dirs = match env::var_os("XDG_DATA_DIRS") {
+        Some(s) => s.into_string().unwrap(),
+        None => "/usr/local/share:/usr/share".to_string(),
+    };
+
+    std::iter::once(xdg_data_home.as_str())
+        .chain(xdg_data_dirs.split(":"))
+        .map(|p| Desktop::parse_dir(&format!("{}/applications", p)))
         .filter_map(Result::ok)
         .flatten()
         .filter(|d| {

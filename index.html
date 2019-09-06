@@ -8,7 +8,6 @@
 				display: grid;
 				justify-items: center;
 				align-items: center;
-				width: 100%;
 			}
 			h1 {
 				font-size: 3em;
@@ -17,6 +16,9 @@
 			}
 			h2 {
 				text-align: center;
+				font-family: monospace;
+			}
+			h3 {
 				font-family: monospace;
 			}
 			header {
@@ -53,15 +55,22 @@
 			<p>
 				<a href="https://github.com/kennylevinsen/wldash"><code>wldash</code></a> is a convenient dashboard and launcher for Wayland (requires wlr-layer-shell-unstable-v1 support), allowing easy access to things like date and time, backlight and volume control.
 			</p>
+			<h3>How to get wldash</h3>
+			<ul>
+				<li><a href="https://github.com/kennylevinsen/wldash/releases">Download the latest release from GitHub</a></li>
+				<li>To build:
+					<pre><code>
+git clone https://github.com/kennylevinsen/wldash
+cd wldash
+cargo build --release
+cp ./target/release/wldash /usr/local/bin/
+wldash
+					</code></pre>
+				</li>
+			</ul>
+			<h3>Usage</h3>
 			<p>
-				To run:
-				<pre><code>
-	git clone https://github.com/kennylevinsen/wldash
-	cd wldash
-	cargo build --release
-	cp ./target/release/wldash /usr/local/bin/
-	wldash
-				</code></pre>
+				Run <code>wldash print-config</code> to see the current configuration. Use that as template to write a new one to <code>~/.config/wldash/config.json</code>. The widgets, their size and layout can be configured as well.
 			</p>
 			<p>
 				To make wldash toggle itself every time it is started, instantiate with <code>wldash start-or-kill</code>.
@@ -70,17 +79,19 @@
 				To run arbitrary command, type <code>!</code>. To use built-in calculator, type <code>=</code>.
 			</p>
 			<p>
+				Hint: Try to scroll, left-click and right-click on things.
+			</p>
+			<h3>Links</h3>
+			<p>
 				<ul>
 					<li>Github link: <a href="https://github.com/kennylevinsen/wldash">https://github.com/kennylevinsen/wldash</a></li>
 					<li>IRC: #wldash @ irc.freenode.net</li>
 				</ul>
 			</p>
-			<p>
-				Donate:
-				<ul>
-					<li><a href="https://en.liberapay.com/kennylevinsen/">LiberaPay</a></li>
-				</ul>
-			</p>
+			<h3>Donate</h3>
+			<ul>
+				<li><a href="https://en.liberapay.com/kennylevinsen/">LiberaPay</a></li>
+			</ul>
 			<p>
 				<a href="https://kl.wtf/">© 2019, Kenny Levinsen</a>
 			</p>

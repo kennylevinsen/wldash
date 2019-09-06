@@ -1,7 +1,7 @@
 use crate::cmd::Cmd;
+use crate::color::Color;
 use crate::widget;
 use crate::widgets;
-use crate::color::Color;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::sync::mpsc::Sender;

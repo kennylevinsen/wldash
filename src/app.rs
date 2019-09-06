@@ -1,12 +1,12 @@
-use std::cmp::max;
 use std::collections::VecDeque;
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 use chrono::Local;
 
-use smithay_client_toolkit::keyboard::{keysyms, map_keyboard_auto, Event as KbEvent, KeyState};
-use smithay_client_toolkit::utils::DoubleMemPool;
+use smithay_client_toolkit::keyboard::{
+    keysyms, map_keyboard_auto, Event as KbEvent, KeyState, ModifiersState,
+};
 
 use wayland_client::protocol::{wl_compositor, wl_output, wl_pointer, wl_shm, wl_surface};
 use wayland_client::{Display, EventQueue, GlobalEvent, GlobalManager, NewProxy};
@@ -16,16 +16,10 @@ use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
 
 use crate::buffer::Buffer;
 use crate::color::Color;
+use crate::widget::{DrawContext, Widget};
 
 use crate::cmd::Cmd;
-
-use crate::modules::backlight::Backlight;
-use crate::modules::battery::UpowerBattery;
-use crate::modules::calendar::Calendar;
-use crate::modules::clock::Clock;
-use crate::modules::launcher::Launcher;
-use crate::modules::module::{Input, Module};
-use crate::modules::sound::PulseAudio;
+use crate::doublemempool::DoubleMemPool;
 
 pub enum OutputMode {
     Active,
@@ -39,7 +33,6 @@ struct AppInner {
     configured_surfaces: Arc<Mutex<usize>>,
     outputs: Vec<(u32, wl_output::WlOutput)>,
     shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
-    dimensions: (u32, u32),
     draw_tx: Sender<Cmd>,
     output_mode: OutputMode,
     visible: bool,
@@ -55,7 +48,6 @@ impl AppInner {
             configured_surfaces: Arc::new(Mutex::new(0)),
             outputs: Vec::new(),
             shell: None,
-            dimensions: (0, 0),
             draw_tx: tx,
             output_mode: output_mode,
             visible: true,
@@ -66,7 +58,6 @@ impl AppInner {
     fn add_shell_surface(
         compositor: &wl_compositor::WlCompositor,
         shell: &zwlr_layer_shell_v1::ZwlrLayerShellV1,
-        dimensions: (u32, u32),
         scale: u32,
         configured_surfaces: Arc<Mutex<usize>>,
         tx: Sender<Cmd>,
@@ -79,6 +70,8 @@ impl AppInner {
             .create_surface(NewProxy::implement_dummy)
             .unwrap();
 
+        let this_is_stupid = Arc::new(Mutex::new(false));
+
         let shell_surface = shell
             .get_layer_surface(
                 &surface,
@@ -89,9 +82,13 @@ impl AppInner {
                     layer.implement_closure(
                         move |evt, layer| match evt {
                             zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
-                                *(configured_surfaces.lock().unwrap()) += 1;
-                                layer.ack_configure(serial);
-                                tx.send(Cmd::ForceDraw).unwrap();
+                                let mut x = this_is_stupid.lock().unwrap();
+                                if !*x {
+                                    *x = true;
+                                    *(configured_surfaces.lock().unwrap()) += 1;
+                                    layer.ack_configure(serial);
+                                    tx.send(Cmd::ForceDraw).unwrap();
+                                }
                             }
                             _ => unreachable!(),
                         },
@@ -102,7 +99,6 @@ impl AppInner {
             .unwrap();
 
         shell_surface.set_keyboard_interactivity(1);
-        shell_surface.set_size(dimensions.0/scale, dimensions.1/scale);
         surface.set_buffer_scale(scale as i32);
         surface.commit();
         (surface, shell_surface)
@@ -136,7 +132,6 @@ impl AppInner {
                     let (surface, shell_surface) = AppInner::add_shell_surface(
                         &compositor,
                         &shell,
-                        self.dimensions,
                         self.scale,
                         self.configured_surfaces.clone(),
                         self.draw_tx.clone(),
@@ -152,7 +147,6 @@ impl AppInner {
                         let (surface, shell_surface) = AppInner::add_shell_surface(
                             &compositor,
                             &shell,
-                            self.dimensions,
                             self.scale,
                             self.configured_surfaces.clone(),
                             self.draw_tx.clone(),
@@ -201,10 +195,6 @@ impl AppInner {
     fn set_shell(&mut self, shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>) {
         self.shell = shell
     }
-
-    fn set_dimensions(&mut self, dimensions: (u32, u32)) {
-        self.dimensions = dimensions
-    }
 }
 
 pub struct App {
@@ -212,12 +202,19 @@ pub struct App {
     display: Display,
     event_queue: EventQueue,
     cmd_queue: Arc<Mutex<VecDeque<Cmd>>>,
-    modules: Vec<Module>,
+    widget: Option<Box<dyn Widget + Send>>,
     inner: Arc<Mutex<AppInner>>,
+    last_damage: Option<Vec<(i32, i32, i32, i32)>>,
+    last_dim: (u32, u32),
 }
 
 impl App {
-    pub fn redraw(&mut self, force: bool) -> Result<(), ::std::io::Error> {
+    pub fn redraw(&mut self, mut force: bool) -> Result<(), ::std::io::Error> {
+        let widget = match self.widget {
+            Some(ref mut widget) => widget,
+            None => return Ok(()),
+        };
+
         let inner = self.inner.lock().unwrap();
         let time = Local::now();
 
@@ -226,41 +223,56 @@ impl App {
             return Ok(());
         }
 
-        let pool = match self.pools.pool() {
-            Some(pool) => pool,
+        let (last, pool) = match self.pools.pool() {
+            Some((last, pool)) => (last, pool),
             None => return Ok(()),
         };
 
-        let (buf_x, buf_y) = inner.dimensions;
-
-        let bg = Color::new(0.0, 0.0, 0.0, 0.9);
+        let size = widget.size();
+        let size_changed = self.last_dim != size;
 
         // resize the pool if relevant
-
-        pool.resize((4 * buf_x * buf_y) as usize)
+        pool.resize((4 * size.0 * size.1) as usize)
             .expect("Failed to resize the memory pool.");
-
         let mmap = pool.mmap();
-        let mut buf = Buffer::new(mmap, inner.dimensions);
+        let mut buf = Buffer::new(mmap, size);
+
+        // Copy old damage
+        if let Some(d) = &self.last_damage {
+            if !size_changed {
+                let lastmmap = last.mmap();
+                let last = Buffer::new(lastmmap, size);
+
+                if cfg!(feature = "damage_debug") {
+                    buf.memset(&Color::new(0.5, 0.75, 0.75, 1.0));
+                }
+                for d in d {
+                    last.copy_to(&mut buf, d.clone());
+                }
+            } else {
+                force = true;
+            }
+        } else {
+            force = true;
+        }
+
+        let bg = Color::new(0.0, 0.0, 0.0, 0.9);
         if force {
             buf.memset(&bg);
         }
-        let mut damage = vec![];
-
-        {
-            let mut margin_buf = buf.subdimensions((20, 20, buf_x - 40, buf_y - 40))?;
-            for module in self.modules.iter() {
-                if module.update(&time, force)? {
-                    let mut b = &mut margin_buf.subdimensions(module.get_bounds())?;
-                    let mut d = module.draw(&mut b, &bg, &time)?;
-                    damage.append(&mut d);
-                }
-            }
-        }
+        let report = widget.draw(
+            &mut DrawContext {
+                buf: &mut buf,
+                bg: &bg,
+                time: &time,
+                force,
+            },
+            (0, 0),
+        )?;
 
         mmap.flush().unwrap();
 
-        if damage.len() == 0 {
+        if !size_changed && !report.full_damage && report.damage.len() == 0 {
             // Nothing to do
             return Ok(());
         }
@@ -268,22 +280,33 @@ impl App {
         // get a buffer and attach it
         let new_buffer = pool.buffer(
             0,
-            buf_x as i32,
-            buf_y as i32,
-            4 * buf_x as i32,
+            report.width as i32,
+            report.height as i32,
+            4 * size.0 as i32,
             wl_shm::Format::Argb8888,
         );
+        if size_changed {
+            for shell_surface in inner.shell_surfaces.iter() {
+                shell_surface.set_size(size.0 / inner.scale, size.1 / inner.scale);
+            }
+        }
         for surface in inner.surfaces.iter() {
             surface.attach(Some(&new_buffer), 0, 0);
-            if force {
-                surface.damage_buffer(0, 0, buf_x as i32, buf_y as i32);
+            if cfg!(feature = "damage_debug") || force || report.full_damage {
+                surface.damage_buffer(0, 0, size.0 as i32, size.1 as i32);
             } else {
-                for d in damage.iter() {
+                for d in report.damage.iter() {
                     surface.damage_buffer(d.0, d.1, d.2, d.3);
                 }
             }
             surface.commit();
         }
+        self.last_damage = if force || report.full_damage {
+            Some(vec![(0, 0, size.0 as i32, size.1 as i32)])
+        } else {
+            Some(report.damage)
+        };
+        self.last_dim = size;
         Ok(())
     }
 
@@ -305,36 +328,13 @@ impl App {
         &mut self.event_queue
     }
 
-    pub fn wipe(&mut self) {
-        let inner = self.inner.lock().unwrap();
-        let pool = match self.pools.pool() {
-            Some(pool) => pool,
-            None => return,
-        };
-        pool.resize((4 * inner.dimensions.0 * inner.dimensions.1) as usize)
-            .expect("Failed to resize the memory pool.");
-        let mmap = pool.mmap();
-        let mut buf = Buffer::new(mmap, inner.dimensions);
-        let bg = Color::new(0.0, 0.0, 0.0, 0.9);
-        buf.memset(&bg);
+    pub fn get_widget(&mut self) -> &mut Box<dyn Widget + Send> {
+        self.widget.as_mut().unwrap()
     }
 
-    pub fn with_modules<F>(&self, f: F)
-    where
-        F: Fn(&Module),
-    {
-        for m in self.modules.iter() {
-            f(m);
-        }
-    }
-
-    pub fn get_module(&self, pos: (u32, u32)) -> Option<&Module> {
-        for m in self.modules.iter() {
-            if m.intersect(pos) {
-                return Some(&m);
-            }
-        }
-        None
+    pub fn set_widget(&mut self, w: Box<dyn Widget + Send>) -> Result<(), ::std::io::Error> {
+        self.widget = Some(w);
+        self.redraw(true)
     }
 
     pub fn new(tx: Sender<Cmd>, output_mode: OutputMode, scale: u32) -> App {
@@ -343,32 +343,6 @@ impl App {
         //
         // Set up modules
         //
-        let (mod_tx, mod_rx) = channel();
-        std::thread::spawn(move || {
-            let mut modules = vec![
-                Module::new(Box::new(Clock::new(tx.clone())), (0, 0, 536, 320)),
-                Module::new(Box::new(Calendar::new()), (0, 368, 1232, 344)),
-            ];
-
-            if let Ok(m) = Launcher::new(tx.clone()) {
-                modules.push(Module::new(Box::new(m), (0, 728, 1232, 32)));
-            }
-
-            let mut vert_off = 0;
-            if let Ok(m) = UpowerBattery::new(tx.clone()) {
-                modules.push(Module::new(Box::new(m), (640, vert_off, 592, 32)));
-                vert_off += 32;
-            }
-            if let Ok(m) = Backlight::new() {
-                modules.push(Module::new(Box::new(m), (640, vert_off, 592, 32)));
-                vert_off += 32;
-            }
-            if let Ok(m) = PulseAudio::new(tx.clone()) {
-                modules.push(Module::new(Box::new(m), (640, vert_off, 592, 32)));
-            }
-
-            mod_tx.send(modules).unwrap();
-        });
 
         let cmd_queue = Arc::new(Mutex::new(VecDeque::new()));
 
@@ -435,7 +409,7 @@ impl App {
             })
             .expect("server didn't advertise `wl_shm`");
 
-        let pools = DoubleMemPool::new(&shm, || {}).expect("Failed to create a memory pool !");
+        let pools = DoubleMemPool::new(&shm).expect("Failed to create a memory pool !");
 
         //
         // Get our seat
@@ -457,11 +431,18 @@ impl App {
             } => match state {
                 KeyState::Pressed => match keysym {
                     keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
-                    v => kbd_clone.lock().unwrap().push_back(Cmd::KeyboardInput {
-                        input: Input::Keypress {
-                            key: v,
-                            interpreted: utf8,
+                    v => kbd_clone.lock().unwrap().push_back(Cmd::Keyboard {
+                        key: v,
+                        key_state: state,
+                        modifiers_state: ModifiersState {
+                            ctrl: false,
+                            alt: false,
+                            shift: false,
+                            caps_lock: false,
+                            logo: false,
+                            num_lock: false,
                         },
+                        interpreted: utf8,
                     }),
                 },
                 _ => (),
@@ -486,22 +467,6 @@ impl App {
             },
         ));
 
-        //
-        // Calculate window dimensions
-        //
-        let modules = mod_rx.recv().unwrap();
-
-        let mut dimensions = (0, 0);
-        for m in modules.iter() {
-            let b = m.get_bounds();
-            dimensions = (max(dimensions.0, b.0 + b.2), max(dimensions.1, b.1 + b.3));
-        }
-
-        // Add padding
-        inner
-            .lock()
-            .unwrap()
-            .set_dimensions((dimensions.0 + 40, dimensions.1 + 40));
         inner.lock().unwrap().outputs_changed();
         event_queue.sync_roundtrip().unwrap();
 
@@ -547,31 +512,19 @@ impl App {
                         _ => {}
                     },
                     wl_pointer::Event::Frame => {
-                        if pos.0 < 20 || pos.1 < 20 {
-                            // Ignore stuff outside our margins
-                            return;
-                        }
-                        let pos = (pos.0 - 20, pos.1 - 20);
                         if vert_scroll != 0.0 || horiz_scroll != 0.0 {
-                            pointer_clone.lock().unwrap().push_back(Cmd::MouseInput {
+                            pointer_clone.lock().unwrap().push_back(Cmd::MouseScroll {
+                                scroll: (horiz_scroll, vert_scroll),
                                 pos: pos,
-                                input: Input::Scroll {
-                                    pos: pos,
-                                    x: horiz_scroll,
-                                    y: vert_scroll,
-                                },
                             });
                             vert_scroll = 0.0;
                             horiz_scroll = 0.0;
                         }
                         if btn_clicked {
-                            pointer_clone.lock().unwrap().push_back(Cmd::MouseInput {
-                                pos: pos,
-                                input: Input::Click {
-                                    pos: pos,
-                                    button: btn,
-                                },
-                            });
+                            pointer_clone
+                                .lock()
+                                .unwrap()
+                                .push_back(Cmd::MouseClick { btn: btn, pos: pos });
                             btn_clicked = false;
                         }
                     }
@@ -589,8 +542,10 @@ impl App {
             event_queue: event_queue,
             cmd_queue: cmd_queue,
             pools: pools,
-            modules: modules,
+            widget: None,
             inner: inner,
+            last_damage: None,
+            last_dim: (0, 0),
         }
     }
 }

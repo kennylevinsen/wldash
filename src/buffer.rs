@@ -38,13 +38,43 @@ impl<'a> Buffer<'a> {
         }
     }
 
+    pub fn copy_to(&self, other: &mut Buffer, (x, y, width, height): (i32, i32, i32, i32)) {
+        debug_assert!(self.dimensions == other.dimensions);
+        debug_assert!(self.subdimensions.is_none() && other.subdimensions.is_none());
+
+        if x == 0 && width as u32 == self.dimensions.0 {
+            // Full-width copy
+            let offset = y as isize * self.dimensions.0 as isize;
+            let n = height as usize * self.dimensions.0 as usize;
+            unsafe {
+                std::ptr::copy(
+                    (self.buf.as_ptr() as *const u32).offset(offset),
+                    (other.buf.as_mut_ptr() as *mut u32).offset(offset),
+                    n,
+                );
+            }
+        } else {
+            // Row-by-row copy
+            for cur_y in y as isize..(y + height) as isize {
+                let offset = x as isize + cur_y as isize * self.dimensions.0 as isize;
+                unsafe {
+                    std::ptr::copy(
+                        (self.buf.as_ptr() as *const u32).offset(offset),
+                        (other.buf.as_mut_ptr() as *mut u32).offset(offset),
+                        width as usize,
+                    );
+                }
+            }
+        }
+    }
+
     pub fn subdimensions(
         &mut self,
         subdimensions: (u32, u32, u32, u32),
     ) -> Result<Buffer, ::std::io::Error> {
         let bounds = self.get_bounds();
-        if subdimensions.0 + subdimensions.2 > bounds.2
-            || subdimensions.1 + subdimensions.3 > bounds.3
+        if subdimensions.0 + subdimensions.2 >= bounds.2
+            || subdimensions.1 + subdimensions.3 >= bounds.3
         {
             return Err(::std::io::Error::new(
                 ::std::io::ErrorKind::Other,
@@ -67,14 +97,9 @@ impl<'a> Buffer<'a> {
         })
     }
 
-    pub fn offset(
-        &mut self,
-        offset: (u32, u32),
-    ) -> Result<Buffer, ::std::io::Error> {
+    pub fn offset(&mut self, offset: (u32, u32)) -> Result<Buffer, ::std::io::Error> {
         let bounds = self.get_bounds();
-        if offset.0 > bounds.2
-            || offset.1 > bounds.3
-        {
+        if offset.0 > bounds.2 || offset.1 > bounds.3 {
             return Err(::std::io::Error::new(
                 ::std::io::ErrorKind::Other,
                 format!(
@@ -119,7 +144,7 @@ impl<'a> Buffer<'a> {
 
     pub fn put(&mut self, pos: (u32, u32), c: &Color) -> Result<(), ::std::io::Error> {
         let true_pos = if let Some(subdim) = self.subdimensions {
-            if pos.0 > subdim.2 || pos.1 > subdim.3 {
+            if pos.0 >= subdim.2 || pos.1 >= subdim.3 {
                 return Err(::std::io::Error::new(
                     ::std::io::ErrorKind::Other,
                     format!(

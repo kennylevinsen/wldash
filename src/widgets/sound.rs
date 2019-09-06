@@ -1,8 +1,6 @@
-use crate::buffer::Buffer;
 use crate::cmd::Cmd;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
-use crate::modules::module::{Input, ModuleImpl};
+use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -11,8 +9,6 @@ use std::rc::Rc;
 use std::sync::mpsc::{channel, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
-
-use chrono::{DateTime, Local};
 
 use libpulse_binding::callbacks::ListResult;
 use libpulse_binding::context::{
@@ -385,12 +381,17 @@ impl PulseAudioSoundDevice {
         Ok(device)
     }
 
+    fn muted(&self) -> bool {
+        let inner = self.inner.lock().unwrap();
+        inner.muted
+    }
+
     fn volume(&self) -> f32 {
         let inner = self.inner.lock().unwrap();
         inner.volume_avg
     }
 
-    fn set_volume(&mut self, step: f32) -> Result<(), ::std::io::Error> {
+    fn inc_volume(&mut self, step: f32) -> Result<(), ::std::io::Error> {
         let mut inner = self.inner.lock().unwrap();
         let mut volume = match inner.volume {
             Some(volume) => volume,
@@ -409,6 +410,38 @@ impl PulseAudioSoundDevice {
         } else {
             volume.decrease(Volume(-step as u32));
         }
+
+        let name = inner
+            .name
+            .clone()
+            .unwrap_or_else(|| inner.default_sink.clone());
+
+        // update volumes
+        inner.volume = Some(volume);
+        inner.volume_avg = volume.avg().0 as f32 / VOLUME_NORM.0 as f32;
+        self.client
+            .lock()
+            .unwrap()
+            .send(PulseAudioClientRequest::SetSinkVolumeByName(
+                None, name, volume,
+            ))?;
+        Ok(())
+    }
+
+    fn set_volume(&mut self, val: f32) -> Result<(), ::std::io::Error> {
+        let mut inner = self.inner.lock().unwrap();
+        let mut volume = match inner.volume {
+            Some(volume) => volume,
+            None => {
+                return Err(::std::io::Error::new(
+                    ::std::io::ErrorKind::Other,
+                    "unable to set volume",
+                ))
+            }
+        };
+
+        // apply step to volumes
+        volume.scale(Volume((val * VOLUME_NORM.0 as f32).round() as u32));
 
         let name = inner
             .name
@@ -447,91 +480,46 @@ impl PulseAudioSoundDevice {
 
 pub struct PulseAudio {
     device: PulseAudioSoundDevice,
-    font: Font,
-    dirty: Arc<Mutex<bool>>,
 }
 
 impl PulseAudio {
-    pub fn new(listener: Sender<Cmd>) -> Result<PulseAudio, ::std::io::Error> {
-        let mut font = Font::new(&ROBOTO_REGULAR, 24.0);
-        font.add_str_to_cache("volume");
-        let dirty = Arc::new(Mutex::new(true));
-        let dev_dirty = dirty.clone();
-        let device = PulseAudioSoundDevice::new(move || {
-            *dev_dirty.lock().unwrap() = true;
-            listener.send(Cmd::Draw).unwrap();
-        })?;
-
-        let pa = PulseAudio {
-            device: device,
-            font: font,
-            dirty: dirty,
-        };
-        Ok(pa)
+    pub fn new(
+        font_size: f32,
+        length: u32,
+        sender: Sender<Cmd>,
+    ) -> Result<Box<BarWidget>, ::std::io::Error> {
+        BarWidget::new(font_size, length, move |dirty| {
+            let device = PulseAudioSoundDevice::new(move || {
+                *dirty.lock().unwrap() = true;
+                sender.send(Cmd::Draw).unwrap();
+            })?;
+            Ok(Box::new(PulseAudio { device: device }))
+        })
     }
 }
 
-impl ModuleImpl for PulseAudio {
-    fn draw(
-        &self,
-        buf: &mut Buffer,
-        bg: &Color,
-        _time: &DateTime<Local>,
-    ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
-        let muted = self.device.inner.lock().unwrap().muted;
-        let mut vol = self.device.volume();
-        buf.memset(bg);
-        let c = if muted {
+impl BarWidgetImpl for PulseAudio {
+    fn name(&self) -> &str {
+        "volume"
+    }
+    fn value(&self) -> f32 {
+        self.device.volume()
+    }
+    fn color(&self) -> Color {
+        let muted = self.device.muted();
+        if muted {
             Color::new(1.0, 1.0, 0.0, 1.0)
         } else {
             Color::new(1.0, 1.0, 1.0, 1.0)
-        };
-        self.font.draw_text(
-            buf,
-            bg,
-            &Color::new(1.0, 1.0, 1.0, 1.0),
-            "volume",
-        )?;
-        draw_bar(&mut buf.offset((128, 0))?, &c, 464, 24, vol)?;
-        let mut iter = 1.0;
-        while vol > 1.0 {
-            let c = &Color::new(0.75 / iter, 0.25 / iter, 0.25 / iter, 1.0);
-            vol -= 1.0;
-            iter += 1.0;
-            draw_bar(&mut buf.offset((128, 0))?, &c, 464, 24, vol)?;
-        }
-        draw_box(&mut buf.offset((128, 0))?, &c, (464, 24))?;
-        Ok(vec![buf.get_signed_bounds()])
-    }
-
-    fn update(&mut self, _time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
-        let mut d = self.dirty.lock().unwrap();
-        if *d || force {
-            *d = false;
-            Ok(true)
-        } else {
-            Ok(false)
         }
     }
-
-    fn input(&mut self, input: Input) {
-        match input {
-            Input::Scroll {
-                pos: _pos,
-                x: _x,
-                y,
-            } => {
-                self.device.set_volume(y as f32 / -800.0).unwrap();
-                *self.dirty.lock().unwrap() = true;
-            }
-            Input::Click { pos: _pos, button } => match button {
-                273 => {
-                    self.device.toggle().unwrap();
-                    *self.dirty.lock().unwrap() = true;
-                }
-                _ => {}
-            },
-            _ => {}
-        }
+    fn inc(&mut self, inc: f32) {
+        self.device.inc_volume(inc).unwrap();
+    }
+    fn set(&mut self, val: f32) {
+        self.device.set_volume(val).unwrap();
+    }
+    fn toggle(&mut self) {
+        self.device.toggle().unwrap();
     }
 }

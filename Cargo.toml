@@ -12,6 +12,7 @@ default = [ "rcalc" ]
 ivy = [ "libivy" ]
 bc = []
 rcalc = [ "rcalc_lib" ]
+damage_debug = []
 
 [dependencies]
 smithay-client-toolkit = "0.6.4"
@@ -31,3 +32,5 @@ libivy = { git = "https://github.com/kennylevinsen/libivy.git", optional = true 
 rcalc_lib = { version = "0.9", optional = true }
 rust-ini = "0.13"
 shlex = "0.1"
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }

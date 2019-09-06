@@ -1,21 +1,15 @@
-use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
-use crate::modules::module::{Input, ModuleImpl};
+use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 
 use std::fs::OpenOptions;
 use std::io::{Error, ErrorKind};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
-use chrono::{DateTime, Local};
-
 pub struct Backlight {
     device_path: PathBuf,
     cur_brightness: u64,
     max_brightness: u64,
-    font: Font,
-    dirty: bool,
 }
 
 fn read_file_as_u64(path: &Path) -> Result<u64, Error> {
@@ -36,7 +30,6 @@ impl Backlight {
     pub fn update(&mut self) -> Result<(), Error> {
         self.cur_brightness = read_file_as_u64(self.device_path.join("brightness").as_path())?;
         self.max_brightness = read_file_as_u64(self.device_path.join("max_brightness").as_path())?;
-        self.dirty = true;
         Ok(())
     }
 
@@ -58,6 +51,11 @@ impl Backlight {
         (self.cur_brightness as f32 / self.max_brightness as f32)
     }
 
+    pub fn set(&mut self, val: f32) -> Result<(), Error> {
+        self.cur_brightness = (self.max_brightness as f32 * val) as u64;
+        Ok(())
+    }
+
     pub fn add(&mut self, diff: f32) -> Result<(), Error> {
         let inc = (self.max_brightness as f32 * diff) as i64;
 
@@ -72,7 +70,7 @@ impl Backlight {
         Ok(())
     }
 
-    pub fn new() -> Result<Self, Error> {
+    pub fn new(font_size: f32, length: u32) -> Result<Box<BarWidget>, Error> {
         let devices = Path::new("/sys/class/backlight").read_dir()?;
 
         let first_device = match devices.take(1).next() {
@@ -86,90 +84,56 @@ impl Backlight {
             device_path: first_device.path(),
             cur_brightness: 0,
             max_brightness: 0,
-            font: Font::new(&ROBOTO_REGULAR, 24.0),
-            dirty: true,
         };
-
-        dev.font.add_str_to_cache("backlight");
 
         dev.update()?;
 
-        Ok(dev)
+        Ok(BarWidget::new_simple(font_size, length, Box::new(dev)))
     }
 }
 
-impl ModuleImpl for Backlight {
-    fn draw(
-        &self,
-        buf: &mut Buffer,
-        bg: &Color,
-        _time: &DateTime<Local>,
-    ) -> Result<Vec<(i32, i32, i32, i32)>, Error> {
-        buf.memset(bg);
-        let c = Color::new(1.0, 1.0, 1.0, 1.0);
-        self.font.draw_text(
-            buf,
-            bg,
-            &c,
-            "backlight",
-        )?;
-        draw_bar(
-            &mut buf.offset((128, 0))?,
-            &c,
-            464,
-            24,
-            self.brightness(),
-        )?;
-        draw_box(&mut buf.offset((128, 0))?, &c, (464, 24))?;
-        Ok(vec![buf.get_signed_bounds()])
+impl BarWidgetImpl for Backlight {
+    fn name(&self) -> &str {
+        "backlight"
     }
-
-    fn update(&mut self, _time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
-        if self.dirty || force {
-            self.dirty = false;
-            Ok(true)
-        } else {
-            Ok(false)
+    fn value(&self) -> f32 {
+        self.brightness()
+    }
+    fn color(&self) -> Color {
+        Color::new(1.0, 1.0, 1.0, 1.0)
+    }
+    fn inc(&mut self, inc: f32) {
+        self.add(inc).unwrap();
+        match self.sync() {
+            Ok(val) => val,
+            Err(err) => {
+                eprintln!("Error while trying to change brightness: {}", err);
+                ()
+            }
         }
     }
-
-    fn input(&mut self, input: Input) {
-        match input {
-            Input::Scroll {
-                pos: _pos,
-                x: _x,
-                y,
-            } => {
-                self.add(y as f32 / -800.0).unwrap();
-                match self.sync() {
-                    Ok(val) => val,
-                    Err(err) => {
-                        eprintln!("Error while trying to change brightness: {}", err);
-                        ()
-                    }
-                }
+    fn set(&mut self, val: f32) {
+        self.set(val).unwrap();
+        match self.sync() {
+            Ok(val) => val,
+            Err(err) => {
+                eprintln!("Error while trying to change brightness: {}", err);
+                ()
             }
-            Input::Click { pos: _pos, button } => {
-                match button {
-                    273 => {
-                        // Right click
-                        self.cur_brightness = if self.cur_brightness == 1 {
-                            self.max_brightness
-                        } else {
-                            1
-                        };
-                        match self.sync() {
-                            Ok(val) => val,
-                            Err(err) => {
-                                eprintln!("Error while trying to change brightness: {}", err);
-                                ()
-                            }
-                        }
-                    }
-                    _ => {}
-                }
+        }
+    }
+    fn toggle(&mut self) {
+        self.cur_brightness = if self.cur_brightness == 1 {
+            self.max_brightness
+        } else {
+            1
+        };
+        match self.sync() {
+            Ok(val) => val,
+            Err(err) => {
+                eprintln!("Error while trying to change brightness: {}", err);
+                ()
             }
-            _ => {}
         }
     }
 }

@@ -1,14 +1,16 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{Font, DEJAVUSANS_MONO, ROBOTO_REGULAR};
-use crate::modules::module::{Input, ModuleImpl};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget};
 
-use chrono::{Date, DateTime, Datelike, Local};
+use chrono::{Date, Datelike, Local};
 
 pub struct Calendar {
     cur_date: Date<Local>,
     dirty: bool,
     offset: f64,
+    sections: u32,
+    font_size: u32,
     calendar_cache: Font,
     month_cache: Font,
     year_cache: Font,
@@ -55,7 +57,7 @@ impl Calendar {
         )?;
         if time.year() != orig.year() {
             self.year_cache.draw_text(
-                &mut buf.offset((320, 0))?,
+                &mut buf.offset((self.font_size * 20, 0))?,
                 background_color,
                 &Color::new(0.8, 0.8, 0.8, 1.0),
                 &format!("{:}", time.year()),
@@ -79,7 +81,10 @@ impl Calendar {
             };
 
             self.day_cache.draw_text(
-                &mut buf.offset((idx * 48 + 4, (y_off * 32) + 64))?,
+                &mut buf.offset((
+                    idx * self.font_size * 3 + self.font_size / 5,
+                    y_off * self.font_size * 2 + self.font_size * 4,
+                ))?,
                 background_color,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &wk_chr,
@@ -105,7 +110,7 @@ impl Calendar {
             //
             let wk = time.iso_week();
             self.calendar_cache.draw_text(
-                &mut buf.offset((0 * 48, (y_off * 32) + 64))?,
+                &mut buf.offset((0, y_off * self.font_size * 2 + self.font_size * 4))?,
                 background_color,
                 &Color::new(0.75, 0.75, 0.75, 1.0),
                 &format!("{:02}", wk.week()),
@@ -123,7 +128,10 @@ impl Calendar {
                 };
 
                 self.calendar_cache.draw_text(
-                    &mut buf.offset((x_pos * 48, (y_off * 32) + 64))?,
+                    &mut buf.offset((
+                        x_pos * self.font_size * 3,
+                        y_off * self.font_size * 2 + self.font_size * 4,
+                    ))?,
                     background_color,
                     &c,
                     &format!("{:02}", time.day()),
@@ -145,38 +153,63 @@ impl Calendar {
 }
 
 impl Calendar {
-    pub fn new() -> Calendar {
-        let mut calendar_cache = Font::new(&DEJAVUSANS_MONO, 32.0);
+    pub fn new(font_size: f32, sections: u32) -> Box<Calendar> {
+        let mut calendar_cache = Font::new(&DEJAVUSANS_MONO, font_size * 2.0);
         calendar_cache.add_str_to_cache("0123456789");
-        let mut month_cache = Font::new(&ROBOTO_REGULAR, 64.0);
+        let mut month_cache = Font::new(&ROBOTO_REGULAR, font_size * 4.0);
         month_cache.add_str_to_cache("JanuryFebMchApilJgstSmOoNvD");
-        let mut year_cache = Font::new(&DEJAVUSANS_MONO, 24.0);
+        let mut year_cache = Font::new(&DEJAVUSANS_MONO, font_size * 1.5);
         year_cache.add_str_to_cache("-0123456789");
-        let mut day_cache = Font::new(&DEJAVUSANS_MONO, 16.0);
+        let mut day_cache = Font::new(&DEJAVUSANS_MONO, font_size);
         day_cache.add_str_to_cache("MONTUEWDHFRISA");
-        Calendar {
+        Box::new(Calendar {
             cur_date: Local::now().date(),
             dirty: true,
             offset: 0.0,
+            sections: sections,
+            font_size: font_size as u32,
             calendar_cache: calendar_cache,
             month_cache: month_cache,
             year_cache: year_cache,
             day_cache: day_cache,
-        }
+        })
     }
 }
 
-impl ModuleImpl for Calendar {
+impl Widget for Calendar {
+    fn size(&self) -> (u32, u32) {
+        let cal_width = 7 * self.font_size * 3 + self.font_size * 2;
+        let cal_pad = self.font_size * 3;
+        (
+            cal_width * self.sections + cal_pad * (self.sections - 1),
+            (self.font_size as f32 * 21.5) as u32,
+        )
+    }
+
     fn draw(
-        &self,
-        buf: &mut Buffer,
-        background_color: &Color,
-        time: &DateTime<Local>,
-    ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
-        buf.memset(background_color);
-        let time = time.date();
+        &mut self,
+        ctx: &mut DrawContext,
+        pos: (u32, u32),
+    ) -> Result<DrawReport, ::std::io::Error> {
+        let (width, height) = self.size();
+        if ctx.time.date() == self.cur_date && !ctx.force && !self.dirty {
+            return Ok(DrawReport::empty(width, height));
+        }
+        self.dirty = false;
+        self.cur_date = ctx.time.date();
+
+        let buf = &mut ctx.buf.subdimensions((pos.0, pos.1, width, height))?;
+        buf.memset(ctx.bg);
+        let time = ctx.time.date();
         let mut t = time.with_day(1).unwrap();
         let o = (self.offset / 100.0) as i32;
+
+        let cals = self.sections - 1;
+        let pre_cals = cals / 2;
+        for _ in 0..pre_cals {
+            t = t.pred().with_day(1).unwrap();
+        }
+
         if o != 0 {
             let mut month = (t.month() - 1) as i32 + o;
             let mut year = t.year();
@@ -194,64 +227,40 @@ impl ModuleImpl for Calendar {
                 .with_month((month + 1) as u32)
                 .unwrap();
         }
-        self.draw_month(
-            &mut buf.offset((0, 0))?,
-            background_color,
-            &time,
-            &t.pred().with_day(1).unwrap(),
-        )?;
-        self.draw_month(
-            &mut buf.offset((432, 0))?,
-            background_color,
-            &time,
-            &t,
-        )?;
-        let n = if t.month() == 12 {
-            t.with_year(t.year() + 1).unwrap().with_month(1).unwrap()
-        } else {
-            t.with_month(t.month() + 1).unwrap()
-        };
-        self.draw_month(
-            &mut buf.offset((864, 0))?,
-            background_color,
-            &time,
-            &n,
-        )?;
-        Ok(vec![buf.get_signed_bounds()])
+        let cal_pad = 7 * self.font_size * 3 + self.font_size * 5;
+        for idx in 0..self.sections {
+            self.draw_month(&mut buf.offset((cal_pad * idx, 0))?, ctx.bg, &time, &t)?;
+
+            t = if t.month() == 12 {
+                t.with_year(t.year() + 1).unwrap().with_month(1).unwrap()
+            } else {
+                t.with_month(t.month() + 1).unwrap()
+            };
+        }
+        Ok(DrawReport {
+            width: width,
+            height: height,
+            damage: vec![buf.get_signed_bounds()],
+            full_damage: false,
+        })
     }
 
-    fn update(&mut self, time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
-        if self.dirty {
-            self.dirty = false;
-            Ok(true)
-        } else if time.date() != self.cur_date || force {
-            self.cur_date = time.date();
-            Ok(true)
+    fn keyboard_input(&mut self, _: u32, _: ModifiersState, _: KeyState, _: Option<String>) {}
+    fn mouse_click(&mut self, _: u32, (x, _): (u32, u32)) {
+        let cal_pad = 7 * self.font_size * 3 + self.font_size * 5;
+        let cals = self.sections - 1;
+        let pre_cals = cals / 2;
+        if x < pre_cals * cal_pad {
+            self.offset -= 100.0;
+        } else if x >= (pre_cals + 1) * cal_pad {
+            self.offset += 100.0;
         } else {
-            Ok(false)
+            self.offset = 0.0;
         }
+        self.dirty = true;
     }
-
-    fn input(&mut self, input: Input) {
-        match input {
-            Input::Scroll { pos: _, x: _, y } => {
-                self.offset += y;
-                self.dirty = true;
-            }
-            Input::Click {
-                pos: (x, _),
-                button: _,
-            } => {
-                if x < 448 {
-                    self.offset -= 100.0;
-                } else if x >= 896 {
-                    self.offset += 100.0;
-                } else {
-                    self.offset = 0.0;
-                }
-                self.dirty = true;
-            }
-            _ => {}
-        }
+    fn mouse_scroll(&mut self, (_, y): (f64, f64), _: (u32, u32)) {
+        self.offset += y;
+        self.dirty = true;
     }
 }

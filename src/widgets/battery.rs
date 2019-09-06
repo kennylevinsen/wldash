@@ -1,14 +1,11 @@
-use crate::buffer::Buffer;
 use crate::cmd::Cmd;
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
-use crate::modules::module::{Input, ModuleImpl};
+use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
-use chrono::{DateTime, Local};
 use dbus;
 
 fn get_upower_property(
@@ -40,14 +37,12 @@ fn get_upower_property(
 
 pub struct UpowerBattery {
     device_path: String,
-    font: Font,
     inner: Arc<Mutex<UpowerBatteryInner>>,
 }
 
 pub struct UpowerBatteryInner {
     state: UpowerBatteryState,
     capacity: f64,
-    dirty: bool,
 }
 
 enum UpowerBatteryState {
@@ -116,88 +111,89 @@ impl UpowerBattery {
             }
         };
 
-        let mut font = Font::new(&ROBOTO_REGULAR, 24.0);
-        font.add_str_to_cache("battery");
-
         Ok(UpowerBattery {
             device_path,
-            font: font,
             inner: Arc::new(Mutex::new(UpowerBatteryInner {
                 capacity: capacity,
                 state: state,
-                dirty: true,
             })),
         })
     }
 
-    pub fn new(listener: Sender<Cmd>) -> Result<Self, ::std::io::Error> {
-        let d = UpowerBattery::from_device("BAT0")?;
-        let path = d.device_path.clone();
-        let inner = d.inner.clone();
-        let _ = thread::Builder::new()
-            .name("battery_monitor".to_string())
-            .spawn(move || {
-                let con = dbus::Connection::get_private(dbus::BusType::System)
-                    .expect("Failed to establish D-Bus connection.");
-                let rule = format!(
-                    "type='signal',\
-                     path='{}',\
-                     interface='org.freedesktop.DBus.Properties',\
-                     member='PropertiesChanged'",
-                    path
-                );
+    pub fn new(
+        font_size: f32,
+        length: u32,
+        sender: Sender<Cmd>,
+    ) -> Result<Box<BarWidget>, ::std::io::Error> {
+        BarWidget::new(font_size, length, move |dirty| {
+            let d = UpowerBattery::from_device("BAT0")?;
+            let path = d.device_path.clone();
+            let inner = d.inner.clone();
+            let _ = thread::Builder::new()
+                .name("battery_monitor".to_string())
+                .spawn(move || {
+                    let con = dbus::Connection::get_private(dbus::BusType::System)
+                        .expect("Failed to establish D-Bus connection.");
+                    let rule = format!(
+                        "type='signal',\
+                         path='{}',\
+                         interface='org.freedesktop.DBus.Properties',\
+                         member='PropertiesChanged'",
+                        path
+                    );
 
-                // First we're going to get an (irrelevant) NameAcquired event.
-                con.incoming(10_000).next();
+                    // First we're going to get an (irrelevant) NameAcquired event.
+                    con.incoming(10_000).next();
 
-                con.add_match(&rule)
-                    .expect("Failed to add D-Bus match rule.");
+                    con.add_match(&rule)
+                        .expect("Failed to add D-Bus match rule.");
 
-                loop {
-                    if con.incoming(10_000).next().is_some() {
-                        let capacity = get_upower_property(&con, &path, "Percentage")
-                            .unwrap()
-                            .get1::<dbus::arg::Variant<f64>>()
-                            .unwrap()
-                            .0;
-                        let state = match get_upower_property(&con, &path, "State")
-                            .unwrap()
-                            .get1::<dbus::arg::Variant<u32>>()
-                            .unwrap()
-                            .0
-                        {
-                            1 => UpowerBatteryState::Charging,
-                            2 => UpowerBatteryState::Discharging,
-                            3 => UpowerBatteryState::Empty,
-                            4 => UpowerBatteryState::Full,
-                            5 => UpowerBatteryState::NotCharging,
-                            6 => UpowerBatteryState::Discharging,
-                            _ => UpowerBatteryState::Unknown,
-                        };
-                        let mut inner = inner.lock().unwrap();
-                        inner.state = state;
-                        inner.capacity = capacity;
-                        inner.dirty = true;
-                        listener.send(Cmd::Draw).unwrap();
+                    loop {
+                        if con.incoming(10_000).next().is_some() {
+                            let capacity = get_upower_property(&con, &path, "Percentage")
+                                .unwrap()
+                                .get1::<dbus::arg::Variant<f64>>()
+                                .unwrap()
+                                .0;
+                            let state = match get_upower_property(&con, &path, "State")
+                                .unwrap()
+                                .get1::<dbus::arg::Variant<u32>>()
+                                .unwrap()
+                                .0
+                            {
+                                1 => UpowerBatteryState::Charging,
+                                2 => UpowerBatteryState::Discharging,
+                                3 => UpowerBatteryState::Empty,
+                                4 => UpowerBatteryState::Full,
+                                5 => UpowerBatteryState::NotCharging,
+                                6 => UpowerBatteryState::Discharging,
+                                _ => UpowerBatteryState::Unknown,
+                            };
+                            let mut inner = inner.lock().unwrap();
+                            inner.state = state;
+                            inner.capacity = capacity;
+                            *dirty.lock().unwrap() = true;
+                            sender.send(Cmd::Draw).unwrap();
+                        }
                     }
-                }
-            });
+                });
 
-        Ok(d)
+            Ok(Box::new(d))
+        })
     }
 }
 
-impl ModuleImpl for UpowerBattery {
-    fn draw(
-        &self,
-        buf: &mut Buffer,
-        bg: &Color,
-        _time: &DateTime<Local>,
-    ) -> Result<Vec<(i32, i32, i32, i32)>, ::std::io::Error> {
-        buf.memset(bg);
+impl BarWidgetImpl for UpowerBattery {
+    fn name(&self) -> &str {
+        "battery"
+    }
+    fn value(&self) -> f32 {
         let inner = self.inner.lock().unwrap();
-        let text_color = Color::new(1.0, 1.0, 1.0, 1.0);
-        let bar_color = match inner.state {
+        (inner.capacity as f32) / 100.0
+    }
+    fn color(&self) -> Color {
+        let inner = self.inner.lock().unwrap();
+        match inner.state {
             UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => {
                 if inner.capacity > 10.0 {
                     Color::new(1.0, 1.0, 1.0, 1.0)
@@ -211,39 +207,9 @@ impl ModuleImpl for UpowerBattery {
             UpowerBatteryState::NotCharging | UpowerBatteryState::Empty => {
                 Color::new(1.0, 0.5, 0.5, 1.0)
             }
-        };
-
-        self.font.draw_text(
-            &mut buf.offset((0, 0))?,
-            bg,
-            &text_color,
-            "battery",
-        )?;
-        draw_bar(
-            &mut buf.offset((128, 0))?,
-            &bar_color,
-            464,
-            24,
-            (inner.capacity as f32) / 100.0,
-        )?;
-
-        draw_box(
-            &mut buf.offset((128, 0))?,
-            &bar_color,
-            (464, 24),
-        )?;
-        Ok(vec![buf.get_signed_bounds()])
-    }
-
-    fn update(&mut self, _time: &DateTime<Local>, force: bool) -> Result<bool, ::std::io::Error> {
-        let mut inner = self.inner.lock().unwrap();
-        if inner.dirty || force {
-            inner.dirty = false;
-            Ok(true)
-        } else {
-            Ok(false)
         }
     }
-
-    fn input(&mut self, _input: Input) {}
+    fn inc(&mut self, _: f32) {}
+    fn set(&mut self, _: f32) {}
+    fn toggle(&mut self) {}
 }

@@ -20,7 +20,13 @@ pub struct Desktop {
 
 impl Desktop {
     fn parse(f: &str) -> Result<Desktop, Box<dyn Error>> {
-        let file = Ini::load_from_file_opt(f, ParseOption{ enabled_quote: false, enabled_escape: false })?;
+        let file = Ini::load_from_file_opt(
+            f,
+            ParseOption {
+                enabled_quote: false,
+                enabled_escape: false,
+            },
+        )?;
         match file.section(Some("Desktop Entry").to_owned()) {
             Some(desktop) => Ok(Desktop {
                 entry_type: desktop.get("Type").unwrap_or(&"".to_string()).to_string(),

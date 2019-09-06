@@ -1,10 +1,22 @@
-use crate::modules::module::Input;
+use smithay_client_toolkit::keyboard::{KeyState, ModifiersState};
 
 pub enum Cmd {
     Exit,
     Draw,
     ForceDraw,
     ToggleVisible,
-    MouseInput { pos: (u32, u32), input: Input },
-    KeyboardInput { input: Input },
+    MouseClick {
+        btn: u32,
+        pos: (u32, u32),
+    },
+    MouseScroll {
+        scroll: (f64, f64),
+        pos: (u32, u32),
+    },
+    Keyboard {
+        key: u32,
+        key_state: KeyState,
+        modifiers_state: ModifiersState,
+        interpreted: Option<String>,
+    },
 }

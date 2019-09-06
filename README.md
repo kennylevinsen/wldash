@@ -11,7 +11,11 @@ Consider this alpha-quality: While it works, *everything* is subject to change w
 3. Put somewhere: `cp target/release/wldash /usr/local/bin/wldash`
 4. Run: `wldash`
 
-To display wldash on all outputs, set `WLDASH_ALL_OUTPUTS=1`. To cut size in half, set `WLDASH_SCALE=2`.
+To see the default configuration, run `wldash print-config`. To configure, place a file in `$XDG_CONFIG_HOME/wldash/config.json` (or if `XDG_CONFIG_HOME` is not set, `~/.config/wldash/config.json`).
+
+Notable settings: `outptuMode` can be `active` or `all`, `scale` can be set to `2` to half the buffer size, and the widgets (and their layout) can be configured.
+
+For more info, look in `src/config.rs`.
 
 ## System dependencies
 
@@ -21,12 +25,7 @@ To display wldash on all outputs, set `WLDASH_ALL_OUTPUTS=1`. To cut size in hal
 
 The launcher for wldash is built-in, based on https://github.com/kennylevinsen/dot-desktop. Pluggable systems may come back in the future.
 
-Configuration currently happen through environment variables:
-
-- WLDASH_APP_OPENER: The command used to open normal applications. For sway, the recommended value is "swaymsg exec".
-- WLDASH_TERM_OPENER: The command used to open terminal applications.
-- WLDASH_URL_OPENER: The command used to open a URL.
-- XDG_DATA_DIRS and XDG_DATA_HOME: Used to find the many `applications` folders that contain `desktop` files.
+The environment variables `XDG_DATA_DIRS` and `XDG_DATA_HOME` are read to find the many `applications` folders that contain `desktop` files.
 
 ## Features
 

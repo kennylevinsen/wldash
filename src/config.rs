@@ -1,6 +1,7 @@
 use crate::cmd::Cmd;
 use crate::widget;
 use crate::widgets;
+use crate::color::Color;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::sync::mpsc::Sender;
@@ -149,6 +150,7 @@ pub struct Config {
     pub widget: Widget,
     pub output_mode: OutputMode,
     pub scale: u32,
+    pub background: Color,
 }
 
 impl Default for Config {
@@ -204,6 +206,7 @@ impl Default for Config {
             },
             output_mode: Default::default(),
             scale: 1,
+            background: Color::new(0.0, 0.0, 0.0, 0.9),
         }
     }
 }

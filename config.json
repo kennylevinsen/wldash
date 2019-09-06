@@ -39,5 +39,11 @@
 		}
 	},
 	"outputMode": "active",
-	"scale": 1
+	"scale": 1,
+	"background": {
+		"red": 0,
+		"green": 0,
+		"blue": 0,
+		"opacity": 0.9
+	}
 }

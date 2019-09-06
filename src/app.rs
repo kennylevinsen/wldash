@@ -203,6 +203,7 @@ pub struct App {
     event_queue: EventQueue,
     cmd_queue: Arc<Mutex<VecDeque<Cmd>>>,
     widget: Option<Box<dyn Widget + Send>>,
+    bg: Color,
     inner: Arc<Mutex<AppInner>>,
     last_damage: Option<Vec<(i32, i32, i32, i32)>>,
     last_dim: (u32, u32),
@@ -256,14 +257,13 @@ impl App {
             force = true;
         }
 
-        let bg = Color::new(0.0, 0.0, 0.0, 0.9);
         if force {
-            buf.memset(&bg);
+            buf.memset(&self.bg);
         }
         let report = widget.draw(
             &mut DrawContext {
                 buf: &mut buf,
-                bg: &bg,
+                bg: &self.bg,
                 time: &time,
                 force,
             },
@@ -337,7 +337,7 @@ impl App {
         self.redraw(true)
     }
 
-    pub fn new(tx: Sender<Cmd>, output_mode: OutputMode, scale: u32) -> App {
+    pub fn new(tx: Sender<Cmd>, output_mode: OutputMode, bg: Color, scale: u32) -> App {
         let inner = Arc::new(Mutex::new(AppInner::new(tx.clone(), output_mode, scale)));
 
         //
@@ -543,6 +543,7 @@ impl App {
             cmd_queue: cmd_queue,
             pools: pools,
             widget: None,
+            bg: bg,
             inner: inner,
             last_damage: None,
             last_dim: (0, 0),

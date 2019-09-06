@@ -107,6 +107,9 @@ fn main() {
         config::OutputMode::Active => OutputMode::Active,
     };
 
+
+    let background = config.background;
+
     let (tx_draw, rx_draw) = channel();
     let tx_draw_mod = tx_draw.clone();
     let (mod_tx, mod_rx) = channel();
@@ -118,7 +121,7 @@ fn main() {
         }
     });
 
-    let mut app = App::new(tx_draw, output_mode, scale);
+    let mut app = App::new(tx_draw, output_mode, background, scale);
     let widget = mod_rx.recv().unwrap();
     app.set_widget(widget).unwrap();
 

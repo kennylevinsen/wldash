@@ -166,11 +166,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "libivy"
-version = "0.1.0"
-source = "git+https://github.com/kennylevinsen/libivy.git#d906d4518a44459663b64fc9d3b2f71c2dc030c3"
-
-[[package]]
 name = "libloading"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -667,14 +662,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "wldash"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "byteorder 1.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.4.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "dbus 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "fuzzy-matcher 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libivy 0.1.0 (git+https://github.com/kennylevinsen/libivy.git)",
  "libpulse-binding 2.11.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "memmap 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nix 0.15.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -725,7 +719,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 "checksum libc 0.2.62 (registry+https://github.com/rust-lang/crates.io-index)" = "34fcd2c08d2f832f376f4173a231990fa5aef4e99fb569867318a227ef4c06ba"
 "checksum libdbus-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "69382cb3be797cfe62ba89ac5e594a0e3022914ff44867ffbcfc03daa24eebd7"
-"checksum libivy 0.1.0 (git+https://github.com/kennylevinsen/libivy.git)" = "<none>"
 "checksum libloading 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "f2b111a074963af1d37a139918ac6d49ad1d0d5e47f72fd55388619691a7d753"
 "checksum libpulse-binding 2.11.1 (registry+https://github.com/rust-lang/crates.io-index)" = "e7712e3c895da914d7d969475238cc43933c5c4cf7ef3654106be9db2b327cbb"
 "checksum libpulse-sys 1.9.1 (registry+https://github.com/rust-lang/crates.io-index)" = "67df96705dc149577155690c05e067334d1d8a62bcac1a1611ef28eaaeb76354"

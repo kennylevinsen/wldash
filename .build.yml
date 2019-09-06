@@ -1,0 +1,11 @@
+image: archlinux
+packages:
+  - rust
+  - libpulse
+tasks:
+  - rustfmt-check: |
+      cd wldash
+      cargo fmt -- --check
+  - build: |
+      cd wldash
+      cargo build

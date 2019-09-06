@@ -30,7 +30,14 @@ pub struct Launcher {
 }
 
 impl Launcher {
-    pub fn new(font_size: f32, length: u32, listener: Sender<Cmd>, app: String, term: String, url: String) -> Box<Launcher> {
+    pub fn new(
+        font_size: f32,
+        length: u32,
+        listener: Sender<Cmd>,
+        app: String,
+        term: String,
+        url: String,
+    ) -> Box<Launcher> {
         Box::new(Launcher {
             options: load_desktop_files(),
             term_opener: term,

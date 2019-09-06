@@ -1,15 +1,15 @@
 use crate::cmd::Cmd;
 use crate::widget;
 use crate::widgets;
-use std::sync::mpsc::Sender;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
+use std::sync::mpsc::Sender;
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum Widget {
     Margin {
-    	margins: (u32, u32, u32, u32),
+        margins: (u32, u32, u32, u32),
         widget: Box<Widget>,
     },
     Fixed {
@@ -32,11 +32,11 @@ pub enum Widget {
     Launcher {
         font_size: f32,
         length: u32,
-        #[serde(default)] 
+        #[serde(default)]
         app_opener: String,
-        #[serde(default)] 
+        #[serde(default)]
         term_opener: String,
-        #[serde(default)] 
+        #[serde(default)]
         url_opener: String,
     },
     Battery {
@@ -56,10 +56,7 @@ pub enum Widget {
 impl Widget {
     pub fn construct(self, tx: Sender<Cmd>) -> Option<Box<dyn widget::Widget + Send>> {
         match self {
-            Widget::Margin {
-                margins,
-                widget,
-            } => match widget.construct(tx.clone()) {
+            Widget::Margin { margins, widget } => match widget.construct(tx.clone()) {
                 Some(w) => Some(widget::Margin::new(margins, w)),
                 None => None,
             },
@@ -93,13 +90,23 @@ impl Widget {
                 font_size,
                 sections,
             } => Some(widgets::calendar::Calendar::new(font_size, sections)),
-            Widget::Launcher { font_size, length, app_opener, term_opener, url_opener } => Some(widgets::launcher::Launcher::new(
+            Widget::Launcher {
+                font_size,
+                length,
+                app_opener,
+                term_opener,
+                url_opener,
+            } => Some(widgets::launcher::Launcher::new(
                 font_size,
                 length,
                 tx.clone(),
                 app_opener,
                 term_opener,
-                if url_opener.len() == 0 { "xdg_open ".to_string() } else { url_opener },
+                if url_opener.len() == 0 {
+                    "xdg_open ".to_string()
+                } else {
+                    url_opener
+                },
             )),
             Widget::Battery { font_size, length } => {
                 match widgets::battery::UpowerBattery::new(font_size, length, tx.clone()) {
@@ -126,14 +133,14 @@ impl Widget {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum OutputMode {
-	All,
-	Active,
+    All,
+    Active,
 }
 
 impl Default for OutputMode {
-	fn default() -> Self {
-		OutputMode::Active
-	}
+    fn default() -> Self {
+        OutputMode::Active
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -145,58 +152,58 @@ pub struct Config {
 }
 
 impl Default for Config {
-	fn default() -> Self {
-		Config{
-			widget: Widget::Margin {
-	            margins: (20, 20, 20, 20),
-	            widget: Box::new(Widget::VerticalLayout(vec![
-	                Box::new(Widget::HorizontalLayout(vec![
-	                    Box::new(Widget::Margin {
-	                        margins: (0, 88, 0, 32),
-	                        widget: Box::new(Widget::VerticalLayout(vec![
-	                            Box::new(Widget::Date { font_size: 64.0 }),
-	                            Box::new(Widget::Clock { font_size: 256.0 }),
-	                        ])),
-	                    }),
-	                    Box::new(Widget::VerticalLayout(vec![
-	                        Box::new(Widget::Margin {
-	                            margins: (0, 0, 0, 8),
-	                            widget: Box::new(Widget::Battery {
-	                                font_size: 24.0,
-	                                length: 600,
-	                            }),
-	                        }),
-	                        Box::new(Widget::Margin {
-	                            margins: (0, 0, 0, 8),
-	                            widget: Box::new(Widget::Backlight {
-	                                font_size: 24.0,
-	                                length: 600,
-	                            }),
-	                        }),
-	                        Box::new(Widget::Margin {
-	                            margins: (0, 0, 0, 8),
-	                            widget: Box::new(Widget::PulseAudio {
-	                                font_size: 24.0,
-	                                length: 600,
-	                            }),
-	                        }),
-	                    ])),
-	                ])),
-	                Box::new(Widget::Calendar {
-	                    font_size: 16.0,
-	                    sections: 3,
-	                }),
-	                Box::new(Widget::Launcher {
-	                    font_size: 32.0,
-	                    length: 1200,
-	                    app_opener: "".to_string(),
-	                    term_opener: "".to_string(),
-	                    url_opener: "".to_string(),
-	                }),
-	            ])),
-	        },
-			output_mode: Default::default(),
-			scale: 1,
-		}
-	}
+    fn default() -> Self {
+        Config {
+            widget: Widget::Margin {
+                margins: (20, 20, 20, 20),
+                widget: Box::new(Widget::VerticalLayout(vec![
+                    Box::new(Widget::HorizontalLayout(vec![
+                        Box::new(Widget::Margin {
+                            margins: (0, 88, 0, 32),
+                            widget: Box::new(Widget::VerticalLayout(vec![
+                                Box::new(Widget::Date { font_size: 64.0 }),
+                                Box::new(Widget::Clock { font_size: 256.0 }),
+                            ])),
+                        }),
+                        Box::new(Widget::VerticalLayout(vec![
+                            Box::new(Widget::Margin {
+                                margins: (0, 0, 0, 8),
+                                widget: Box::new(Widget::Battery {
+                                    font_size: 24.0,
+                                    length: 600,
+                                }),
+                            }),
+                            Box::new(Widget::Margin {
+                                margins: (0, 0, 0, 8),
+                                widget: Box::new(Widget::Backlight {
+                                    font_size: 24.0,
+                                    length: 600,
+                                }),
+                            }),
+                            Box::new(Widget::Margin {
+                                margins: (0, 0, 0, 8),
+                                widget: Box::new(Widget::PulseAudio {
+                                    font_size: 24.0,
+                                    length: 600,
+                                }),
+                            }),
+                        ])),
+                    ])),
+                    Box::new(Widget::Calendar {
+                        font_size: 16.0,
+                        sections: 3,
+                    }),
+                    Box::new(Widget::Launcher {
+                        font_size: 32.0,
+                        length: 1200,
+                        app_opener: "".to_string(),
+                        term_opener: "".to_string(),
+                        url_opener: "".to_string(),
+                    }),
+                ])),
+            },
+            output_mode: Default::default(),
+            scale: 1,
+        }
+    }
 }

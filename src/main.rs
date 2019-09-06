@@ -1,10 +1,10 @@
+use std::default::Default;
 use std::env;
+use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::mpsc::channel;
-use std::fs::File;
-use std::default::Default;
 
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
@@ -40,14 +40,14 @@ fn main() {
         Err(_) => match env::var("HOME") {
             Ok(home) => home + "/.config/wldash",
             Err(_) => panic!("unable to find user folder"),
-        }
+        },
     };
 
     let config: config::Config = match File::open(config_home + "/config.json") {
         Ok(f) => {
             let reader = BufReader::new(f);
             serde_json::from_reader(reader).unwrap()
-        },
+        }
         Err(_) => Default::default(),
     };
 

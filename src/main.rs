@@ -107,7 +107,6 @@ fn main() {
         config::OutputMode::Active => OutputMode::Active,
     };
 
-
     let background = config.background;
 
     let (tx_draw, rx_draw) = channel();

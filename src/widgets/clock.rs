@@ -46,7 +46,9 @@ impl Clock {
 
 impl Widget for Clock {
     fn size(&self) -> (u32, u32) {
-        ((2.0 * self.size).ceil() as u32, self.size.ceil() as u32)
+        let digit = (self.size * 0.45).ceil() as u32;
+        let colon = (self.size * 0.20).ceil() as u32;
+        (digit * 4 + colon, self.size.ceil() as u32)
     }
 
     fn draw(
@@ -55,7 +57,6 @@ impl Widget for Clock {
         pos: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
         let (width, height) = self.size();
-
         if !(ctx.time.date() != self.cur_time.date()
             || ctx.time.hour() != self.cur_time.hour()
             || ctx.time.minute() != self.cur_time.minute()

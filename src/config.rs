@@ -147,10 +147,10 @@ impl Default for OutputMode {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
-    pub widget: Widget,
     pub output_mode: OutputMode,
     pub scale: u32,
     pub background: Color,
+    pub widget: Widget,
 }
 
 impl Default for Config {

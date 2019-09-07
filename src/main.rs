@@ -27,7 +27,7 @@ enum Mode {
     Start,
     StartOrKill,
     ToggleVisible,
-    PrintConfig,
+    PrintConfig(bool),
 }
 
 fn main() {
@@ -43,12 +43,18 @@ fn main() {
         },
     };
 
-    let config: config::Config = match File::open(config_home + "/config.json") {
+    let (is_yaml, config): (bool, config::Config) = match File::open(config_home.clone() + "/config.yaml") {
         Ok(f) => {
             let reader = BufReader::new(f);
-            serde_json::from_reader(reader).unwrap()
+            (true, serde_yaml::from_reader(reader).unwrap())
         }
-        Err(_) => Default::default(),
+        Err(_) =>  match File::open(config_home + "/config.json") {
+            Ok(f) => {
+                let reader = BufReader::new(f);
+                (false, serde_json::from_reader(reader).unwrap())
+            }
+            Err(_) => (true, Default::default()),
+        }
     };
 
     let scale = config.scale;
@@ -60,7 +66,9 @@ fn main() {
             "start" => Mode::Start,
             "start-or-kill" => Mode::StartOrKill,
             "toggle-visible" => Mode::ToggleVisible,
-            "print-config" => Mode::PrintConfig,
+            "print-config" => Mode::PrintConfig(!is_yaml),
+            "print-config-json" => Mode::PrintConfig(true),
+            "print-config-yaml" => Mode::PrintConfig(false),
             s => {
                 eprintln!("unsupported sub-command {}", s);
                 std::process::exit(1);
@@ -93,8 +101,12 @@ fn main() {
                 std::process::exit(1);
             };
         }
-        Mode::PrintConfig => {
-            println!("{}", serde_json::to_string_pretty(&config).unwrap());
+        Mode::PrintConfig(json) => {
+            if json {
+                println!("{}", serde_json::to_string_pretty(&config).unwrap());
+            } else {
+                println!("{}", serde_yaml::to_string(&config).unwrap());
+            }
             std::process::exit(0);
         }
     }

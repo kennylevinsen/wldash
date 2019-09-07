@@ -11,7 +11,7 @@ Consider this alpha-quality: While it works, *everything* is subject to change w
 3. Put somewhere: `cp target/release/wldash /usr/local/bin/wldash`
 4. Run: `wldash`
 
-To see the default configuration, run `wldash print-config`. To configure, place a file in `$XDG_CONFIG_HOME/wldash/config.json` (or if `XDG_CONFIG_HOME` is not set, `~/.config/wldash/config.json`).
+To see the default configuration, run `wldash print-config`. To configure, place a file in `$XDG_CONFIG_HOME/wldash/config.yaml` (or if `XDG_CONFIG_HOME` is not set, `~/.config/wldash/config.yaml`). JSON is also currently supported.
 
 Notable settings: `outptuMode` can be `active` or `all`, `scale` can be set to `2` to half the buffer size, and the widgets (and their layout) can be configured.
 

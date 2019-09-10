@@ -245,7 +245,10 @@ impl PulseAudioClient {
                 conn.mainloop.borrow_mut().run().unwrap();
             });
 
-        if !rx1.recv().unwrap() || !rx2.recv().unwrap() {
+        let pa_writer_res = rx1.recv().unwrap();
+        let pa_reader_res = rx2.recv().unwrap();
+
+        if !pa_writer_res || !pa_reader_res {
             return Err(::std::io::Error::new(
                 ::std::io::ErrorKind::Other,
                 "unable to start pulseaudio thread",

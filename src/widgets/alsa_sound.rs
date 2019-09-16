@@ -21,8 +21,6 @@ pub struct AlsaMixer {
     pub mixer: Mixer,
 }
 
-//unsafe impl Send for AlsaMixer {}
-
 impl AlsaMixer {
     pub fn new() -> ::std::io::Result<Self> {
         Mixer::new(CARD_NAME, true)
@@ -40,18 +38,24 @@ impl AlsaMixer {
             }
         }
     }
-    pub fn get_master_volume(&self) -> ::std::io::Result<i64> {
+    pub fn get_master_volume(&self) -> ::std::io::Result<f32> {
         self.get_master()
             .and_then(|master| {
+                let (min, max) = master.get_playback_volume_range();
+                let max_range = (max - min) as f32;
                 master.get_playback_volume(SelemChannelId::mono())
-                      .map_err(|e| alsa_error_to_io_error("Failed to get `Master` volume", &e))
+                    .map(|volume| (volume - min) as f32 / max_range)
+                    .map_err(|e| alsa_error_to_io_error("Failed to get `Master` volume", &e))
             })
     }
-    pub fn set_master_volume(&self, volume: i64) -> ::std::io::Result<()> {
+    pub fn set_master_volume(&self, volume: f32) -> ::std::io::Result<()> {
         self.get_master()
             .and_then(|master| {
+                let (min, max) = master.get_playback_volume_range();
+                let max_range = max - min;
+                let volume = min + ((max_range as f32) * volume) as i64;
                 master.set_playback_volume_all(volume)
-                      .map_err(|e| alsa_error_to_io_error("Failed to set `Master` volume", &e))
+                    .map_err(|e| alsa_error_to_io_error("Failed to set `Master` volume", &e))
             })
     }
 }
@@ -65,7 +69,7 @@ impl AlsaVolume {
         AlsaMixer::new()
             .map(|mixer| Self{ inner: Arc::new(Mutex::new(mixer)) })
     }
-    pub fn get_master_volume(&self) -> ::std::io::Result<i64> {
+    pub fn get_master_volume(&self) -> ::std::io::Result<f32> {
         self.inner
             .try_lock()
             .map_err(|_| {
@@ -76,7 +80,7 @@ impl AlsaVolume {
             .and_then(|ref alsa_mixer| alsa_mixer.get_master_volume())
     }
     
-    pub fn set_master_volume(&self, volume: i64) -> ::std::io::Result<()> {
+    pub fn set_master_volume(&self, volume: f32) -> ::std::io::Result<()> {
         self.inner
             .try_lock()
             .map_err(|_| {
@@ -100,36 +104,15 @@ impl BarWidgetImpl for AlsaVolume {
     fn value(&self) -> f32 {
         // TODO: use min/max instead of hardcoded constants
         self.get_master_volume()
-            .map(|volume| volume as f32 / 65536.0f32)
             .unwrap_or_else(|e| { eprintln!("{}", e); 0.0f32 })
     }
     fn color(&self) -> Color {
         // TODO: Custom color from config
         Color::new(1.0, 1.0, 1.0, 1.0)
     }
-    fn inc(&mut self, diff: f32) {
-        let r = self.inner
-            .try_lock()
-            .map_err(|_| {
-                let kind = ::std::io::ErrorKind::Other;
-                let msg = "Failed to set `Master` volume: locking failed";
-                ::std::io::Error::new(kind, msg)
-            })
-            .and_then(|ref mixer| {
-                let volume = mixer.get_master_volume()
-                    .map_err(|e| eprintln!("{}", e))
-                    .unwrap_or(0) as f32;
-                let volume = volume + diff * 65536.0f32;
-                let volume = if volume > 65536.0f32 { 65536 } else { volume as i64 };
-                eprintln!("Inc: {}", volume);
-                mixer.set_master_volume(volume)
-            });
-        if let Err(e) = r {
-            eprintln!("<AlsaVolume as BarWidgetImpl>::inc() failed: {}", e);
-        }
-    }
+    fn inc(&mut self, _diff: f32) { }
     fn set(&mut self, abs: f32) {
-        let r = self.set_master_volume((abs * 65536.0f32) as i64);
+        let r = self.set_master_volume(abs);
         if let Err(e) = r {
             eprintln!("<AlsaVolume as BarWidgetImpl>::set() failed: {}", e);
         }

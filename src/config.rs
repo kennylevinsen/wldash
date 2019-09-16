@@ -48,10 +48,16 @@ pub enum Widget {
         font_size: f32,
         length: u32,
     },
+    #[cfg(feature="pulseaudio")]
     PulseAudio {
         font_size: f32,
         length: u32,
     },
+    #[cfg(feature="alsasound")]
+    AlsaSound {
+        font_size: f32,
+        length: u32
+    }
 }
 
 impl Widget {
@@ -121,8 +127,16 @@ impl Widget {
                     Err(_) => None,
                 }
             }
+            #[cfg(feature="pulseaudio")]
             Widget::PulseAudio { font_size, length } => {
-                match widgets::sound::PulseAudio::new(font_size, length, tx.clone()) {
+                match widgets::pulse_sound::PulseAudio::new(font_size, length, tx.clone()) {
+                    Ok(w) => Some(w),
+                    Err(_) => None,
+                }
+            }
+            #[cfg(feature="alsasound")]
+            Widget::AlsaSound { font_size, length } => {
+                match widgets::alsa_sound::AlsaVolume::new(font_size, length) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }

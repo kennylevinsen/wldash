@@ -21,6 +21,7 @@ use crate::widget::{DrawContext, Widget};
 use crate::cmd::Cmd;
 use crate::doublemempool::DoubleMemPool;
 
+#[derive(Debug)]
 pub enum OutputMode {
     Active,
     All,
@@ -123,47 +124,49 @@ impl AppInner {
 
         self.configured_surfaces = Arc::new(Mutex::new(0));
 
-        if self.visible {
-            match self.output_mode {
-                OutputMode::Active => {
-                    if self.shell_surfaces.len() > 0 {
-                        return;
-                    }
+        if !self.visible {
+            self.surfaces = Vec::new();
+            self.shell_surfaces = Vec::new();
+            return;
+        }
+
+        match self.output_mode {
+            OutputMode::Active => {
+                if self.shell_surfaces.len() > 0 {
+                    return;
+                }
+
+                let (surface, shell_surface) = AppInner::add_shell_surface(
+                    &compositor,
+                    &shell,
+                    self.scale,
+                    self.configured_surfaces.clone(),
+                    self.draw_tx.clone(),
+                    None,
+                );
+                self.surfaces = vec![surface];
+                self.shell_surfaces = vec![shell_surface];
+            }
+            OutputMode::All => {
+                let mut surfaces = Vec::new();
+                let mut shell_surfaces = Vec::new();
+                for output in self.outputs.iter() {
                     let (surface, shell_surface) = AppInner::add_shell_surface(
                         &compositor,
                         &shell,
                         self.scale,
                         self.configured_surfaces.clone(),
                         self.draw_tx.clone(),
-                        None,
+                        Some(&output.1),
                     );
-                    self.surfaces = vec![surface];
-                    self.shell_surfaces = vec![shell_surface];
+                    surfaces.push(surface);
+                    shell_surfaces.push(shell_surface);
                 }
-                OutputMode::All => {
-                    let mut surfaces = Vec::new();
-                    let mut shell_surfaces = Vec::new();
-                    for output in self.outputs.iter() {
-                        let (surface, shell_surface) = AppInner::add_shell_surface(
-                            &compositor,
-                            &shell,
-                            self.scale,
-                            self.configured_surfaces.clone(),
-                            self.draw_tx.clone(),
-                            Some(&output.1),
-                        );
-                        surfaces.push(surface);
-                        shell_surfaces.push(shell_surface);
-                    }
-                    self.surfaces = surfaces;
-                    self.shell_surfaces = shell_surfaces;
-                }
+                self.surfaces = surfaces;
+                self.shell_surfaces = shell_surfaces;
             }
-            self.draw_tx.send(Cmd::ForceDraw).unwrap();
-        } else {
-            self.surfaces = Vec::new();
-            self.shell_surfaces = Vec::new();
         }
+        self.draw_tx.send(Cmd::ForceDraw).unwrap();
     }
 
     fn add_output(&mut self, id: u32, output: wl_output::WlOutput) {
@@ -210,7 +213,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn redraw(&mut self, mut force: bool) -> Result<(), ::std::io::Error> {
+    pub fn redraw(&mut self, force: bool) -> Result<(), ::std::io::Error> {
         let widget = match self.widget {
             Some(ref mut widget) => widget,
             None => return Ok(()),
@@ -219,7 +222,9 @@ impl App {
         let inner = self.inner.lock().unwrap();
         let time = Local::now();
 
-        if inner.shell_surfaces.len() != *inner.configured_surfaces.lock().unwrap() {
+        if !inner.visible ||
+            inner.shell_surfaces.len() != *inner.configured_surfaces.lock().unwrap() ||
+            inner.surfaces.len() == 0 {
             // Not ready yet
             return Ok(());
         }
@@ -231,6 +236,7 @@ impl App {
 
         let size = widget.size();
         let size_changed = self.last_dim != size;
+        let force = force | size_changed;
 
         // resize the pool if relevant
         pool.resize((4 * size.0 * size.1) as usize)
@@ -239,8 +245,8 @@ impl App {
         let mut buf = Buffer::new(mmap, size);
 
         // Copy old damage
-        if let Some(d) = &self.last_damage {
-            if !size_changed {
+        let force = match (force, &self.last_damage) {
+            (false, Some(d)) => {
                 let lastmmap = last.mmap();
                 let last = Buffer::new(lastmmap, size);
 
@@ -250,12 +256,10 @@ impl App {
                 for d in d {
                     last.copy_to(&mut buf, d.clone());
                 }
-            } else {
-                force = true;
+                false
             }
-        } else {
-            force = true;
-        }
+            _ => true
+        };
 
         if force {
             buf.memset(&self.bg);
@@ -272,8 +276,9 @@ impl App {
 
         mmap.flush().unwrap();
 
-        if !size_changed && !report.full_damage && report.damage.len() == 0 {
+        if !force && !report.full_damage && report.damage.len() == 0 {
             // Nothing to do
+            self.pools.never_mind();
             return Ok(());
         }
 
@@ -316,6 +321,20 @@ impl App {
         if !inner.visible {
             self.last_dim = (0, 0);
         }
+        inner.outputs_changed();
+    }
+
+    pub fn hide(&mut self) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.visible = false;
+        self.last_dim = (0, 0);
+        inner.outputs_changed();
+    }
+
+    pub fn show(&mut self) {
+        let mut inner = self.inner.lock().unwrap();
+        inner.visible = true;
+        self.last_dim = (0, 0);
         inner.outputs_changed();
     }
 
@@ -470,7 +489,6 @@ impl App {
             },
         ));
 
-        inner.lock().unwrap().outputs_changed();
         event_queue.sync_roundtrip().unwrap();
 
         //

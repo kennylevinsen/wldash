@@ -19,7 +19,7 @@ impl DoubleMemPool {
     pub fn pool(&mut self) -> Option<(&mut MemPool, &mut MemPool)> {
         let switch = self.switch;
         self.switch = !self.switch;
-        let (last, cur) = if switch {
+        let (last, cur) = if !switch {
             (&mut self.pool2, &mut self.pool1)
         } else {
             (&mut self.pool1, &mut self.pool2)
@@ -30,5 +30,9 @@ impl DoubleMemPool {
         } else {
             Some((last, cur))
         }
+    }
+
+    pub fn never_mind(&mut self) {
+        self.switch = !self.switch;
     }
 }

@@ -25,6 +25,7 @@ use cmd::Cmd;
 
 enum Mode {
     Start,
+    Daemonize,
     StartOrKill,
     ToggleVisible,
     PrintConfig(bool),
@@ -63,7 +64,7 @@ fn main() {
     let mode = match args.len() {
         1 => Mode::Start,
         2 => match args[1].as_str() {
-            "start" => Mode::Start,
+            "start" => Mode::Daemonize,
             "start-or-kill" => Mode::StartOrKill,
             "toggle-visible" => Mode::ToggleVisible,
             "print-config" => Mode::PrintConfig(!is_yaml),
@@ -79,6 +80,8 @@ fn main() {
             std::process::exit(1);
         }
     };
+
+    let mut daemon = false;
 
     match mode {
         Mode::ToggleVisible => {
@@ -100,6 +103,13 @@ fn main() {
                 eprintln!("wldash is already running");
                 std::process::exit(1);
             };
+        }
+        Mode::Daemonize => {
+            if let Ok(_) = UnixStream::connect(socket_path.clone()) {
+                eprintln!("wldash is already running");
+                std::process::exit(1);
+            };
+            daemon = true;
         }
         Mode::PrintConfig(json) => {
             if json {
@@ -133,6 +143,11 @@ fn main() {
     });
 
     let mut app = App::new(tx_draw, output_mode, background, scale);
+    if daemon {
+        app.hide();
+    } else {
+        app.show();
+    }
     let widget = mod_rx.recv().unwrap();
     app.set_widget(widget).unwrap();
 
@@ -224,10 +239,16 @@ fn main() {
                 }
                 Cmd::ToggleVisible => {
                     app.toggle_visible();
+                    app.flush_display();
                 }
                 Cmd::Exit => {
-                    let _ = std::fs::remove_file(socket_path);
-                    return;
+                    if daemon {
+                        app.hide();
+                        app.flush_display();
+                    } else {
+                        let _ = std::fs::remove_file(socket_path);
+                        return;
+                    }
                 }
             },
             None => {

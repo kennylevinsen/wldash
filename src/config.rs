@@ -129,14 +129,14 @@ impl Widget {
             }
             #[cfg(feature="pulseaudio")]
             Widget::PulseAudio { font_size, length } => {
-                match widgets::pulse_sound::PulseAudio::new(font_size, length, tx.clone()) {
+                match widgets::audio::PulseAudio::new(font_size, length, tx.clone()) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
             }
             #[cfg(feature="alsasound")]
             Widget::AlsaSound { font_size, length } => {
-                match widgets::alsa_sound::AlsaVolume::new(font_size, length) {
+                match widgets::audio::Alsa::new(font_size, length) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }

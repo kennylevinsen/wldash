@@ -8,10 +8,10 @@ edition = "2018"
 lto = "fat"
 
 [features]
-default = ["alsasound", "pulseaudio"]
+default = ["alsa-widget", "pulseaudio-widget"]
 damage_debug = []
-alsasound = ["alsa"]
-pulseaudio = ["libpulse-binding"]
+alsa-widget = ["alsa"]
+pulseaudio-widget = ["libpulse-binding"]
 
 
 [dependencies]

@@ -1,11 +1,11 @@
 
-#[cfg(feature="alsasound")]
+#[cfg(feature="alsa-widget")]
 mod alsa_sound;
-#[cfg(feature="alsasound")]
+#[cfg(feature="alsa-widget")]
 pub use alsa_sound::Alsa;
 
-#[cfg(feature="pulseaudio")]
+#[cfg(feature="pulseaudio-widget")]
 mod pulse_sound;
-#[cfg(feature="pulseaudio")]
+#[cfg(feature="pulseaudio-widget")]
 pub use pulse_sound::PulseAudio;
 

@@ -32,10 +32,13 @@ pub struct Alsa {
 
 impl Alsa {
     pub fn new(font_size: f32, length: u32) -> ::std::io::Result<Box<BarWidget>> {
-        Mixer::new(CARD_NAME, true)
-            .map(|mixer| BarWidget::new_simple(font_size, length, Box::new(Self { mixer })))
-            .map_err(|err| alsa_error_to_io_error("Failed to create ALSA mixer", &err))
+        let mixer = Mixer::new(CARD_NAME, true)
+            .map_err(|err| alsa_error_to_io_error("Failed to create ALSA mixer", &err))?;
+        let mixer = Self { mixer };
+        mixer.get_master_volume()?; // probing
+        Ok(BarWidget::new_simple(font_size, length, Box::new(mixer)))
     }
+    #[inline]
     pub fn get_master<'a>(&'a self) -> ::std::io::Result<Selem<'a>> {
         let master_id = SelemId::new(SELEM_NAME, SELEM_ID);
         match self.mixer.find_selem(&master_id) {
@@ -85,20 +88,22 @@ impl BarWidgetImpl for Alsa {
         "volume"
     }
     fn value(&self) -> f32 {
-        self.get_master_volume()
-            .unwrap_or_else(|e| { eprintln!("{}", e); 0.0f32 })
+        match self.get_master_volume() {
+            Ok(v) => v,
+            Err(e) => panic!(e)
+        }
     }
     fn color(&self) -> Color {
         Color::new(1.0, 1.0, 1.0, 1.0)
     }
     fn inc(&mut self, diff: f32) {
         if let Err(e) = self.inc_master_volume(diff) {
-            eprintln!("<Alsa as BarWidgetImpl>::inc() failed: {}", e);
+            panic!(e)
         }
     }
     fn set(&mut self, abs: f32) {
         if let Err(e) = self.set_master_volume(abs) {
-            eprintln!("<Alsa as BarWidgetImpl>::set() failed: {}", e);
+            panic!(e)
         }
     }
     fn toggle(&mut self) {}

@@ -313,6 +313,9 @@ impl App {
     pub fn toggle_visible(&mut self) {
         let mut inner = self.inner.lock().unwrap();
         inner.visible = !inner.visible;
+        if !inner.visible {
+            self.last_dim = (0, 0);
+        }
         inner.outputs_changed();
     }
 

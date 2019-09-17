@@ -70,8 +70,8 @@ impl Alsa {
             .and_then(|master| {
                 let (min, max) = master.get_playback_volume_range();
                 master.get_playback_volume(SelemChannelId::mono())
-                    .map(|volume| alsa_volume_to_f32(volume, min, max))
                     .and_then(|volume| {
+                        let volume = alsa_volume_to_f32(volume, min, max);
                         let volume = f32_to_alsa_volume(volume + diff, min, max);
                         master.set_playback_volume_all(volume)
                     })
@@ -93,12 +93,12 @@ impl BarWidgetImpl for Alsa {
     }
     fn inc(&mut self, diff: f32) {
         if let Err(e) = self.inc_master_volume(diff) {
-            eprintln!("<AlsaVolume as BarWidgetImpl>::inc() failed: {}", e);
+            eprintln!("<Alsa as BarWidgetImpl>::inc() failed: {}", e);
         }
     }
     fn set(&mut self, abs: f32) {
         if let Err(e) = self.set_master_volume(abs) {
-            eprintln!("<AlsaVolume as BarWidgetImpl>::set() failed: {}", e);
+            eprintln!("<Alsa as BarWidgetImpl>::set() failed: {}", e);
         }
     }
     fn toggle(&mut self) {}

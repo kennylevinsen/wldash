@@ -60,26 +60,30 @@ fn main() {
 
     let scale = config.scale;
 
-    let args: Vec<String> = env::args().collect();
-    let mode = match args.len() {
-        1 => Mode::Start,
-        2 => match args[1].as_str() {
-            "start" => Mode::Daemonize,
-            "start-or-kill" => Mode::StartOrKill,
-            "toggle-visible" => Mode::ToggleVisible,
-            "print-config" => Mode::PrintConfig(!is_yaml),
-            "print-config-json" => Mode::PrintConfig(true),
-            "print-config-yaml" => Mode::PrintConfig(false),
-            s => {
-                eprintln!("unsupported sub-command {}", s);
-                std::process::exit(1);
+    let mut args = env::args();
+    let _ = args.next();
+    let mode = match args.next() {
+        Some(arg) => {
+            match arg.as_str() {
+                "start" => Mode::Daemonize,
+                "start-or-kill" => Mode::StartOrKill,
+                "toggle-visible" => Mode::ToggleVisible,
+                "print-config" => Mode::PrintConfig(!is_yaml),
+                "print-config-json" => Mode::PrintConfig(true),
+                "print-config-yaml" => Mode::PrintConfig(false),
+                s => {
+                    eprintln!("unsupported sub-command {}", s);
+                    std::process::exit(1);
+                }
             }
         },
-        v => {
-            eprintln!("expected 0 or 1 arguments, got {}", v);
-            std::process::exit(1);
-        }
+        None => Mode::Start
     };
+    if let Some(_) = args.next() {
+        // total = args.count + 2 (the two we skipped + the rest)
+        eprintln!("expected 0 or 1 arguments, got {}", args.count() + 2);
+        std::process::exit(1);
+    }
 
     let mut daemon = false;
 

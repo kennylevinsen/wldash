@@ -196,6 +196,7 @@ impl Default for Config {
                                     length: 600,
                                 }),
                             }),
+                            #[cfg(feature="pulseaudio-widget")]
                             Box::new(Widget::Margin {
                                 margins: (0, 0, 0, 8),
                                 widget: Box::new(Widget::PulseAudio {

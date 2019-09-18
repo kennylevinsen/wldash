@@ -6,5 +6,5 @@ pub mod clock;
 pub mod date;
 pub mod launcher;
 
-#[allow(dead_code)]
+#[cfg(any(feature="alsa-widget", feature="pulseaudio-widget"))]
 pub mod audio;

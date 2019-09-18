@@ -1,4 +1,3 @@
-use std::default::Default;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -14,6 +13,7 @@ mod buffer;
 mod cmd;
 mod color;
 mod config;
+mod configfmt;
 mod desktop;
 mod doublemempool;
 mod draw;
@@ -22,13 +22,15 @@ mod widgets;
 
 use app::{App, OutputMode};
 use cmd::Cmd;
+use config::Config;
+use configfmt::ConfigFmt;
 
 enum Mode {
     Start,
     Daemonize,
     StartOrKill,
     ToggleVisible,
-    PrintConfig(bool),
+    PrintConfig(ConfigFmt),
 }
 
 fn main() {
@@ -44,40 +46,61 @@ fn main() {
         },
     };
 
-    let (is_yaml, config): (bool, config::Config) = match File::open(config_home.clone() + "/config.yaml") {
-        Ok(f) => {
-            let reader = BufReader::new(f);
-            (true, serde_yaml::from_reader(reader).unwrap())
-        }
-        Err(_) =>  match File::open(config_home + "/config.json") {
-            Ok(f) => {
-                let reader = BufReader::new(f);
-                (false, serde_json::from_reader(reader).unwrap())
+    // From all existing files take the first readable one and write it's extension to `ext`
+    let mut ext = [0x0; 8];
+    let file = configfmt::CONFIG_NAMES
+        .iter()
+        .map(|name| std::path::Path::new(&config_home).join(name))
+        .filter_map(|path| {
+            match File::open(&path) {
+                Ok(file) => {
+                    let e = path.extension().and_then(|e| e.to_str())?;
+                    let len = e.len();
+                    let from = len.saturating_sub(8); // the longest possible extension
+                    ext[0..len - from].copy_from_slice(&e.as_bytes()[from..]);
+                    Some(file)
+                }
+                Err(_) => None,
             }
-            Err(_) => (true, Default::default()),
-        }
-    };
+        })
+        .next();
+
+    let fmt = std::str::from_utf8(&ext)
+        .ok()
+        .and_then(ConfigFmt::new)
+        .unwrap_or_default();
+
+    let config: Config = file
+        .map(|f| fmt.from_reader(BufReader::new(f)))
+        .unwrap_or_default();
 
     let scale = config.scale;
 
     let mut args = env::args();
     let _ = args.next();
     let mode = match args.next() {
-        Some(arg) => {
-            match arg.as_str() {
-                "start" => Mode::Daemonize,
-                "start-or-kill" => Mode::StartOrKill,
-                "toggle-visible" => Mode::ToggleVisible,
-                "print-config" => Mode::PrintConfig(!is_yaml),
-                "print-config-json" => Mode::PrintConfig(true),
-                "print-config-yaml" => Mode::PrintConfig(false),
-                s => {
+        Some(arg) => match arg.as_str() {
+            "start" => Mode::Daemonize,
+            "start-or-kill" => Mode::StartOrKill,
+            "toggle-visible" => Mode::ToggleVisible,
+            "print-config" => Mode::PrintConfig(fmt),
+            s => {
+                let p = "print-config-";
+                let l = p.len();
+                let fmt = if s.starts_with(p) {
+                    ConfigFmt::new(&s[l..])
+                } else {
+                    None
+                };
+                if let Some(fmt) = fmt {
+                    Mode::PrintConfig(fmt)
+                } else {
                     eprintln!("unsupported sub-command {}", s);
                     std::process::exit(1);
                 }
             }
         },
-        None => Mode::Start
+        None => Mode::Start,
     };
     if let Some(_) = args.next() {
         // total = args.count + 2 (the two we skipped + the rest)
@@ -115,12 +138,8 @@ fn main() {
             };
             daemon = true;
         }
-        Mode::PrintConfig(json) => {
-            if json {
-                println!("{}", serde_json::to_string_pretty(&config).unwrap());
-            } else {
-                println!("{}", serde_yaml::to_string(&config).unwrap());
-            }
+        Mode::PrintConfig(fmt) => {
+            println!("{}", fmt.to_string(&config));
             std::process::exit(0);
         }
     }

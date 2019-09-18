@@ -322,7 +322,8 @@ impl Widget for Launcher {
                                 if lexed.len() > 0 {
                                     let _ =
                                         Command::new(lexed[0].clone()).args(&lexed[1..]).spawn();
-                                    self.input = "".to_string();
+                                    self.input.clear();
+                                    self.input.shrink_to_fit();
                                     self.tx.send(Cmd::Exit).unwrap();
                                 }
                             }
@@ -334,7 +335,8 @@ impl Widget for Launcher {
                                         let _ = Command::new(lexed[0].clone())
                                             .args(&lexed[1..])
                                             .spawn();
-                                        self.input = "".to_string();
+                                        self.input.clear();
+                                        self.input.shrink_to_fit();
                                         self.tx.send(Cmd::Exit).unwrap();
                                     }
                                 }

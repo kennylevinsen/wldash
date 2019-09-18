@@ -51,35 +51,29 @@ impl Alsa {
         }
     }
     pub fn get_master_volume(&self) -> ::std::io::Result<f32> {
-        self.get_master()
-            .and_then(|master| {
-                let (min, max) = master.get_playback_volume_range();
-                master.get_playback_volume(SelemChannelId::mono())
-                    .map(|volume| alsa_volume_to_f32(volume, min, max))
-                    .map_err(|e| alsa_error_to_io_error("Failed to get `Master` volume", &e))
-            })
+        let master = self.get_master()?;
+        let (min, max) = master.get_playback_volume_range();
+        master.get_playback_volume(SelemChannelId::mono())
+            .map(|volume| alsa_volume_to_f32(volume, min, max))
+            .map_err(|e| alsa_error_to_io_error("Failed to get `Master` volume", &e))
     }
     pub fn set_master_volume(&self, volume: f32) -> ::std::io::Result<()> {
-        self.get_master()
-            .and_then(|master| {
-                let (min, max) = master.get_playback_volume_range();
-                let volume = f32_to_alsa_volume(volume, min, max);
-                master.set_playback_volume_all(volume)
-                    .map_err(|e| alsa_error_to_io_error("Failed to set `Master` volume", &e))
-            })
+        let master = self.get_master()?;
+        let (min, max) = master.get_playback_volume_range();
+        let volume = f32_to_alsa_volume(volume, min, max);
+        master.set_playback_volume_all(volume)
+            .map_err(|e| alsa_error_to_io_error("Failed to set `Master` volume", &e))
     }
     pub fn inc_master_volume(&self, diff: f32) -> ::std::io::Result<()> {
-        self.get_master()
-            .and_then(|master| {
-                let (min, max) = master.get_playback_volume_range();
-                master.get_playback_volume(SelemChannelId::mono())
-                    .and_then(|volume| {
-                        let volume = alsa_volume_to_f32(volume, min, max);
-                        let volume = f32_to_alsa_volume(volume + diff, min, max);
-                        master.set_playback_volume_all(volume)
-                    })
-                    .map_err(|e| alsa_error_to_io_error("Failed to inc/dec `Master` volume", &e))
+        let master = self.get_master()?;
+        let (min, max) = master.get_playback_volume_range();
+        master.get_playback_volume(SelemChannelId::mono())
+            .and_then(|volume| {
+                let volume = alsa_volume_to_f32(volume, min, max);
+                let volume = f32_to_alsa_volume(volume + diff, min, max);
+                master.set_playback_volume_all(volume)
             })
+            .map_err(|e| alsa_error_to_io_error("Failed to inc/dec `Master` volume", &e))
     }
 }
 

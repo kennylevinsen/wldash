@@ -21,6 +21,7 @@ mod widget;
 mod widgets;
 
 use app::{App, OutputMode};
+use config::Config;
 use cmd::Cmd;
 
 enum Mode {
@@ -44,19 +45,31 @@ fn main() {
         },
     };
 
-    let (is_yaml, config): (bool, config::Config) = match File::open(config_home.clone() + "/config.yaml") {
-        Ok(f) => {
-            let reader = BufReader::new(f);
-            (true, serde_yaml::from_reader(reader).unwrap())
-        }
-        Err(_) =>  match File::open(config_home + "/config.json") {
-            Ok(f) => {
-                let reader = BufReader::new(f);
-                (false, serde_json::from_reader(reader).unwrap())
+    let mut ext = [0x0; 4];
+    let file = ["config.yaml", "config.json"]
+        .iter()
+        .map(|name| { std::path::Path::new(&config_home).join(name) })
+        .filter_map(|path| {
+            match File::open(&path) {
+                Ok(file) => {
+                    let e = path.extension().and_then(|e| e.to_str())?;
+                    let from = e.len().saturating_sub(4); // the longest possible extension
+                    ext.copy_from_slice(&e.as_bytes()[from..]);
+                    Some(file)
+                },
+                Err(_) => None
             }
-            Err(_) => (true, Default::default()),
+        })
+        .next();
+
+    let (is_yaml, config): (bool, Config) = if let Some(file) = file {
+        let reader = BufReader::new(file);
+        match std::str::from_utf8(&ext) {
+            Ok("yaml") => (true, serde_yaml::from_reader(reader).unwrap()),
+            Ok("json") => (false, serde_json::from_reader(reader).unwrap()),
+            _ => (true, Default::default())
         }
-    };
+    } else { (true, Default::default()) };
 
     let scale = config.scale;
 

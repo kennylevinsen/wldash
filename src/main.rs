@@ -48,7 +48,7 @@ fn main() {
 
     // From all existing files take the first readable one and write it's extension to `ext`
     let mut ext = [0x0; 4];
-    let file = ["config.yaml", "config.json"]
+    let file = serdefmt::CONFIG_NAMES
         .iter()
         .map(|name| { std::path::Path::new(&config_home).join(name) })
         .filter_map(|path| {
@@ -65,7 +65,7 @@ fn main() {
         .next();
 
     let fmt = std::str::from_utf8(&ext).ok()
-        .and_then(SerdeFmt::try_new_with_ext)
+        .and_then(SerdeFmt::new)
         .unwrap_or_default();
     
     let config: Config = file.map(|f| fmt.from_reader(BufReader::new(f))).unwrap_or_default();
@@ -81,11 +81,15 @@ fn main() {
                 "start-or-kill" => Mode::StartOrKill,
                 "toggle-visible" => Mode::ToggleVisible,
                 "print-config" => Mode::PrintConfig(fmt),
-                "print-config-json" => Mode::PrintConfig(SerdeFmt::Json),
-                "print-config-yaml" => Mode::PrintConfig(SerdeFmt::Yaml),
                 s => {
-                    eprintln!("unsupported sub-command {}", s);
-                    std::process::exit(1);
+                    let ext = s.trim_start_matches("print-config-");
+                    match SerdeFmt::new(ext) {
+                        Some(fmt) => Mode::PrintConfig(fmt),
+                        None => {
+                            eprintln!("unsupported sub-command {}", s);
+                            std::process::exit(1);
+                        }
+                    }
                 }
             }
         },

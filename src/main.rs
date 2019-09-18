@@ -1,4 +1,3 @@
-use std::default::Default;
 use std::env;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -17,19 +16,21 @@ mod config;
 mod desktop;
 mod doublemempool;
 mod draw;
+mod serdefmt;
 mod widget;
 mod widgets;
 
 use app::{App, OutputMode};
 use config::Config;
 use cmd::Cmd;
+use serdefmt::SerdeFmt;
 
 enum Mode {
     Start,
     Daemonize,
     StartOrKill,
     ToggleVisible,
-    PrintConfig(bool),
+    PrintConfig(SerdeFmt),
 }
 
 fn main() {
@@ -45,6 +46,7 @@ fn main() {
         },
     };
 
+    // From all existing files take the first readable one and write it's extension to `ext`
     let mut ext = [0x0; 4];
     let file = ["config.yaml", "config.json"]
         .iter()
@@ -62,14 +64,11 @@ fn main() {
         })
         .next();
 
-    let (is_yaml, config): (bool, Config) = if let Some(file) = file {
-        let reader = BufReader::new(file);
-        match std::str::from_utf8(&ext) {
-            Ok("yaml") => (true, serde_yaml::from_reader(reader).unwrap()),
-            Ok("json") => (false, serde_json::from_reader(reader).unwrap()),
-            _ => (true, Default::default())
-        }
-    } else { (true, Default::default()) };
+    let fmt = std::str::from_utf8(&ext).ok()
+        .and_then(SerdeFmt::try_new_with_ext)
+        .unwrap_or_default();
+    
+    let config: Config = file.map(|f| fmt.from_reader(BufReader::new(f))).unwrap_or_default();
 
     let scale = config.scale;
 
@@ -81,9 +80,9 @@ fn main() {
                 "start" => Mode::Daemonize,
                 "start-or-kill" => Mode::StartOrKill,
                 "toggle-visible" => Mode::ToggleVisible,
-                "print-config" => Mode::PrintConfig(!is_yaml),
-                "print-config-json" => Mode::PrintConfig(true),
-                "print-config-yaml" => Mode::PrintConfig(false),
+                "print-config" => Mode::PrintConfig(fmt),
+                "print-config-json" => Mode::PrintConfig(SerdeFmt::Json),
+                "print-config-yaml" => Mode::PrintConfig(SerdeFmt::Yaml),
                 s => {
                     eprintln!("unsupported sub-command {}", s);
                     std::process::exit(1);
@@ -128,12 +127,8 @@ fn main() {
             };
             daemon = true;
         }
-        Mode::PrintConfig(json) => {
-            if json {
-                println!("{}", serde_json::to_string_pretty(&config).unwrap());
-            } else {
-                println!("{}", serde_yaml::to_string(&config).unwrap());
-            }
+        Mode::PrintConfig(fmt) => {
+            println!("{}", fmt.to_string(&config));
             std::process::exit(0);
         }
     }

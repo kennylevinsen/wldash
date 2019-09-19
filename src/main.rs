@@ -47,7 +47,7 @@ fn main() {
     };
 
     // From all existing files take the first readable one and write it's extension to `ext`
-    let mut ext = [0x0; 4];
+    let mut ext = [0x0; 8];
     let file = serdefmt::CONFIG_NAMES
         .iter()
         .map(|name| { std::path::Path::new(&config_home).join(name) })
@@ -55,8 +55,9 @@ fn main() {
             match File::open(&path) {
                 Ok(file) => {
                     let e = path.extension().and_then(|e| e.to_str())?;
-                    let from = e.len().saturating_sub(4); // the longest possible extension
-                    ext.copy_from_slice(&e.as_bytes()[from..]);
+                    let len = e.len();
+                    let from = len.saturating_sub(8); // the longest possible extension
+                    ext[0..len - from].copy_from_slice(&e.as_bytes()[from..]);
                     Some(file)
                 },
                 Err(_) => None

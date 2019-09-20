@@ -323,7 +323,6 @@ impl Widget for Launcher {
                                     let _ =
                                         Command::new(lexed[0].clone()).args(&lexed[1..]).spawn();
                                     self.input.clear();
-                                    self.input.shrink_to_fit();
                                     self.tx.send(Cmd::Exit).unwrap();
                                 }
                             }
@@ -336,7 +335,6 @@ impl Widget for Launcher {
                                             .args(&lexed[1..])
                                             .spawn();
                                         self.input.clear();
-                                        self.input.shrink_to_fit();
                                         self.tx.send(Cmd::Exit).unwrap();
                                     }
                                 }

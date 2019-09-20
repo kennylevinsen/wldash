@@ -13,24 +13,24 @@ mod buffer;
 mod cmd;
 mod color;
 mod config;
+mod configfmt;
 mod desktop;
 mod doublemempool;
 mod draw;
-mod serdefmt;
 mod widget;
 mod widgets;
 
 use app::{App, OutputMode};
 use config::Config;
 use cmd::Cmd;
-use serdefmt::SerdeFmt;
+use configfmt::ConfigFmt;
 
 enum Mode {
     Start,
     Daemonize,
     StartOrKill,
     ToggleVisible,
-    PrintConfig(SerdeFmt),
+    PrintConfig(ConfigFmt),
 }
 
 fn main() {
@@ -48,7 +48,7 @@ fn main() {
 
     // From all existing files take the first readable one and write it's extension to `ext`
     let mut ext = [0x0; 8];
-    let file = serdefmt::CONFIG_NAMES
+    let file = configfmt::CONFIG_NAMES
         .iter()
         .map(|name| { std::path::Path::new(&config_home).join(name) })
         .filter_map(|path| {
@@ -66,7 +66,7 @@ fn main() {
         .next();
 
     let fmt = std::str::from_utf8(&ext).ok()
-        .and_then(SerdeFmt::new)
+        .and_then(ConfigFmt::new)
         .unwrap_or_default();
     
     let config: Config = file.map(|f| fmt.from_reader(BufReader::new(f))).unwrap_or_default();
@@ -84,7 +84,7 @@ fn main() {
                 "print-config" => Mode::PrintConfig(fmt),
                 s => {
                     let ext = s.trim_start_matches("print-config-");
-                    match SerdeFmt::new(ext) {
+                    match ConfigFmt::new(ext) {
                         Some(fmt) => Mode::PrintConfig(fmt),
                         None => {
                             eprintln!("unsupported sub-command {}", s);

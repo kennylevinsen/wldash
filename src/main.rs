@@ -21,8 +21,8 @@ mod widget;
 mod widgets;
 
 use app::{App, OutputMode};
-use config::Config;
 use cmd::Cmd;
+use config::Config;
 use configfmt::ConfigFmt;
 
 enum Mode {
@@ -83,13 +83,14 @@ fn main() {
                 "toggle-visible" => Mode::ToggleVisible,
                 "print-config" => Mode::PrintConfig(fmt),
                 s => {
-                    let ext = s.trim_start_matches("print-config-");
-                    match ConfigFmt::new(ext) {
-                        Some(fmt) => Mode::PrintConfig(fmt),
-                        None => {
-                            eprintln!("unsupported sub-command {}", s);
-                            std::process::exit(1);
-                        }
+                    let p = "print-config-";
+                    let l = p.len();
+                    let fmt = if s.starts_with(p) { ConfigFmt::new(&s[l..]) } else { None };
+                    if let Some(fmt) = fmt {
+                        Mode::PrintConfig(fmt)
+                    } else { 
+                        eprintln!("unsupported sub-command {}", s);
+                        std::process::exit(1);
                     }
                 }
             }

@@ -10,59 +10,49 @@ pub struct Color {
 
 impl Color {
     pub fn new(red: f32, green: f32, blue: f32, opacity: f32) -> Color {
-        Color {
-            red: if red > 1.0 {
-                1.0
-            } else if red < 0.0 {
-                0.0
-            } else {
-                red
-            },
-            green: if green > 1.0 {
-                1.0
-            } else if green < 0.0 {
-                0.0
-            } else {
-                green
-            },
-            blue: if blue > 1.0 {
-                1.0
-            } else if blue < 0.0 {
-                0.0
-            } else {
-                blue
-            },
-            opacity: if opacity > 1.0 {
-                1.0
-            } else if opacity < 0.0 {
-                0.0
-            } else {
-                opacity
-            },
-        }
+        let (red, green, blue, opacity) = clamp(red, green, blue, opacity);
+        Color { red, green, blue, opacity }
     }
 
     pub fn blend(&self, other: &Color, ratio: f32) -> Color {
-        let ratio = if ratio > 1.0 {
-            1.0
-        } else if ratio < 0.0 {
-            0.0
-        } else {
-            ratio
-        };
+        let ratio = clamp_f32(ratio, 0.0, 1.0);
 
         Color {
-            red: self.red + ((other.red - self.red) * ratio),
-            green: self.green + ((other.green - self.green) * ratio),
-            blue: self.blue + ((other.blue - self.blue) * ratio),
-            opacity: self.opacity + ((other.opacity - self.opacity) * ratio),
+            red:     blend_f32(self.red,     other.red,     ratio),
+            green:   blend_f32(self.green,   other.green,   ratio),
+            blue:    blend_f32(self.blue,    other.blue,    ratio),
+            opacity: blend_f32(self.opacity, other.opacity, ratio),
         }
     }
 
+    #[inline]
     pub fn as_argb8888(&self) -> u32 {
-        ((255.0 * self.opacity) as u32 & 0xFF) << 24
-            | ((255.0 * self.red) as u32 & 0xFF) << 16
-            | ((255.0 * self.green) as u32 & 0xFF) << 8
-            | ((255.0 * self.blue) as u32 & 0xFF)
+        ((255.0 * self.opacity) as u32 & 0xFF) << 24 |
+        ((255.0 * self.red)     as u32 & 0xFF) << 16 |
+        ((255.0 * self.green)   as u32 & 0xFF) << 8  |
+        ((255.0 * self.blue)    as u32 & 0xFF)
     }
+}
+
+#[inline]
+fn clamp(r: f32, g: f32, b: f32, o: f32) -> (f32, f32, f32, f32) {
+    clamp_naive(r, g, b, o)
+}
+
+#[inline]
+fn clamp_naive(r: f32, g: f32, b: f32, o: f32) -> (f32, f32, f32, f32) {
+    (clamp_f32(r, 0.0, 1.0),
+     clamp_f32(g, 0.0, 1.0),
+     clamp_f32(b, 0.0, 1.0),
+     clamp_f32(o, 0.0, 1.0))
+}
+
+#[inline]
+fn clamp_f32(v: f32, a: f32, b: f32) -> f32 {
+    if v > b { b } else if v < a { a } else { v }
+}
+
+#[inline]
+fn blend_f32(a: f32, b: f32, r: f32) -> f32 {
+    a + ((b - a) * r)
 }

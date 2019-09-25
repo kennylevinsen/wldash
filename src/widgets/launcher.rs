@@ -101,7 +101,7 @@ impl Launcher {
                 )?
             };
 
-            x_off += size.0 + self.font_size / 4;
+            x_off += size.0 + self.font_size * 3 / 8;
             width_remaining -= (size.0 + self.font_size / 4) as i32;
 
             if width_remaining < 0 {

@@ -177,6 +177,9 @@ impl Calendar {
 }
 
 impl Widget for Calendar {
+    fn enter(&mut self) {}
+    fn leave(&mut self) {}
+
     fn size(&self) -> (u32, u32) {
         let cal_width = 7 * self.font_size * 3 + self.font_size * 2;
         let cal_pad = self.font_size * 3;

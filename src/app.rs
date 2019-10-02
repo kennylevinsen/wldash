@@ -222,9 +222,10 @@ impl App {
         let inner = self.inner.lock().unwrap();
         let time = Local::now();
 
-        if !inner.visible ||
-            inner.shell_surfaces.len() != *inner.configured_surfaces.lock().unwrap() ||
-            inner.surfaces.len() == 0 {
+        if !inner.visible
+            || inner.shell_surfaces.len() != *inner.configured_surfaces.lock().unwrap()
+            || inner.surfaces.len() == 0
+        {
             // Not ready yet
             return Ok(());
         }
@@ -258,7 +259,7 @@ impl App {
                 }
                 false
             }
-            _ => true
+            _ => true,
         };
 
         if force {
@@ -313,15 +314,6 @@ impl App {
         };
         self.last_dim = size;
         Ok(())
-    }
-
-    pub fn toggle_visible(&mut self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.visible = !inner.visible;
-        if !inner.visible {
-            self.last_dim = (0, 0);
-        }
-        inner.outputs_changed();
     }
 
     pub fn hide(&mut self) {
@@ -444,6 +436,14 @@ impl App {
         // Keyboard processing
         //
         let kbd_clone = cmd_queue.clone();
+        let modifiers_state = Arc::new(Mutex::new(ModifiersState {
+            ctrl: false,
+            alt: false,
+            shift: false,
+            caps_lock: false,
+            logo: false,
+            num_lock: false,
+        }));
         map_keyboard_auto(&seat, move |event: KbEvent, _| match event {
             KbEvent::Key {
                 keysym,
@@ -453,22 +453,19 @@ impl App {
             } => match state {
                 KeyState::Pressed => match keysym {
                     keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
+                    keysyms::XKB_KEY_c if modifiers_state.lock().unwrap().ctrl => {
+                        kbd_clone.lock().unwrap().push_back(Cmd::Exit)
+                    }
                     v => kbd_clone.lock().unwrap().push_back(Cmd::Keyboard {
                         key: v,
                         key_state: state,
-                        modifiers_state: ModifiersState {
-                            ctrl: false,
-                            alt: false,
-                            shift: false,
-                            caps_lock: false,
-                            logo: false,
-                            num_lock: false,
-                        },
+                        modifiers_state: modifiers_state.lock().unwrap().clone(),
                         interpreted: utf8,
                     }),
                 },
                 _ => (),
             },
+            KbEvent::Modifiers { modifiers } => *modifiers_state.lock().unwrap() = modifiers,
             _ => (),
         })
         .expect("Failed to map keyboard");

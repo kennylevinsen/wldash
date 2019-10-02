@@ -27,6 +27,8 @@ impl Date {
 }
 
 impl Widget for Date {
+    fn enter(&mut self) {}
+    fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {
         ((6.5 * self.size).ceil() as u32, self.size.ceil() as u32)
     }

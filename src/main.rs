@@ -206,6 +206,7 @@ fn main() {
 
     app.cmd_queue().lock().unwrap().push_back(Cmd::Draw);
 
+    let mut visible = !daemon;
     let q = app.cmd_queue();
     loop {
         let cmd = q.lock().unwrap().pop_front();
@@ -238,12 +239,21 @@ fn main() {
                     q.lock().unwrap().push_back(Cmd::Draw);
                 }
                 Cmd::ToggleVisible => {
-                    app.toggle_visible();
+                    visible = !visible;
+                    if visible {
+                        app.get_widget().enter();
+                        app.show();
+                    } else {
+                        app.hide();
+                        app.get_widget().leave();
+                    }
                     app.flush_display();
                 }
                 Cmd::Exit => {
                     if daemon {
+                        visible = false;
                         app.hide();
+                        app.get_widget().leave();
                         app.flush_display();
                     } else {
                         let _ = std::fs::remove_file(socket_path);

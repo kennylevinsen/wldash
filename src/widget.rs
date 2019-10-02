@@ -30,6 +30,8 @@ impl DrawReport {
 }
 
 pub trait Widget {
+    fn enter(&mut self);
+    fn leave(&mut self);
     fn size(&self) -> (u32, u32);
     fn draw(
         &mut self,
@@ -60,6 +62,16 @@ impl VerticalLayout {
 }
 
 impl Widget for VerticalLayout {
+    fn enter(&mut self) {
+        for child in &mut self.children {
+            child.enter();
+        }
+    }
+    fn leave(&mut self) {
+        for child in &mut self.children {
+            child.leave();
+        }
+    }
     fn size(&self) -> (u32, u32) {
         let mut width = 0;
         let mut height = 0;
@@ -156,6 +168,16 @@ impl HorizontalLayout {
 }
 
 impl Widget for HorizontalLayout {
+    fn enter(&mut self) {
+        for child in &mut self.children {
+            child.enter();
+        }
+    }
+    fn leave(&mut self) {
+        for child in &mut self.children {
+            child.leave();
+        }
+    }
     fn size(&self) -> (u32, u32) {
         let mut width = 0;
         let mut height = 0;
@@ -258,6 +280,12 @@ impl Margin {
 }
 
 impl Widget for Margin {
+    fn enter(&mut self) {
+        self.child.enter()
+    }
+    fn leave(&mut self) {
+        self.child.leave()
+    }
     fn size(&self) -> (u32, u32) {
         let size = self.child.size();
         (
@@ -326,6 +354,12 @@ impl Fixed {
 }
 
 impl Widget for Fixed {
+    fn enter(&mut self) {
+        self.child.enter()
+    }
+    fn leave(&mut self) {
+        self.child.leave()
+    }
     fn size(&self) -> (u32, u32) {
         self.size
     }

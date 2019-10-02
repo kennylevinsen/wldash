@@ -192,6 +192,14 @@ fn wlcopy(s: &str) -> Result<(), String> {
 }
 
 impl Widget for Launcher {
+    fn enter(&mut self) {}
+    fn leave(&mut self) {
+        self.input = "".to_string();
+        self.offset = 0;
+        self.result = None;
+        self.dirty = true;
+    }
+
     fn size(&self) -> (u32, u32) {
         (self.length, self.font_size)
     }
@@ -269,11 +277,12 @@ impl Widget for Launcher {
     fn keyboard_input(
         &mut self,
         key: u32,
-        _: ModifiersState,
+        modifiers: ModifiersState,
         _: KeyState,
         interpreted: Option<String>,
     ) {
         match key {
+            keysyms::XKB_KEY_u if modifiers.ctrl => self.leave(),
             keysyms::XKB_KEY_BackSpace => {
                 if self.input.len() > 0 {
                     self.input = self.input[..self.input.len() - 1].to_string();
@@ -322,7 +331,6 @@ impl Widget for Launcher {
                                 if lexed.len() > 0 {
                                     let _ =
                                         Command::new(lexed[0].clone()).args(&lexed[1..]).spawn();
-                                    self.input = "".to_string();
                                     self.tx.send(Cmd::Exit).unwrap();
                                 }
                             }
@@ -334,7 +342,6 @@ impl Widget for Launcher {
                                         let _ = Command::new(lexed[0].clone())
                                             .args(&lexed[1..])
                                             .spawn();
-                                        self.input = "".to_string();
                                         self.tx.send(Cmd::Exit).unwrap();
                                     }
                                 }

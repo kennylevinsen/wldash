@@ -61,6 +61,8 @@ impl BarWidget {
 }
 
 impl Widget for BarWidget {
+    fn enter(&mut self) {}
+    fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {
         (self.length, self.font_size)
     }

@@ -45,6 +45,8 @@ impl Clock {
 }
 
 impl Widget for Clock {
+    fn enter(&mut self) {}
+    fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {
         let digit = (self.size * 0.45).ceil() as u32;
         let colon = (self.size * 0.20).ceil() as u32;

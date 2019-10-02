@@ -6,5 +6,5 @@ pub mod clock;
 pub mod date;
 pub mod launcher;
 
-#[cfg(any(feature="alsa-widget", feature="pulseaudio-widget"))]
+#[cfg(any(feature = "alsa-widget", feature = "pulseaudio-widget"))]
 pub mod audio;

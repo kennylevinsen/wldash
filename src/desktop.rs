@@ -27,7 +27,7 @@ impl Desktop {
                 enabled_escape: false,
             },
         )?;
-        match file.section(Some("Desktop Entry").to_owned()) {
+        match file.section(Some("Desktop Entry")) {
             Some(desktop) => Ok(Desktop {
                 entry_type: desktop.get("Type").unwrap_or(&"".to_string()).to_string(),
                 name: desktop.get("Name").unwrap_or(&"".to_string()).to_string(),
@@ -45,7 +45,7 @@ impl Desktop {
     }
 
     fn parse_dir(d: &str) -> Result<Vec<Desktop>, Box<dyn Error>> {
-        let mut files: Vec<Desktop> = Vec::new();
+        let mut files: Vec<Desktop> = Vec::with_capacity(16);
         for entry in fs::read_dir(d)? {
             let entry = entry?;
             let path = entry.path();

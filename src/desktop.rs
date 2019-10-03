@@ -16,6 +16,7 @@ pub struct Desktop {
     pub exec: Option<String>,
     pub url: Option<String>,
     pub term: bool,
+    pub gnome_product: Option<String>,
 }
 
 impl Desktop {
@@ -36,6 +37,7 @@ impl Desktop {
                 hidden: desktop.get("Hidden").unwrap_or(&"".to_string()) == "true",
                 exec: desktop.get("Exec").map(|x| x.to_string()),
                 url: desktop.get("URL").map(|x| x.to_string()),
+                gnome_product: desktop.get("X-GNOME-Bugzilla-Product").map(|x| x.to_string()),
             }),
             None => Err(Box::new(io_error::new(
                 ErrorKind::NotFound,

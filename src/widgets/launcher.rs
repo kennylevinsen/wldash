@@ -80,7 +80,9 @@ impl Launcher {
             };
             let size = if idx == self.offset && self.input.len() > 0 {
                 let (_, indices) =
-                    fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase()).unwrap();
+                    fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
+                    .unwrap_or((0, vec![]));
+
                 let mut colors = Vec::with_capacity(m.name.len());
                 for pos in 0..m.name.len() {
                     if indices.contains(&pos) {
@@ -239,6 +241,16 @@ impl Widget for Launcher {
                     .filter(|(x, _)| x.is_some())
                     .map(|(x, y)| (x.unwrap(), y.clone()))
                     .collect::<Vec<(i64, Desktop)>>();
+
+                for desktop in self.options.iter() {
+                    let d = desktop.clone();
+                    if let Some(gnome_product) = &desktop.gnome_product {
+                        let fuzz = fuzzy_match(&gnome_product.to_lowercase(), &self.input.to_lowercase());
+                        if let Some(fuzz) = fuzz {
+                            m.push((fuzz, d));
+                        }
+                    }
+                }
 
                 m.sort_by(|(x1, y1), (x2, y2)| {
                     if x1 > x2 {

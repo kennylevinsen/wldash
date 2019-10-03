@@ -28,7 +28,7 @@ fn get_upower_property(
     .append2(
         dbus::MessageItem::Str("org.freedesktop.UPower.Device".to_string()),
         dbus::MessageItem::Str(property.to_string()),
-    );;
+    );
 
     con.send_with_reply_and_block(msg, 1000).map_err(|_| {
         ::std::io::Error::new(::std::io::ErrorKind::Other, "could not send dbus message")

@@ -3,7 +3,7 @@ use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::desktop::{load_desktop_files, Desktop};
 use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -192,6 +192,7 @@ fn wlcopy(s: &str) -> Result<(), String> {
 }
 
 impl Widget for Launcher {
+    fn wait(&self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {
         self.input = "".to_string();

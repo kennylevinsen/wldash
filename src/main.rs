@@ -5,8 +5,10 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::mpsc::channel;
 
+use timerfd::{TimerFd, TimerState, SetTimeFlags};
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
+use chrono::{Local, Duration};
 
 mod app;
 mod buffer;
@@ -24,6 +26,7 @@ use app::{App, OutputMode};
 use cmd::Cmd;
 use config::Config;
 use configfmt::ConfigFmt;
+use widget::WaitContext;
 
 enum Mode {
     Start,
@@ -222,14 +225,19 @@ fn main() {
             }
         });
 
-    let mut fds = [
-        PollFd::new(app.event_queue().get_connection_fd(), PollFlags::POLLIN),
-        PollFd::new(rx_pipe.as_raw_fd(), PollFlags::POLLIN),
-    ];
+    let mut timer = TimerFd::new().unwrap();
+    let ev_fd = PollFd::new(app.event_queue().get_connection_fd(), PollFlags::POLLIN);
+    let rx_fd = PollFd::new(rx_pipe.as_raw_fd(), PollFlags::POLLIN);
+    let tm_fd = PollFd::new(timer.as_raw_fd(), PollFlags::POLLIN);
 
     app.cmd_queue().lock().unwrap().push_back(Cmd::Draw);
 
     let mut visible = !daemon;
+    let mut wait_ctx = WaitContext{
+        fds: Vec::new(),
+        target_time: None,
+    };
+
     let q = app.cmd_queue();
     loop {
         let cmd = q.lock().unwrap().pop_front();
@@ -287,9 +295,27 @@ fn main() {
             None => {
                 app.flush_display();
 
-                poll(&mut fds, -1).unwrap();
+                wait_ctx.fds.clear();
+                wait_ctx.fds.push(ev_fd);
+                wait_ctx.fds.push(rx_fd);
+                wait_ctx.target_time = None;
 
-                if fds[0].revents().unwrap().contains(PollFlags::POLLIN) {
+                app.get_widget().wait(&mut wait_ctx);
+
+                if let Some(target_time) = wait_ctx.target_time {
+                    let n = Local::now();
+                    let sleep = if target_time > n {
+                        target_time - n
+                    } else {
+                        Duration::seconds(0)
+                    };
+                    timer.set_state(TimerState::Oneshot(sleep.to_std().unwrap()), SetTimeFlags::Default);
+                    wait_ctx.fds.push(tm_fd);
+                }
+
+                poll(&mut wait_ctx.fds, -1).unwrap();
+
+                if wait_ctx.fds[0].revents().unwrap().contains(PollFlags::POLLIN) {
                     if let Some(guard) = app.event_queue().prepare_read() {
                         if let Err(e) = guard.read_events() {
                             if e.kind() != ::std::io::ErrorKind::WouldBlock {
@@ -306,9 +332,15 @@ fn main() {
                         .expect("Failed to dispatch all messages.");
                 }
 
-                if fds[1].revents().unwrap().contains(PollFlags::POLLIN) {
+                if wait_ctx.fds[1].revents().unwrap().contains(PollFlags::POLLIN) {
                     let mut v = [0x00];
                     rx_pipe.read_exact(&mut v).unwrap();
+                }
+
+                if wait_ctx.target_time.is_some() &&
+                    wait_ctx.fds[wait_ctx.fds.len()-1].revents().unwrap().contains(PollFlags::POLLIN) {
+                    timer.read();
+                    q.lock().unwrap().push_back(Cmd::Draw);
                 }
             }
         }

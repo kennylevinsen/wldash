@@ -1,3 +1,4 @@
+use nix::poll::{PollFd};
 use crate::buffer::Buffer;
 use crate::color::Color;
 use chrono::{DateTime, Local};
@@ -29,7 +30,25 @@ impl DrawReport {
     }
 }
 
+pub struct WaitContext {
+    pub fds: Vec<PollFd>,
+    pub target_time: Option<DateTime<Local>>,
+}
+
+impl WaitContext {
+    pub fn set_time(&mut self, new_time: DateTime<Local>) {
+        if let Some(ot) = self.target_time {
+            if new_time < ot {
+                self.target_time = Some(new_time);
+            }
+        } else {
+            self.target_time = Some(new_time);
+        }
+    }
+}
+
 pub trait Widget {
+    fn wait(&self, ctx: &mut WaitContext);
     fn enter(&mut self);
     fn leave(&mut self);
     fn size(&self) -> (u32, u32);
@@ -62,6 +81,11 @@ impl VerticalLayout {
 }
 
 impl Widget for VerticalLayout {
+    fn wait(&self, ctx: &mut WaitContext) {
+        for child in &self.children {
+            child.wait(ctx);
+        }
+    }
     fn enter(&mut self) {
         for child in &mut self.children {
             child.enter();
@@ -168,6 +192,11 @@ impl HorizontalLayout {
 }
 
 impl Widget for HorizontalLayout {
+    fn wait(&self, ctx: &mut WaitContext) {
+        for child in &self.children {
+            child.wait(ctx);
+        }
+    }
     fn enter(&mut self) {
         for child in &mut self.children {
             child.enter();
@@ -280,6 +309,9 @@ impl Margin {
 }
 
 impl Widget for Margin {
+    fn wait(&self, ctx: &mut WaitContext) {
+        self.child.wait(ctx)
+    }
     fn enter(&mut self) {
         self.child.enter()
     }
@@ -354,6 +386,9 @@ impl Fixed {
 }
 
 impl Widget for Fixed {
+    fn wait(&self, ctx: &mut WaitContext) {
+        self.child.wait(ctx)
+    }
     fn enter(&mut self) {
         self.child.enter()
     }

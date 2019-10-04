@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
 
 use std::sync::{Arc, Mutex};
 
@@ -61,6 +61,7 @@ impl BarWidget {
 }
 
 impl Widget for BarWidget {
+    fn wait(&self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {

@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
 
 use chrono::{DateTime, Datelike, Local};
 
@@ -27,6 +27,7 @@ impl Date {
 }
 
 impl Widget for Date {
+    fn wait(&self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {

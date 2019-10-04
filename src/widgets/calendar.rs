@@ -1,7 +1,7 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
 use crate::draw::{Font, DEJAVUSANS_MONO, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
 
 use chrono::{Date, Datelike, Local};
 
@@ -177,6 +177,7 @@ impl Calendar {
 }
 
 impl Widget for Calendar {
+    fn wait(&self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}
 

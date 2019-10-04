@@ -1,9 +1,6 @@
-use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget};
-
-use std::sync::mpsc::Sender;
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
 
 use chrono::{DateTime, Datelike, Duration, Local, Timelike};
 
@@ -14,23 +11,7 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub fn new(size: f32, ch: Sender<Cmd>) -> Box<Clock> {
-        let _ = std::thread::Builder::new()
-            .name("clock_ticker".to_string())
-            .spawn(move || loop {
-                let n = Local::now();
-                let target = (n + Duration::seconds(60))
-                    .with_second(0)
-                    .unwrap()
-                    .with_nanosecond(0)
-                    .unwrap();
-
-                let d = target - n;
-
-                std::thread::sleep(d.to_std().unwrap());
-                ch.send(Cmd::Draw).unwrap();
-            });
-
+    pub fn new(size: f32) -> Box<Clock> {
         let mut clock_cache = Font::new(&ROBOTO_REGULAR, size);
         clock_cache.add_str_to_cache("0123456789:");
 
@@ -45,6 +26,14 @@ impl Clock {
 }
 
 impl Widget for Clock {
+    fn wait(&self, ctx: &mut WaitContext) {
+        let target = (self.cur_time + Duration::seconds(60))
+            .with_second(0)
+            .unwrap()
+            .with_nanosecond(0)
+            .unwrap();
+        ctx.set_time(target);
+    }
     fn enter(&mut self) {}
     fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {

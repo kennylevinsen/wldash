@@ -91,7 +91,7 @@ impl Widget {
                     .map(|x| x.unwrap())
                     .collect(),
             )),
-            Widget::Clock { font_size } => Some(widgets::clock::Clock::new(font_size, tx.clone())),
+            Widget::Clock { font_size } => Some(widgets::clock::Clock::new(font_size)),
             Widget::Date { font_size } => Some(widgets::date::Date::new(font_size)),
             Widget::Calendar {
                 font_size,

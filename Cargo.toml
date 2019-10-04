@@ -21,12 +21,14 @@ pulseaudio-widget = ["libpulse-binding"]
 smithay-client-toolkit = "0.6.4"
 byteorder = "1.3"
 rusttype = "0.7"
+failure = "0.1.5"
 chrono = "0.4"
 nix = "0.15"
 memmap = "0.7"
 os_pipe = "0.8"
 wayland-client = { version = "0.23", features = ["dlopen"] }
 wayland-protocols = { version = "0.23", features = ["client", "unstable_protocols"] }
+wl-clipboard-rs = { version = "0.3" }
 dbus = "0.6"
 fuzzy-matcher = "0.2"
 lazy_static = "1.4"

@@ -178,17 +178,10 @@ fn calc(s: &str) -> Result<String, String> {
 }
 
 fn wlcopy(s: &str) -> Result<(), String> {
-    let mut child = std::process::Command::new("wl-copy")
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .arg(s)
-        .spawn()
-        .map_err(|_| "wl-copy not available".to_string())?;
-    child
-        .wait()
-        .map_err(|_| "unable to run wl-copy".to_string())?;
-    Ok(())
+    use wl_clipboard_rs::copy::{MimeType, Options, Source};
+    use failure::Fail;
+    let opts = Options::new();
+    opts.copy(Source::Bytes(s.as_bytes()), MimeType::Text).map_err(|e|e.name().unwrap_or("unknown error").to_string())
 }
 
 impl Widget for Launcher {

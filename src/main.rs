@@ -189,46 +189,11 @@ fn main() {
             tx_pipe.write_all(&[0x1]).unwrap();
         });
 
-    let ipc_queue = app.cmd_queue();
-    let _ = std::thread::Builder::new()
-        .name("ipc_server".to_string())
-        .spawn(move || loop {
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        let client_queue = ipc_queue.clone();
-                        let mut client_pipe = ipc_pipe.try_clone().unwrap();
-                        let _ = std::thread::Builder::new()
-                            .name("ipc_client".to_string())
-                            .spawn(move || {
-                                let r = BufReader::new(stream);
-                                for line in r.lines() {
-                                    match line {
-                                        Ok(v) => match v.as_str() {
-                                            "kill" => {
-                                                client_queue.lock().unwrap().push_back(Cmd::Exit)
-                                            }
-                                            "toggle_visible" => client_queue
-                                                .lock()
-                                                .unwrap()
-                                                .push_back(Cmd::ToggleVisible),
-                                            v => eprintln!("unknown command: {}", v),
-                                        },
-                                        Err(_) => return,
-                                    }
-                                    client_pipe.write_all(&[0x1]).unwrap();
-                                }
-                            });
-                    }
-                    Err(_) => break,
-                }
-            }
-        });
-
     let mut timer = TimerFd::new().unwrap();
     let ev_fd = PollFd::new(app.event_queue().get_connection_fd(), PollFlags::POLLIN);
     let rx_fd = PollFd::new(rx_pipe.as_raw_fd(), PollFlags::POLLIN);
     let tm_fd = PollFd::new(timer.as_raw_fd(), PollFlags::POLLIN);
+    let ipc_fd = PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN);
 
     app.cmd_queue().lock().unwrap().push_back(Cmd::Draw);
 
@@ -298,6 +263,7 @@ fn main() {
                 wait_ctx.fds.clear();
                 wait_ctx.fds.push(ev_fd);
                 wait_ctx.fds.push(rx_fd);
+                wait_ctx.fds.push(ipc_fd);
                 wait_ctx.target_time = None;
 
                 app.get_widget().wait(&mut wait_ctx);
@@ -335,6 +301,34 @@ fn main() {
                 if wait_ctx.fds[1].revents().unwrap().contains(PollFlags::POLLIN) {
                     let mut v = [0x00];
                     rx_pipe.read_exact(&mut v).unwrap();
+                }
+
+                if wait_ctx.fds[2].revents().unwrap().contains(PollFlags::POLLIN) {
+                    if let Ok((stream, _)) = listener.accept() {
+                        let client_queue = q.clone();
+                        let mut client_pipe = ipc_pipe.try_clone().unwrap();
+                        let _ = std::thread::Builder::new()
+                            .name("ipc_client".to_string())
+                            .spawn(move || {
+                                let r = BufReader::new(stream);
+                                for line in r.lines() {
+                                    match line {
+                                        Ok(v) => match v.as_str() {
+                                            "kill" => {
+                                                client_queue.lock().unwrap().push_back(Cmd::Exit)
+                                            }
+                                            "toggle_visible" => client_queue
+                                                .lock()
+                                                .unwrap()
+                                                .push_back(Cmd::ToggleVisible),
+                                            v => eprintln!("unknown command: {}", v),
+                                        },
+                                        Err(_) => return,
+                                    }
+                                    client_pipe.write_all(&[0x1]).unwrap();
+                                }
+                            });
+                    }
                 }
 
                 if wait_ctx.target_time.is_some() &&

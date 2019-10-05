@@ -1,5 +1,6 @@
 use crate::color::Color;
 use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
+use crate::widget::WaitContext;
 
 use alsa::mixer::{Mixer, Selem, SelemChannelId, SelemId};
 
@@ -83,6 +84,7 @@ impl Alsa {
 }
 
 impl BarWidgetImpl for Alsa {
+    fn wait(&mut self, _: &mut WaitContext) {}
     fn name(&self) -> &str {
         "volume"
     }

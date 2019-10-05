@@ -1,10 +1,12 @@
 use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
+use crate::widget::WaitContext;
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
-use std::thread;
+
+use nix::poll::{PollFd, PollFlags};
 
 use dbus;
 
@@ -35,14 +37,27 @@ fn get_upower_property(
     })
 }
 
-pub struct UpowerBattery {
-    device_path: String,
-    inner: Arc<Mutex<UpowerBatteryInner>>,
+// The widget is created on a different thread than where it will be used, so
+// we need it to be Send. However, dbus::Connection has a void*, so it's not
+// auto-derived. So, we make a small wrapper where we make it Send.
+struct DbusConnection(dbus::Connection);
+
+impl std::convert::AsRef<dbus::Connection> for DbusConnection {
+    fn as_ref(&self) -> &dbus::Connection {
+        return &self.0
+    }
 }
 
-pub struct UpowerBatteryInner {
+unsafe impl Send for DbusConnection {}
+
+pub struct UpowerBattery {
+    device_path: String,
+    sender: Sender<Cmd>,
+    dirty: Arc<Mutex<bool>>,
     state: UpowerBatteryState,
     capacity: f64,
+    con: DbusConnection,
+    watch: dbus::Watch,
 }
 
 enum UpowerBatteryState {
@@ -55,12 +70,26 @@ enum UpowerBatteryState {
 }
 
 impl UpowerBattery {
-    pub fn from_device(device: &str) -> Result<Self, ::std::io::Error> {
+    pub fn from_device(dirty: Arc<Mutex<bool>>, sender: Sender<Cmd>, device: &str) -> Result<Self, ::std::io::Error> {
+        let con = dbus::Connection::get_private(dbus::BusType::System)
+            .map_err(|_| ::std::io::Error::new(
+                ::std::io::ErrorKind::Other,
+                "unable to open dbus",
+            ))?;
         let device_path = format!("/org/freedesktop/UPower/devices/battery_{}", device);
-        let con = dbus::Connection::get_private(dbus::BusType::System).map_err(|_| {
-            ::std::io::Error::new(::std::io::ErrorKind::Other, "could not get dbus connection")
-        })?;
 
+        let rule = format!(
+            "type='signal',\
+             path='{}',\
+             interface='org.freedesktop.DBus.Properties',\
+             member='PropertiesChanged'",
+            &device_path
+        );
+        con.add_match(&rule)
+            .map_err(|_| ::std::io::Error::new(
+                ::std::io::ErrorKind::Other,
+                "unable to add match rule to dbus connection",
+            ))?;
         let upower_type: dbus::arg::Variant<u32> =
             match get_upower_property(&con, &device_path, "Type")?.get1() {
                 Some(v) => v,
@@ -111,12 +140,22 @@ impl UpowerBattery {
             }
         };
 
+        let fds = con.watch_fds();
+        if fds.len() != 1 {
+            return Err(::std::io::Error::new(
+                ::std::io::ErrorKind::Other,
+                "expected 1 watch fd from dbus",
+            ));
+        }
+
         Ok(UpowerBattery {
             device_path,
-            inner: Arc::new(Mutex::new(UpowerBatteryInner {
-                capacity: capacity,
-                state: state,
-            })),
+            con: DbusConnection(con),
+            dirty,
+            sender,
+            capacity: capacity,
+            state: state,
+            watch: fds[0],
         })
     }
 
@@ -126,76 +165,52 @@ impl UpowerBattery {
         sender: Sender<Cmd>,
     ) -> Result<Box<BarWidget>, ::std::io::Error> {
         BarWidget::new(font_size, length, move |dirty| {
-            let d = UpowerBattery::from_device("BAT0")?;
-            let path = d.device_path.clone();
-            let inner = d.inner.clone();
-            let _ = thread::Builder::new()
-                .name("battery_monitor".to_string())
-                .spawn(move || {
-                    let con = dbus::Connection::get_private(dbus::BusType::System)
-                        .expect("Failed to establish D-Bus connection.");
-                    let rule = format!(
-                        "type='signal',\
-                         path='{}',\
-                         interface='org.freedesktop.DBus.Properties',\
-                         member='PropertiesChanged'",
-                        path
-                    );
-
-                    // First we're going to get an (irrelevant) NameAcquired event.
-                    con.incoming(10_000).next();
-
-                    con.add_match(&rule)
-                        .expect("Failed to add D-Bus match rule.");
-
-                    loop {
-                        if con.incoming(10_000).next().is_some() {
-                            let capacity = get_upower_property(&con, &path, "Percentage")
-                                .unwrap()
-                                .get1::<dbus::arg::Variant<f64>>()
-                                .unwrap()
-                                .0;
-                            let state = match get_upower_property(&con, &path, "State")
-                                .unwrap()
-                                .get1::<dbus::arg::Variant<u32>>()
-                                .unwrap()
-                                .0
-                            {
-                                1 => UpowerBatteryState::Charging,
-                                2 => UpowerBatteryState::Discharging,
-                                3 => UpowerBatteryState::Empty,
-                                4 => UpowerBatteryState::Full,
-                                5 => UpowerBatteryState::NotCharging,
-                                6 => UpowerBatteryState::Discharging,
-                                _ => UpowerBatteryState::Unknown,
-                            };
-                            let mut inner = inner.lock().unwrap();
-                            inner.state = state;
-                            inner.capacity = capacity;
-                            *dirty.lock().unwrap() = true;
-                            sender.send(Cmd::Draw).unwrap();
-                        }
-                    }
-                });
-
+            let d = UpowerBattery::from_device(dirty, sender, "BAT0")?;
             Ok(Box::new(d))
         })
     }
 }
 
 impl BarWidgetImpl for UpowerBattery {
+    fn wait(&mut self, ctx: &mut WaitContext) {
+        for _ in self.con.as_ref().watch_handle(self.watch.fd(), dbus::WatchEvent::Readable as u32) {
+            let capacity = get_upower_property(self.con.as_ref(), &self.device_path, "Percentage")
+                .unwrap()
+                .get1::<dbus::arg::Variant<f64>>()
+                .unwrap()
+                .0;
+            let state = match get_upower_property(self.con.as_ref(), &self.device_path, "State")
+                .unwrap()
+                .get1::<dbus::arg::Variant<u32>>()
+                .unwrap()
+                .0
+            {
+                1 => UpowerBatteryState::Charging,
+                2 => UpowerBatteryState::Discharging,
+                3 => UpowerBatteryState::Empty,
+                4 => UpowerBatteryState::Full,
+                5 => UpowerBatteryState::NotCharging,
+                6 => UpowerBatteryState::Discharging,
+                _ => UpowerBatteryState::Unknown,
+            };
+            self.state = state;
+            self.capacity = capacity;
+            *self.dirty.lock().unwrap() = true;
+            self.sender.send(Cmd::Draw).unwrap();
+        }
+
+        ctx.fds.push(PollFd::new(self.watch.fd(), PollFlags::POLLIN));
+    }
     fn name(&self) -> &str {
         "battery"
     }
     fn value(&self) -> f32 {
-        let inner = self.inner.lock().unwrap();
-        (inner.capacity as f32) / 100.0
+        (self.capacity as f32) / 100.0
     }
     fn color(&self) -> Color {
-        let inner = self.inner.lock().unwrap();
-        match inner.state {
+        match self.state {
             UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => {
-                if inner.capacity > 10.0 {
+                if self.capacity > 10.0 {
                     Color::new(1.0, 1.0, 1.0, 1.0)
                 } else {
                     Color::new(1.0, 0.5, 0.0, 1.0)

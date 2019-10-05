@@ -192,7 +192,7 @@ fn wlcopy(s: &str) -> Result<(), String> {
 }
 
 impl Widget for Launcher {
-    fn wait(&self, _: &mut WaitContext) {}
+    fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {
         self.input = "".to_string();

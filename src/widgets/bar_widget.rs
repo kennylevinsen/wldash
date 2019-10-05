@@ -5,6 +5,7 @@ use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, W
 use std::sync::{Arc, Mutex};
 
 pub trait BarWidgetImpl {
+    fn wait(&mut self, ctx: &mut WaitContext);
     fn name(&self) -> &str;
     fn value(&self) -> f32;
     fn color(&self) -> Color;
@@ -61,13 +62,14 @@ impl BarWidget {
 }
 
 impl Widget for BarWidget {
-    fn wait(&self, _: &mut WaitContext) {}
+    fn wait(&mut self, ctx: &mut WaitContext) {
+        self.bar_impl.wait(ctx);
+    }
     fn enter(&mut self) {}
     fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {
         (self.length, self.font_size)
     }
-
     fn draw(
         &mut self,
         ctx: &mut DrawContext,

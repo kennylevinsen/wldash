@@ -1,6 +1,7 @@
 use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
+use crate::widget::WaitContext;
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -502,6 +503,7 @@ impl PulseAudio {
 }
 
 impl BarWidgetImpl for PulseAudio {
+    fn wait(&mut self, _: &mut WaitContext) {}
     fn name(&self) -> &str {
         "volume"
     }

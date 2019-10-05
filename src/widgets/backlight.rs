@@ -1,5 +1,6 @@
 use crate::color::Color;
 use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
+use crate::widget::WaitContext;
 
 use std::fs::OpenOptions;
 use std::io::{Error, ErrorKind};
@@ -93,6 +94,7 @@ impl Backlight {
 }
 
 impl BarWidgetImpl for Backlight {
+    fn wait(&mut self, _: &mut WaitContext) {}
     fn name(&self) -> &str {
         "backlight"
     }

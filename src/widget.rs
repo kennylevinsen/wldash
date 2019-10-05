@@ -48,7 +48,7 @@ impl WaitContext {
 }
 
 pub trait Widget {
-    fn wait(&self, ctx: &mut WaitContext);
+    fn wait(&mut self, ctx: &mut WaitContext);
     fn enter(&mut self);
     fn leave(&mut self);
     fn size(&self) -> (u32, u32);
@@ -81,8 +81,8 @@ impl VerticalLayout {
 }
 
 impl Widget for VerticalLayout {
-    fn wait(&self, ctx: &mut WaitContext) {
-        for child in &self.children {
+    fn wait(&mut self, ctx: &mut WaitContext) {
+        for child in &mut self.children {
             child.wait(ctx);
         }
     }
@@ -192,8 +192,8 @@ impl HorizontalLayout {
 }
 
 impl Widget for HorizontalLayout {
-    fn wait(&self, ctx: &mut WaitContext) {
-        for child in &self.children {
+    fn wait(&mut self, ctx: &mut WaitContext) {
+        for child in &mut self.children {
             child.wait(ctx);
         }
     }
@@ -309,7 +309,7 @@ impl Margin {
 }
 
 impl Widget for Margin {
-    fn wait(&self, ctx: &mut WaitContext) {
+    fn wait(&mut self, ctx: &mut WaitContext) {
         self.child.wait(ctx)
     }
     fn enter(&mut self) {
@@ -386,7 +386,7 @@ impl Fixed {
 }
 
 impl Widget for Fixed {
-    fn wait(&self, ctx: &mut WaitContext) {
+    fn wait(&mut self, ctx: &mut WaitContext) {
         self.child.wait(ctx)
     }
     fn enter(&mut self) {

@@ -26,7 +26,7 @@ impl Clock {
 }
 
 impl Widget for Clock {
-    fn wait(&self, ctx: &mut WaitContext) {
+    fn wait(&mut self, ctx: &mut WaitContext) {
         let target = (self.cur_time + Duration::seconds(60))
             .with_second(0)
             .unwrap()

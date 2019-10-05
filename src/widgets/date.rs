@@ -27,7 +27,7 @@ impl Date {
 }
 
 impl Widget for Date {
-    fn wait(&self, _: &mut WaitContext) {}
+    fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {

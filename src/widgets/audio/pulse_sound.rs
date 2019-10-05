@@ -1,7 +1,7 @@
 use crate::cmd::Cmd;
 use crate::color::Color;
-use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 use crate::widget::WaitContext;
+use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 
 use std::cell::RefCell;
 use std::collections::HashMap;

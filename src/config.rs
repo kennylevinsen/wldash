@@ -58,6 +58,10 @@ pub enum Widget {
         font_size: f32,
         length: u32,
     },
+    NetworkManager {
+        font_size: f32,
+        length: u32,
+    }
 }
 
 impl Widget {
@@ -137,6 +141,12 @@ impl Widget {
             #[cfg(feature = "alsa-widget")]
             Widget::AlsaSound { font_size, length } => {
                 match widgets::audio::Alsa::new(font_size, length) {
+                    Ok(w) => Some(w),
+                    Err(_) => None,
+                }
+            }
+            Widget::NetworkManager { font_size, length } => {
+                match widgets::networkmanager::NetworkManager::new(font_size, length, tx.clone()) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }

@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
 use std::sync::{Arc, Mutex};
 
@@ -34,9 +34,9 @@ impl BarWidget {
         Box::new(BarWidget {
             bar_impl: w,
             dirty: Arc::new(Mutex::new(true)),
-            font: font,
+            font,
             font_size: font_size as u32,
-            length: length,
+            length,
         })
     }
 
@@ -53,10 +53,10 @@ impl BarWidget {
 
         Ok(Box::new(BarWidget {
             bar_impl: im,
-            dirty: dirty,
-            font: font,
+            dirty,
+            font,
             font_size: font_size as u32,
-            length: length,
+            length,
         }))
     }
 }

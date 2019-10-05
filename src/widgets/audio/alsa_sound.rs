@@ -1,6 +1,6 @@
 use crate::color::Color;
-use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 use crate::widget::WaitContext;
+use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 
 use alsa::mixer::{Mixer, Selem, SelemChannelId, SelemId};
 

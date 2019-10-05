@@ -3,7 +3,7 @@ use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::desktop::{load_desktop_files, Desktop};
 use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
 use std::cell::RefCell;
 use std::cmp::Ordering;

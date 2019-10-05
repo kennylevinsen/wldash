@@ -1,6 +1,6 @@
 use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
 use chrono::{DateTime, Datelike, Local};
 

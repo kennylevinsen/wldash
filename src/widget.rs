@@ -1,7 +1,7 @@
-use nix::poll::{PollFd};
 use crate::buffer::Buffer;
 use crate::color::Color;
 use chrono::{DateTime, Local};
+use nix::poll::PollFd;
 pub use smithay_client_toolkit::keyboard::{KeyState, ModifiersState};
 
 pub struct DrawContext<'a> {

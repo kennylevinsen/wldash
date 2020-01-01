@@ -23,7 +23,7 @@
 						},{
 							"margin": {
 								"margins": [0,0,0,8],
-								"widget": {"backlight": {"font_size": 24.0,"length": 600}}
+								"widget": {"backlight": {"device": "intel_backlight", "font_size": 24.0,"length": 600}}
 							}
 						},{
 							"margin": {

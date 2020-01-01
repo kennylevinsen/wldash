@@ -45,6 +45,8 @@ pub enum Widget {
         length: u32,
     },
     Backlight {
+        #[serde(default)]
+        device: String,
         font_size: f32,
         length: u32,
     },
@@ -121,8 +123,13 @@ impl Widget {
                     Err(_) => None,
                 }
             }
-            Widget::Backlight { font_size, length } => {
-                match widgets::backlight::Backlight::new(font_size, length) {
+            Widget::Backlight { device, font_size, length } => {
+                let d = if device == "" {
+                    "intel_backlight"
+                } else {
+                    &device
+                };
+                match widgets::backlight::Backlight::new(d, font_size, length) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
@@ -192,6 +199,7 @@ impl Default for Config {
                             Box::new(Widget::Margin {
                                 margins: (0, 0, 0, 8),
                                 widget: Box::new(Widget::Backlight {
+                                    device: "intel_backlight".to_string(),
                                     font_size: 24.0,
                                     length: 600,
                                 }),

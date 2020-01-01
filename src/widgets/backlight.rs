@@ -71,18 +71,9 @@ impl Backlight {
         Ok(())
     }
 
-    pub fn new(font_size: f32, length: u32) -> Result<Box<BarWidget>, Error> {
-        let devices = Path::new("/sys/class/backlight").read_dir()?;
-
-        let first_device = match devices.take(1).next() {
-            Some(v) => match v {
-                Ok(v) => v,
-                Err(_) => return Err(Error::new(ErrorKind::Other, "no backlight device")),
-            },
-            None => return Err(Error::new(ErrorKind::Other, "no backlight device")),
-        };
+    pub fn new(path: &str, font_size: f32, length: u32) -> Result<Box<BarWidget>, Error> {
         let mut dev = Backlight {
-            device_path: first_device.path(),
+            device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
             cur_brightness: 0,
             max_brightness: 0,
         };

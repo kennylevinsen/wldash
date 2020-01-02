@@ -235,22 +235,28 @@ impl Widget for Launcher {
                     m.push((
                         fuzzy_match(&desktop.name.to_lowercase(), &self.input.to_lowercase()),
                         d.clone(),
+                        100,
                     ));
                     for keyword in desktop.keywords.iter() {
                         m.push((
                             fuzzy_match(&keyword.to_lowercase(), &self.input.to_lowercase()),
                             d.clone(),
+                            90,
                         ));
                     }
                 }
 
                 let mut m = m.iter()
-                    .filter(|(x, _)| x.is_some())
-                    .map(|(x, y)| (x.unwrap(), y.clone()))
-                    .collect::<Vec<(i64, Desktop)>>();
+                    .filter(|(x, _, _)| x.is_some())
+                    .map(|(x, y, z)| (x.unwrap(), y.clone(), z.clone()))
+                    .collect::<Vec<(i64, Desktop, u64)>>();
 
-                m.sort_by(|(x1, y1), (x2, y2)| {
-                    if x1 > x2 {
+                m.sort_by(|(x1, y1, z1), (x2, y2, z2)| {
+                    if z1 > z2 {
+                        Ordering::Less
+                    } else if z2 > z1 {
+                        Ordering::Greater
+                    } else if x1 > x2 {
                         Ordering::Less
                     } else if x1 < x2 {
                         Ordering::Greater
@@ -263,7 +269,7 @@ impl Widget for Launcher {
                     }
                 });
 
-                self.matches = m.into_iter().map(|(_, x)| x).collect();
+                self.matches = m.into_iter().map(|(_, x, _)| x).collect();
             }
         };
 

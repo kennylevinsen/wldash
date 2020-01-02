@@ -31,7 +31,7 @@ dbus = "0.6"
 fuzzy-matcher = "0.2"
 lazy_static = "1.4"
 rcalc_lib = { version = "0.9" }
-rust-ini = "0.13"
+rust-ini = { version = "0.14", git = "https://github.com/pedrocr/rust-ini.git", branch = "no_eol_comments"}
 shlex = "0.1"
 timerfd = "1.0.0"
 

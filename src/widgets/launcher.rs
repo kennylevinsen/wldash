@@ -80,7 +80,8 @@ impl Launcher {
             };
             let size = if idx == self.offset && self.input.len() > 0 {
                 let (_, indices) =
-                    fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase()).unwrap();
+                    fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
+                    .unwrap_or((0, vec![]));
                 let mut colors = Vec::with_capacity(m.name.len());
                 for pos in 0..m.name.len() {
                     if indices.contains(&pos) {
@@ -227,15 +228,23 @@ impl Widget for Launcher {
             }
             Some('!') => (),
             _ => {
-                let mut m = self
-                    .options
-                    .iter()
-                    .map(|x| {
-                        (
-                            fuzzy_match(&x.name.to_lowercase(), &self.input.to_lowercase()),
-                            x,
-                        )
-                    })
+                let mut m = vec![];
+
+                for desktop in self.options.iter() {
+                    let d = desktop.clone();
+                    m.push((
+                        fuzzy_match(&desktop.name.to_lowercase(), &self.input.to_lowercase()),
+                        d.clone(),
+                    ));
+                    for keyword in desktop.keywords.iter() {
+                        m.push((
+                            fuzzy_match(&keyword.to_lowercase(), &self.input.to_lowercase()),
+                            d.clone(),
+                        ));
+                    }
+                }
+
+                let mut m = m.iter()
                     .filter(|(x, _)| x.is_some())
                     .map(|(x, y)| (x.unwrap(), y.clone()))
                     .collect::<Vec<(i64, Desktop)>>();

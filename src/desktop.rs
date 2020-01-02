@@ -7,7 +7,7 @@ use std::fs;
 use std::io::Error as io_error;
 use std::io::ErrorKind;
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug, Eq, Hash)]
 pub struct Desktop {
     pub entry_type: String,
     pub name: String,

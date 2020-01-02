@@ -9,6 +9,7 @@ use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::process::Command;
 use std::sync::mpsc::Sender;
+use std::collections::HashMap;
 
 use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
@@ -192,6 +193,55 @@ fn wlcopy(s: &str) -> Result<(), String> {
     Ok(())
 }
 
+struct Matcher {
+    matches: HashMap<Desktop, i64>,
+}
+
+impl Matcher {
+    fn new() -> Self {
+        Self {
+            matches: HashMap::new(),
+        }
+    }
+
+    fn try_match(&mut self, dtop: Desktop, val: &str, input: &str, prio: f32) {
+        if let Some(ma) = fuzzy_match(val, input) {
+            let ma = ((ma as f32) * prio) as i64;
+            if let Some(ma_old) = self.matches.get(&dtop) {
+                // Skip over new matches for the same program that are worse
+                // than the one we already have.
+                if ma_old > &ma {
+                    return
+                }
+            }
+
+            self.matches.insert(dtop, ma);
+        }
+    }
+
+    fn matches(&self) -> Vec<Desktop> {
+        let mut m = self.matches.iter()
+           .map(|(key, ma)| (ma.clone(), key.clone()))
+           .collect::<Vec<(i64, Desktop)>>();
+
+        m.sort_by(|(ma1, d1), (ma2, d2)| {
+            if ma1 > ma2 {
+                Ordering::Less
+            } else if ma1 < ma2 {
+                Ordering::Greater
+            } else if d1.name.len() < d2.name.len() {
+                Ordering::Less
+            } else if d1.name.len() > d2.name.len() {
+                Ordering::Greater
+            } else {
+                d1.cmp(d2)
+            }
+        });
+
+        m.into_iter().map(|(_, x)| x).collect()
+    }
+}
+
 impl Widget for Launcher {
     fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
@@ -228,39 +278,26 @@ impl Widget for Launcher {
             }
             Some('!') => (),
             _ => {
-                let mut m = vec![];
+                let mut matcher = Matcher::new();
 
                 for desktop in self.options.iter() {
-                    let d = desktop.clone();
-                    if let Some(ma) = fuzzy_match(&desktop.name.to_lowercase(), &self.input.to_lowercase()) {
-                        m.push((ma, d.clone(), 100));
-                    }
+                    matcher.try_match(
+                        desktop.clone(),
+                        &desktop.name.to_lowercase(),
+                        &self.input.to_lowercase(),
+                        1.0,
+                    );
                     for keyword in desktop.keywords.iter() {
-                        if let Some(ma) = fuzzy_match(&keyword.to_lowercase(), &self.input.to_lowercase()) {
-                            m.push((ma, d.clone(), 90));
-                        }
+                        matcher.try_match(
+                            desktop.clone(),
+                            &keyword.to_lowercase(),
+                            &self.input.to_lowercase(),
+                            0.5,
+                        );
                     }
                 }
 
-                m.sort_by(|(x1, y1, z1), (x2, y2, z2)| {
-                    if z1 > z2 {
-                        Ordering::Less
-                    } else if z2 > z1 {
-                        Ordering::Greater
-                    } else if x1 > x2 {
-                        Ordering::Less
-                    } else if x1 < x2 {
-                        Ordering::Greater
-                    } else if y1.name.len() < y2.name.len() {
-                        Ordering::Less
-                    } else if y1.name.len() > y2.name.len() {
-                        Ordering::Greater
-                    } else {
-                        y1.cmp(y2)
-                    }
-                });
-
-                self.matches = m.into_iter().map(|(_, x, _)| x).collect();
+                self.matches = matcher.matches();
             }
         };
 

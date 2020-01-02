@@ -232,24 +232,15 @@ impl Widget for Launcher {
 
                 for desktop in self.options.iter() {
                     let d = desktop.clone();
-                    m.push((
-                        fuzzy_match(&desktop.name.to_lowercase(), &self.input.to_lowercase()),
-                        d.clone(),
-                        100,
-                    ));
+                    if let Some(ma) = fuzzy_match(&desktop.name.to_lowercase(), &self.input.to_lowercase()) {
+                        m.push((ma, d.clone(), 100));
+                    }
                     for keyword in desktop.keywords.iter() {
-                        m.push((
-                            fuzzy_match(&keyword.to_lowercase(), &self.input.to_lowercase()),
-                            d.clone(),
-                            90,
-                        ));
+                        if let Some(ma) = fuzzy_match(&keyword.to_lowercase(), &self.input.to_lowercase()) {
+                            m.push((ma, d.clone(), 90));
+                        }
                     }
                 }
-
-                let mut m = m.iter()
-                    .filter(|(x, _, _)| x.is_some())
-                    .map(|(x, y, z)| (x.unwrap(), y.clone(), z.clone()))
-                    .collect::<Vec<(i64, Desktop, u64)>>();
 
                 m.sort_by(|(x1, y1, z1), (x2, y2, z2)| {
                     if z1 > z2 {

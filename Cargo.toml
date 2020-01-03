@@ -20,18 +20,18 @@ pulseaudio-widget = ["libpulse-binding"]
 [dependencies]
 smithay-client-toolkit = "0.6.4"
 byteorder = "1.3"
-rusttype = "0.7"
+rusttype = "0.8"
 chrono = "0.4"
-nix = "0.15"
+nix = "0.16"
 memmap = "0.7"
-os_pipe = "0.8"
+os_pipe = "0.9"
 wayland-client = { version = "0.23", features = ["dlopen"] }
 wayland-protocols = { version = "0.23", features = ["client", "unstable_protocols"] }
 dbus = "0.6"
-fuzzy-matcher = "0.2"
+fuzzy-matcher = "0.3"
 lazy_static = "1.4"
-rcalc_lib = { version = "0.9" }
-rust-ini = { version = "0.14", git = "https://github.com/pedrocr/rust-ini.git", branch = "no_eol_comments"}
+rcalc_lib = "0.9"
+rust-ini = "0.14"
 shlex = "0.1"
 timerfd = "1.0.0"
 
@@ -39,5 +39,5 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = { version = "1.0", optional = true }
 serde_yaml = { version = "0.8", optional = true }
 
-libpulse-binding = { version = "2.11", optional = true }
-alsa = { version = "0.3.0", optional = true }
+libpulse-binding = { version = "2.15", optional = true }
+alsa = { version = "0.4.0", optional = true }

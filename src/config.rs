@@ -123,7 +123,11 @@ impl Widget {
                     Err(_) => None,
                 }
             }
-            Widget::Backlight { device, font_size, length } => {
+            Widget::Backlight {
+                device,
+                font_size,
+                length,
+            } => {
                 let d = if device == "" {
                     "intel_backlight"
                 } else {

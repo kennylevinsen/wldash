@@ -5,10 +5,10 @@ use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::sync::mpsc::channel;
 
-use timerfd::{TimerFd, TimerState, SetTimeFlags};
+use chrono::{Duration, Local};
 use nix::poll::{poll, PollFd, PollFlags};
 use os_pipe::pipe;
-use chrono::{Local, Duration};
+use timerfd::{SetTimeFlags, TimerFd, TimerState};
 
 mod app;
 mod buffer;
@@ -198,7 +198,7 @@ fn main() {
     app.cmd_queue().lock().unwrap().push_back(Cmd::Draw);
 
     let mut visible = !daemon;
-    let mut wait_ctx = WaitContext{
+    let mut wait_ctx = WaitContext {
         fds: Vec::new(),
         target_time: None,
     };
@@ -275,13 +275,20 @@ fn main() {
                     } else {
                         Duration::seconds(0)
                     };
-                    timer.set_state(TimerState::Oneshot(sleep.to_std().unwrap()), SetTimeFlags::Default);
+                    timer.set_state(
+                        TimerState::Oneshot(sleep.to_std().unwrap()),
+                        SetTimeFlags::Default,
+                    );
                     wait_ctx.fds.push(tm_fd);
                 }
 
                 poll(&mut wait_ctx.fds, -1).unwrap();
 
-                if wait_ctx.fds[0].revents().unwrap().contains(PollFlags::POLLIN) {
+                if wait_ctx.fds[0]
+                    .revents()
+                    .unwrap()
+                    .contains(PollFlags::POLLIN)
+                {
                     if let Some(guard) = app.event_queue().prepare_read() {
                         if let Err(e) = guard.read_events() {
                             if e.kind() != ::std::io::ErrorKind::WouldBlock {
@@ -298,12 +305,20 @@ fn main() {
                         .expect("Failed to dispatch all messages.");
                 }
 
-                if wait_ctx.fds[1].revents().unwrap().contains(PollFlags::POLLIN) {
+                if wait_ctx.fds[1]
+                    .revents()
+                    .unwrap()
+                    .contains(PollFlags::POLLIN)
+                {
                     let mut v = [0x00];
                     rx_pipe.read_exact(&mut v).unwrap();
                 }
 
-                if wait_ctx.fds[2].revents().unwrap().contains(PollFlags::POLLIN) {
+                if wait_ctx.fds[2]
+                    .revents()
+                    .unwrap()
+                    .contains(PollFlags::POLLIN)
+                {
                     if let Ok((stream, _)) = listener.accept() {
                         let client_queue = q.clone();
                         let mut client_pipe = ipc_pipe.try_clone().unwrap();
@@ -331,8 +346,12 @@ fn main() {
                     }
                 }
 
-                if wait_ctx.target_time.is_some() &&
-                    wait_ctx.fds[wait_ctx.fds.len()-1].revents().unwrap().contains(PollFlags::POLLIN) {
+                if wait_ctx.target_time.is_some()
+                    && wait_ctx.fds[wait_ctx.fds.len() - 1]
+                        .revents()
+                        .unwrap()
+                        .contains(PollFlags::POLLIN)
+                {
                     timer.read();
                     q.lock().unwrap().push_back(Cmd::Draw);
                 }

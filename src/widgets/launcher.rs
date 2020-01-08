@@ -3,13 +3,13 @@ use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::desktop::{load_desktop_files, Desktop};
 use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, Widget, WaitContext};
+use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::process::Command;
 use std::sync::mpsc::Sender;
-use std::collections::HashMap;
 
 use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
@@ -82,7 +82,7 @@ impl Launcher {
             let size = if idx == self.offset && self.input.len() > 0 {
                 let (_, indices) =
                     fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
-                    .unwrap_or((0, vec![]));
+                        .unwrap_or((0, vec![]));
                 let mut colors = Vec::with_capacity(m.name.len());
                 for pos in 0..m.name.len() {
                     if indices.contains(&pos) {
@@ -211,7 +211,7 @@ impl Matcher {
                 // Skip over new matches for the same program that are worse
                 // than the one we already have.
                 if ma_old > &ma {
-                    return
+                    return;
                 }
             }
 
@@ -220,9 +220,11 @@ impl Matcher {
     }
 
     fn matches(&self) -> Vec<Desktop> {
-        let mut m = self.matches.iter()
-           .map(|(key, ma)| (ma.clone(), key.clone()))
-           .collect::<Vec<(i64, Desktop)>>();
+        let mut m = self
+            .matches
+            .iter()
+            .map(|(key, ma)| (ma.clone(), key.clone()))
+            .collect::<Vec<(i64, Desktop)>>();
 
         m.sort_by(|(ma1, d1), (ma2, d2)| {
             if ma1 > ma2 {

@@ -2,6 +2,8 @@ image: archlinux
 packages:
   - rust
   - libpulse
+sources:
+  - https://git.sr.ht/~kennylevinsen/wldash
 tasks:
   - rustfmt-check: |
       cd wldash

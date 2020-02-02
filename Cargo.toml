@@ -6,6 +6,8 @@ edition = "2018"
 
 [profile.release]
 lto = "fat"
+panic = "abort"
+opt-level = "z"
 
 [features]
 default = ["alsa-widget", "pulseaudio-widget", "yaml-cfg", "json-cfg"]

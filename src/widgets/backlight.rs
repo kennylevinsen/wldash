@@ -49,7 +49,7 @@ impl Backlight {
             return 1.0;
         }
 
-        (self.cur_brightness as f32 / self.max_brightness as f32)
+        self.cur_brightness as f32 / self.max_brightness as f32
     }
 
     pub fn set(&mut self, val: f32) -> Result<(), Error> {

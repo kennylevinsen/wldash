@@ -16,10 +16,8 @@ impl Date {
         date_cache
             .add_str_to_cache("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,/ ");
 
-        let time = Local::now();
-
         Box::new(Date {
-            cur_time: time.with_year(time.year().saturating_sub(1)).unwrap(),
+            cur_time: Local::now(),
             date_cache: date_cache,
             size: size,
         })

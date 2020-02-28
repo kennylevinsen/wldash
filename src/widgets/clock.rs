@@ -2,7 +2,7 @@ use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
-use chrono::{DateTime, Datelike, Duration, Local, Timelike};
+use chrono::{DateTime, Duration, Local, Timelike};
 
 pub struct Clock {
     cur_time: DateTime<Local>,
@@ -15,10 +15,8 @@ impl Clock {
         let mut clock_cache = Font::new(&ROBOTO_REGULAR, size);
         clock_cache.add_str_to_cache("0123456789:");
 
-        let time = Local::now();
-
         Box::new(Clock {
-            cur_time: time.with_year(time.year().saturating_sub(1)).unwrap(),
+            cur_time: Local::now(),
             clock_cache: clock_cache,
             size: size,
         })

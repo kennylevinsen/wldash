@@ -56,6 +56,7 @@ Using backlight sys file, only visible of backlight is detected. Scroll to adjus
 Loads desktop files from the usual locations.
 
 The launcher also accepts prefix operators to change its mode:
+
 - `!`: Arbitrary command
 - `=`: Calculator based on rcalc_lib. See https://docs.rs/rcalc_lib/0.9.3/rcalc_lib/
 

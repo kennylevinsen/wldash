@@ -1,5 +1,7 @@
 # wldash
 
+![screenshot](https://git.sr.ht/~kennylevinsen/wldash/blob/master/assets/screenshot.jpg)
+
 A dashboard/launcher/control-panel thing for Wayland. Requires wlr-layer-shell-unstable-v1.
 
 Consider this alpha-quality: While it works, *everything* is subject to change with a moments notice. You may end up pulling in the latest changes, and *poof*, wldash suddenly turns into an artisan espresso machine.

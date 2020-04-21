@@ -2,22 +2,22 @@ use crate::color::Color;
 use crate::draw::{Font, ROBOTO_REGULAR};
 use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
-use chrono::{DateTime, Datelike, Local};
+use chrono::{Datelike, NaiveDateTime};
 
 pub struct Date {
-    cur_time: DateTime<Local>,
+    cur_time: NaiveDateTime,
     date_cache: Font,
     size: f32,
 }
 
 impl Date {
-    pub fn new(size: f32) -> Box<Date> {
+    pub fn new(time: &NaiveDateTime, size: f32) -> Box<Date> {
         let mut date_cache = Font::new(&ROBOTO_REGULAR, size);
         date_cache
             .add_str_to_cache("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,/ ");
 
         Box::new(Date {
-            cur_time: Local::now(),
+            cur_time: time.clone(),
             date_cache: date_cache,
             size: size,
         })

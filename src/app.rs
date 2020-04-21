@@ -220,7 +220,7 @@ impl App {
         };
 
         let inner = self.inner.lock().unwrap();
-        let time = Local::now();
+        let time = Local::now().naive_local();
 
         if !inner.visible
             || inner.shell_surfaces.len() != *inner.configured_surfaces.lock().unwrap()

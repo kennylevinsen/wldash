@@ -2,6 +2,7 @@ use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::widget;
 use crate::widgets;
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::sync::mpsc::Sender;
@@ -63,9 +64,13 @@ pub enum Widget {
 }
 
 impl Widget {
-    pub fn construct(self, tx: Sender<Cmd>) -> Option<Box<dyn widget::Widget + Send>> {
+    pub fn construct(
+        self,
+        time: &NaiveDateTime,
+        tx: Sender<Cmd>,
+    ) -> Option<Box<dyn widget::Widget + Send>> {
         match self {
-            Widget::Margin { margins, widget } => match widget.construct(tx.clone()) {
+            Widget::Margin { margins, widget } => match widget.construct(time, tx.clone()) {
                 Some(w) => Some(widget::Margin::new(margins, w)),
                 None => None,
             },
@@ -73,14 +78,14 @@ impl Widget {
                 width,
                 height,
                 widget,
-            } => match widget.construct(tx.clone()) {
+            } => match widget.construct(time, tx.clone()) {
                 Some(w) => Some(widget::Fixed::new((width, height), w)),
                 None => None,
             },
             Widget::HorizontalLayout(widgets) => Some(widget::HorizontalLayout::new(
                 widgets
                     .into_iter()
-                    .map(|x| x.construct(tx.clone()))
+                    .map(|x| x.construct(time, tx.clone()))
                     .filter(|x| x.is_some())
                     .map(|x| x.unwrap())
                     .collect(),
@@ -88,17 +93,17 @@ impl Widget {
             Widget::VerticalLayout(widgets) => Some(widget::VerticalLayout::new(
                 widgets
                     .into_iter()
-                    .map(|x| x.construct(tx.clone()))
+                    .map(|x| x.construct(time, tx.clone()))
                     .filter(|x| x.is_some())
                     .map(|x| x.unwrap())
                     .collect(),
             )),
-            Widget::Clock { font_size } => Some(widgets::clock::Clock::new(font_size)),
-            Widget::Date { font_size } => Some(widgets::date::Date::new(font_size)),
+            Widget::Clock { font_size } => Some(widgets::clock::Clock::new(time, font_size)),
+            Widget::Date { font_size } => Some(widgets::date::Date::new(time, font_size)),
             Widget::Calendar {
                 font_size,
                 sections,
-            } => Some(widgets::calendar::Calendar::new(font_size, sections)),
+            } => Some(widgets::calendar::Calendar::new(time, font_size, sections)),
             Widget::Launcher {
                 font_size,
                 length,

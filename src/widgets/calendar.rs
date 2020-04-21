@@ -3,10 +3,10 @@ use crate::color::Color;
 use crate::draw::{Font, DEJAVUSANS_MONO, ROBOTO_REGULAR};
 use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
-use chrono::{Date, Datelike, Local};
+use chrono::{Datelike, NaiveDate, NaiveDateTime};
 
 pub struct Calendar {
-    cur_date: Date<Local>,
+    cur_date: NaiveDate,
     dirty: bool,
     offset: f64,
     sections: u32,
@@ -22,8 +22,8 @@ impl Calendar {
         &self,
         buf: &mut Buffer,
         background_color: &Color,
-        orig: &Date<Local>,
-        time: &Date<Local>,
+        orig: &NaiveDate,
+        time: &NaiveDate,
     ) -> Result<(i32, i32, i32, i32), ::std::io::Error> {
         let mut time = time.clone();
         let mut y_off = 1;
@@ -153,7 +153,7 @@ impl Calendar {
 }
 
 impl Calendar {
-    pub fn new(font_size: f32, sections: u32) -> Box<Calendar> {
+    pub fn new(time: &NaiveDateTime, font_size: f32, sections: u32) -> Box<Calendar> {
         let mut calendar_cache = Font::new(&DEJAVUSANS_MONO, font_size * 2.0);
         calendar_cache.add_str_to_cache("0123456789");
         let mut month_cache = Font::new(&ROBOTO_REGULAR, font_size * 4.0);
@@ -163,7 +163,7 @@ impl Calendar {
         let mut day_cache = Font::new(&DEJAVUSANS_MONO, font_size);
         day_cache.add_str_to_cache("MONTUEWDHFRISA");
         Box::new(Calendar {
-            cur_date: Local::now().date(),
+            cur_date: time.date(),
             dirty: true,
             offset: 0.0,
             sections: sections,

@@ -161,8 +161,9 @@ fn main() {
     let tx_draw_mod = tx_draw.clone();
     let (mod_tx, mod_rx) = channel();
     std::thread::spawn(move || {
+        let n = Local::now().naive_local();
         // Print, write to a file, or send to an HTTP server.
-        match config.widget.construct(tx_draw_mod) {
+        match config.widget.construct(&n, tx_draw_mod) {
             Some(w) => mod_tx.send(w).unwrap(),
             None => panic!("no widget configured"),
         }
@@ -269,7 +270,7 @@ fn main() {
                 app.get_widget().wait(&mut wait_ctx);
 
                 if let Some(target_time) = wait_ctx.target_time {
-                    let n = Local::now();
+                    let n = Local::now().naive_local();
                     let sleep = if target_time > n {
                         target_time - n
                     } else {

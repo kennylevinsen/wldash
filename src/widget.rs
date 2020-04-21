@@ -1,13 +1,13 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use chrono::{DateTime, Local};
+use chrono::NaiveDateTime;
 use nix::poll::PollFd;
 pub use smithay_client_toolkit::keyboard::{KeyState, ModifiersState};
 
 pub struct DrawContext<'a> {
     pub buf: &'a mut Buffer<'a>,
     pub bg: &'a Color,
-    pub time: &'a DateTime<Local>,
+    pub time: &'a NaiveDateTime,
     pub force: bool,
 }
 
@@ -32,11 +32,11 @@ impl DrawReport {
 
 pub struct WaitContext {
     pub fds: Vec<PollFd>,
-    pub target_time: Option<DateTime<Local>>,
+    pub target_time: Option<NaiveDateTime>,
 }
 
 impl WaitContext {
-    pub fn set_time(&mut self, new_time: DateTime<Local>) {
+    pub fn set_time(&mut self, new_time: NaiveDateTime) {
         if let Some(ot) = self.target_time {
             if new_time < ot {
                 self.target_time = Some(new_time);

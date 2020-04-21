@@ -11,8 +11,8 @@ pub struct Buffer<'a> {
 impl<'a> Buffer<'a> {
     pub fn new(buf: &'a mut MmapMut, dimensions: (u32, u32)) -> Buffer {
         Buffer {
-            buf: buf,
-            dimensions: dimensions,
+            buf,
+            dimensions,
             subdimensions: None,
         }
     }

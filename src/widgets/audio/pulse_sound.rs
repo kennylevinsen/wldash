@@ -158,7 +158,7 @@ impl PulseAudioClient {
                             match req {
                                 PulseAudioClientRequest::GetDefaultDevice(s) => {
                                     introspector.get_server_info(move |info| {
-                                        let _res = PulseAudioClient::server_info_callback(
+                                        PulseAudioClient::server_info_callback(
                                             cl.clone(),
                                             l.clone(),
                                             info,
@@ -260,13 +260,12 @@ impl PulseAudioClient {
     }
 
     fn send(&self, request: PulseAudioClientRequest) -> Result<(), ::std::io::Error> {
-        let res = self.sender.send(request).map_err(|_e| {
+        self.sender.send(request).map_err(|_e| {
             ::std::io::Error::new(
                 ::std::io::ErrorKind::Other,
                 "unable to send pulseaudio request",
             )
-        });
-        res
+        })
     }
 
     fn server_info_callback<F>(s: Arc<Mutex<Self>>, listener: F, server_info: &ServerInfo)
@@ -371,10 +370,7 @@ impl PulseAudioSoundDevice {
             cl.default_sink.to_string()
         };
         (*inner.lock().unwrap()).name = Some(name.clone());
-        let device = PulseAudioSoundDevice {
-            client: cl,
-            inner: inner,
-        };
+        let device = PulseAudioSoundDevice { client: cl, inner };
         let (tx, rx) = channel();
         {
             let cl = client.lock().unwrap();
@@ -497,7 +493,7 @@ impl PulseAudio {
                 *dirty.lock().unwrap() = true;
                 sender.send(Cmd::Draw).unwrap();
             })?;
-            Ok(Box::new(PulseAudio { device: device }))
+            Ok(Box::new(PulseAudio { device }))
         })
     }
 }

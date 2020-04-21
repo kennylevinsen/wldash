@@ -7,7 +7,7 @@ pub use smithay_client_toolkit::keyboard::{KeyState, ModifiersState};
 pub struct DrawContext<'a> {
     pub buf: &'a mut Buffer<'a>,
     pub bg: &'a Color,
-    pub time: &'a NaiveDateTime,
+    pub time: NaiveDateTime,
     pub force: bool,
 }
 
@@ -76,7 +76,7 @@ pub struct VerticalLayout {
 #[allow(dead_code)]
 impl VerticalLayout {
     pub fn new(children: Vec<Box<dyn Widget + Send>>) -> Box<VerticalLayout> {
-        Box::new(VerticalLayout { children: children })
+        Box::new(VerticalLayout { children })
     }
 }
 
@@ -187,7 +187,7 @@ pub struct HorizontalLayout {
 #[allow(dead_code)]
 impl HorizontalLayout {
     pub fn new(children: Vec<Box<dyn Widget + Send>>) -> Box<HorizontalLayout> {
-        Box::new(HorizontalLayout { children: children })
+        Box::new(HorizontalLayout { children })
     }
 }
 
@@ -301,10 +301,7 @@ pub struct Margin {
 #[allow(dead_code)]
 impl Margin {
     pub fn new(margins: (u32, u32, u32, u32), child: Box<dyn Widget + Send>) -> Box<Margin> {
-        Box::new(Margin {
-            child: child,
-            margins: margins,
-        })
+        Box::new(Margin { child, margins })
     }
 }
 
@@ -378,10 +375,7 @@ pub struct Fixed {
 #[allow(dead_code)]
 impl Fixed {
     pub fn new(size: (u32, u32), child: Box<dyn Widget + Send>) -> Box<Fixed> {
-        Box::new(Fixed {
-            child: child,
-            size: size,
-        })
+        Box::new(Fixed { child, size })
     }
 }
 

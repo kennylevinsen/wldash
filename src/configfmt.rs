@@ -8,7 +8,7 @@ pub enum ConfigFmt {
     Json,
 }
 
-pub const CONFIG_NAMES: &'static [&'static str] = &[
+pub const CONFIG_NAMES: &[&str] = &[
     #[cfg(feature = "yaml-cfg")]
     "config.yaml",
     #[cfg(feature = "json-cfg")]

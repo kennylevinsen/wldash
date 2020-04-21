@@ -19,8 +19,8 @@ pub enum Widget {
         height: u32,
         widget: Box<Widget>,
     },
-    HorizontalLayout(Vec<Box<Widget>>),
-    VerticalLayout(Vec<Box<Widget>>),
+    HorizontalLayout(Vec<Widget>),
+    VerticalLayout(Vec<Widget>),
     Clock {
         font_size: f32,
     },
@@ -66,11 +66,11 @@ pub enum Widget {
 impl Widget {
     pub fn construct(
         self,
-        time: &NaiveDateTime,
+        time: NaiveDateTime,
         tx: Sender<Cmd>,
     ) -> Option<Box<dyn widget::Widget + Send>> {
         match self {
-            Widget::Margin { margins, widget } => match widget.construct(time, tx.clone()) {
+            Widget::Margin { margins, widget } => match widget.construct(time, tx) {
                 Some(w) => Some(widget::Margin::new(margins, w)),
                 None => None,
             },
@@ -78,7 +78,7 @@ impl Widget {
                 width,
                 height,
                 widget,
-            } => match widget.construct(time, tx.clone()) {
+            } => match widget.construct(time, tx) {
                 Some(w) => Some(widget::Fixed::new((width, height), w)),
                 None => None,
             },
@@ -113,17 +113,17 @@ impl Widget {
             } => Some(widgets::launcher::Launcher::new(
                 font_size,
                 length,
-                tx.clone(),
+                tx,
                 app_opener,
                 term_opener,
-                if url_opener.len() == 0 {
+                if url_opener.is_empty() {
                     "xdg_open ".to_string()
                 } else {
                     url_opener
                 },
             )),
             Widget::Battery { font_size, length } => {
-                match widgets::battery::UpowerBattery::new(font_size, length, tx.clone()) {
+                match widgets::battery::UpowerBattery::new(font_size, length, tx) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
@@ -145,7 +145,7 @@ impl Widget {
             }
             #[cfg(feature = "pulseaudio-widget")]
             Widget::PulseAudio { font_size, length } => {
-                match widgets::audio::PulseAudio::new(font_size, length, tx.clone()) {
+                match widgets::audio::PulseAudio::new(font_size, length, tx) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
@@ -189,51 +189,51 @@ impl Default for Config {
             widget: Widget::Margin {
                 margins: (20, 20, 20, 20),
                 widget: Box::new(Widget::VerticalLayout(vec![
-                    Box::new(Widget::HorizontalLayout(vec![
-                        Box::new(Widget::Margin {
+                    Widget::HorizontalLayout(vec![
+                        Widget::Margin {
                             margins: (0, 88, 0, 32),
                             widget: Box::new(Widget::VerticalLayout(vec![
-                                Box::new(Widget::Date { font_size: 64.0 }),
-                                Box::new(Widget::Clock { font_size: 256.0 }),
+                                Widget::Date { font_size: 64.0 },
+                                Widget::Clock { font_size: 256.0 },
                             ])),
-                        }),
-                        Box::new(Widget::VerticalLayout(vec![
-                            Box::new(Widget::Margin {
+                        },
+                        Widget::VerticalLayout(vec![
+                            Widget::Margin {
                                 margins: (0, 0, 0, 8),
                                 widget: Box::new(Widget::Battery {
                                     font_size: 24.0,
                                     length: 600,
                                 }),
-                            }),
-                            Box::new(Widget::Margin {
+                            },
+                            Widget::Margin {
                                 margins: (0, 0, 0, 8),
                                 widget: Box::new(Widget::Backlight {
                                     device: "intel_backlight".to_string(),
                                     font_size: 24.0,
                                     length: 600,
                                 }),
-                            }),
+                            },
                             #[cfg(feature = "pulseaudio-widget")]
-                            Box::new(Widget::Margin {
+                            Widget::Margin {
                                 margins: (0, 0, 0, 8),
                                 widget: Box::new(Widget::PulseAudio {
                                     font_size: 24.0,
                                     length: 600,
                                 }),
-                            }),
-                        ])),
-                    ])),
-                    Box::new(Widget::Calendar {
+                            },
+                        ]),
+                    ]),
+                    Widget::Calendar {
                         font_size: 16.0,
                         sections: 3,
-                    }),
-                    Box::new(Widget::Launcher {
+                    },
+                    Widget::Launcher {
                         font_size: 32.0,
                         length: 1200,
                         app_opener: "".to_string(),
                         term_opener: "".to_string(),
                         url_opener: "".to_string(),
-                    }),
+                    },
                 ])),
             },
             output_mode: Default::default(),

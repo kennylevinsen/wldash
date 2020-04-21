@@ -40,12 +40,12 @@ impl Desktop {
                 keywords: desktop
                     .get("Keywords")
                     .map(|x| {
-                        x.split(";")
+                        x.split(';')
                             .map(|y| y.trim().to_string())
                             .filter(|z| z != "")
                             .collect()
                     })
-                    .unwrap_or(vec![]),
+                    .unwrap_or_else(|| vec![]),
             }),
             None => Err(Box::new(io_error::new(
                 ErrorKind::NotFound,
@@ -92,7 +92,7 @@ pub fn load_desktop_files() -> Vec<Desktop> {
 
     let xdg_data_home = match env::var_os("XDG_DATA_HOME") {
         Some(s) => s.into_string().unwrap(),
-        None => format!("{}/.local/share", home).to_string(),
+        None => format!("{}/.local/share", home),
     };
     let xdg_data_dirs = match env::var_os("XDG_DATA_DIRS") {
         Some(s) => s.into_string().unwrap(),
@@ -100,7 +100,7 @@ pub fn load_desktop_files() -> Vec<Desktop> {
     };
 
     std::iter::once(xdg_data_home.as_str())
-        .chain(xdg_data_dirs.split(":"))
+        .chain(xdg_data_dirs.split(':'))
         .map(|p| Desktop::parse_dir(&format!("{}/applications", p)))
         .filter_map(Result::ok)
         .flatten()

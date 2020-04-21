@@ -11,14 +11,14 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub fn new(time: &NaiveDateTime, size: f32) -> Box<Clock> {
+    pub fn new(time: NaiveDateTime, size: f32) -> Box<Clock> {
         let mut clock_cache = Font::new(&ROBOTO_REGULAR, size);
         clock_cache.add_str_to_cache("0123456789:");
 
         Box::new(Clock {
-            cur_time: time.clone(),
-            clock_cache: clock_cache,
-            size: size,
+            cur_time: time,
+            clock_cache,
+            size,
         })
     }
 }
@@ -54,7 +54,7 @@ impl Widget for Clock {
             return Ok(DrawReport::empty(width, height));
         }
 
-        self.cur_time = ctx.time.clone();
+        self.cur_time = ctx.time;
 
         let buf = &mut ctx.buf.subdimensions((pos.0, pos.1, width, height))?;
         buf.memset(ctx.bg);
@@ -70,8 +70,8 @@ impl Widget for Clock {
         )?;
 
         Ok(DrawReport {
-            width: width,
-            height: height,
+            width,
+            height,
             damage: vec![(pos.0 as i32, pos.1 as i32, width as i32, height as i32)],
             full_damage: false,
         })

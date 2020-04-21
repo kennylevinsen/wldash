@@ -22,10 +22,10 @@ impl Calendar {
         &self,
         buf: &mut Buffer,
         background_color: &Color,
-        orig: &NaiveDate,
-        time: &NaiveDate,
+        orig: NaiveDate,
+        time: NaiveDate,
     ) -> Result<(i32, i32, i32, i32), ::std::io::Error> {
-        let mut time = time.clone();
+        let mut time = time;
         let mut y_off = 1;
         let mut done = false;
 
@@ -153,7 +153,7 @@ impl Calendar {
 }
 
 impl Calendar {
-    pub fn new(time: &NaiveDateTime, font_size: f32, sections: u32) -> Box<Calendar> {
+    pub fn new(time: NaiveDateTime, font_size: f32, sections: u32) -> Box<Calendar> {
         let mut calendar_cache = Font::new(&DEJAVUSANS_MONO, font_size * 2.0);
         calendar_cache.add_str_to_cache("0123456789");
         let mut month_cache = Font::new(&ROBOTO_REGULAR, font_size * 4.0);
@@ -166,12 +166,12 @@ impl Calendar {
             cur_date: time.date(),
             dirty: true,
             offset: 0.0,
-            sections: sections,
+            sections,
             font_size: font_size as u32,
-            calendar_cache: calendar_cache,
-            month_cache: month_cache,
-            year_cache: year_cache,
-            day_cache: day_cache,
+            calendar_cache,
+            month_cache,
+            year_cache,
+            day_cache,
         })
     }
 }
@@ -233,7 +233,7 @@ impl Widget for Calendar {
         }
         let cal_pad = 7 * self.font_size * 3 + self.font_size * 5;
         for idx in 0..self.sections {
-            self.draw_month(&mut buf.offset((cal_pad * idx, 0))?, ctx.bg, &time, &t)?;
+            self.draw_month(&mut buf.offset((cal_pad * idx, 0))?, ctx.bg, time, t)?;
 
             t = if t.month() == 12 {
                 t.with_year(t.year() + 1).unwrap().with_month(1).unwrap()
@@ -242,8 +242,8 @@ impl Widget for Calendar {
             };
         }
         Ok(DrawReport {
-            width: width,
-            height: height,
+            width,
+            height,
             damage: vec![buf.get_signed_bounds()],
             full_damage: false,
         })

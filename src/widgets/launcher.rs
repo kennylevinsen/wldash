@@ -50,15 +50,15 @@ impl Launcher {
             offset: 0,
             font: RefCell::new(Font::new(&ROBOTO_REGULAR, font_size)),
             font_size: font_size as u32,
-            length: length,
+            length,
             dirty: true,
             tx: listener,
         })
     }
 
     fn draw_launcher(&self, buf: &mut Buffer, bg: &Color) -> Result<(), ::std::io::Error> {
-        let mut x_off = if self.input.len() > 0 {
-            let c = if self.matches.len() == 0 {
+        let mut x_off = if !self.input.is_empty() {
+            let c = if self.matches.is_empty() {
                 Color::new(1.0, 0.5, 0.5, 1.0)
             } else {
                 Color::new(1.0, 1.0, 1.0, 1.0)
@@ -79,7 +79,7 @@ impl Launcher {
                 Ok(b) => b,
                 Err(_) => break,
             };
-            let size = if idx == self.offset && self.input.len() > 0 {
+            let size = if idx == self.offset && !self.input.is_empty() {
                 let (_, indices) =
                     fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
                         .unwrap_or((0, vec![]));
@@ -122,7 +122,7 @@ impl Launcher {
             .0
             + self.font_size / 4;
 
-        let x_off = if self.input.len() > 0 {
+        let x_off = if !self.input.is_empty() {
             let dim = self.font.borrow_mut().auto_draw_text(
                 &mut buf.offset((x_off, 0))?,
                 bg,
@@ -160,7 +160,7 @@ impl Launcher {
             .0
             + self.font_size / 4;
 
-        if self.input.len() > 0 {
+        if !self.input.is_empty() {
             self.font.borrow_mut().auto_draw_text(
                 &mut buf.offset((x_off, 0))?,
                 bg,
@@ -175,8 +175,8 @@ impl Launcher {
 
 fn calc(s: &str) -> Result<String, String> {
     rcalc_lib::parse::eval(s, &mut rcalc_lib::parse::CalcState::new())
-        .map(|x| format!("{}", x).to_string())
-        .map_err(|x| format!("{}", x).to_string())
+        .map(|x| format!("{}", x))
+        .map_err(|x| format!("{}", x))
 }
 
 fn wlcopy(s: &str) -> Result<(), String> {
@@ -223,7 +223,7 @@ impl Matcher {
         let mut m = self
             .matches
             .iter()
-            .map(|(key, ma)| (ma.clone(), key.clone()))
+            .map(|(key, ma)| (*ma, key.clone()))
             .collect::<Vec<(i64, Desktop)>>();
 
         m.sort_by(|(ma1, d1), (ma2, d2)| {
@@ -313,8 +313,8 @@ impl Widget for Launcher {
         }?;
 
         Ok(DrawReport {
-            width: width,
-            height: height,
+            width,
+            height,
             damage: vec![buf.get_signed_bounds()],
             full_damage: false,
         })
@@ -330,7 +330,7 @@ impl Widget for Launcher {
         match key {
             keysyms::XKB_KEY_u if modifiers.ctrl => self.leave(),
             keysyms::XKB_KEY_BackSpace => {
-                if self.input.len() > 0 {
+                if !self.input.is_empty() {
                     self.input = self.input[..self.input.len() - 1].to_string();
                     self.offset = 0;
                     self.result = None;
@@ -339,12 +339,11 @@ impl Widget for Launcher {
             }
             keysyms::XKB_KEY_Return => {
                 match self.input.chars().next() {
-                    Some('=') => match self.result {
-                        Some(ref v) => {
+                    Some('=') => {
+                        if let Some(ref v) = self.result {
                             let _ = wlcopy(&v);
                         }
-                        None => (),
-                    },
+                    }
                     Some('!') => {
                         let _ = Command::new("sh")
                             .arg("-c")
@@ -367,24 +366,24 @@ impl Widget for Launcher {
                                     &self.app_opener
                                 };
 
-                                let lexed = if prefix.len() > 0 {
+                                let lexed = if !prefix.is_empty() {
                                     let mut prefix = shlex::split(prefix).unwrap();
                                     prefix.push(exec);
                                     prefix
                                 } else {
                                     shlex::split(&exec).unwrap()
                                 };
-                                if lexed.len() > 0 {
+                                if !lexed.is_empty() {
                                     let _ =
                                         Command::new(lexed[0].clone()).args(&lexed[1..]).spawn();
                                     self.tx.send(Cmd::Exit).unwrap();
                                 }
                             }
                             if let Some(url) = &d.url {
-                                if self.url_opener.len() > 0 {
+                                if !self.url_opener.is_empty() {
                                     let mut lexed = shlex::split(&self.url_opener).unwrap();
                                     lexed.push(url.to_string());
-                                    if lexed.len() > 0 {
+                                    if !lexed.is_empty() {
                                         let _ = Command::new(lexed[0].clone())
                                             .args(&lexed[1..])
                                             .spawn();
@@ -397,26 +396,25 @@ impl Widget for Launcher {
                 };
             }
             keysyms::XKB_KEY_Right => {
-                if self.matches.len() > 0 && self.offset < self.matches.len() - 1 {
+                if !self.matches.is_empty() && self.offset < self.matches.len() - 1 {
                     self.offset += 1;
                     self.dirty = true;
                 }
             }
             keysyms::XKB_KEY_Left => {
-                if self.matches.len() > 0 && self.offset > 0 {
+                if !self.matches.is_empty() && self.offset > 0 {
                     self.offset -= 1;
                     self.dirty = true;
                 }
             }
-            _ => match interpreted {
-                Some(v) => {
+            _ => {
+                if let Some(v) = interpreted {
                     self.input += &v;
                     self.offset = 0;
                     self.result = None;
                     self.dirty = true;
                 }
-                None => {}
-            },
+            }
         }
     }
     fn mouse_click(&mut self, _: u32, _: (u32, u32)) {}

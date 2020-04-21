@@ -2,9 +2,10 @@ use crate::color::Color;
 use crate::widget::WaitContext;
 use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 
+use std::fs;
 use std::fs::OpenOptions;
+use std::io::Write;
 use std::io::{Error, ErrorKind};
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 pub struct Backlight {
@@ -14,11 +15,9 @@ pub struct Backlight {
 }
 
 fn read_file_as_u64(path: &Path) -> Result<u64, Error> {
-    let mut file = OpenOptions::new().read(true).open(path)?;
-    let mut str = String::new();
-    file.read_to_string(&mut str)?;
-    str.pop();
-    str.parse::<u64>()
+    let mut s = fs::read_to_string(path)?;
+    s.pop();
+    s.parse::<u64>()
         .map_err(|_e| Error::new(ErrorKind::Other, "unable to parse value"))
 }
 
@@ -101,7 +100,6 @@ impl BarWidgetImpl for Backlight {
             Ok(val) => val,
             Err(err) => {
                 eprintln!("Error while trying to change brightness: {}", err);
-                ()
             }
         }
     }
@@ -111,7 +109,6 @@ impl BarWidgetImpl for Backlight {
             Ok(val) => val,
             Err(err) => {
                 eprintln!("Error while trying to change brightness: {}", err);
-                ()
             }
         }
     }
@@ -125,7 +122,6 @@ impl BarWidgetImpl for Backlight {
             Ok(val) => val,
             Err(err) => {
                 eprintln!("Error while trying to change brightness: {}", err);
-                ()
             }
         }
     }

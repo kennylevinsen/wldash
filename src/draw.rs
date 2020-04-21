@@ -6,9 +6,8 @@ use std::collections::HashMap;
 use lazy_static::lazy_static;
 use rusttype::{point, Font as RustFont, Scale};
 
-pub static DEJAVUSANS_MONO_FONT_DATA: &'static [u8] =
-    include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
-pub static ROBOTO_REGULAR_FONT_DATA: &'static [u8] = include_bytes!("../fonts/Roboto-Regular.ttf");
+pub static DEJAVUSANS_MONO_FONT_DATA: &[u8] = include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
+pub static ROBOTO_REGULAR_FONT_DATA: &[u8] = include_bytes!("../fonts/Roboto-Regular.ttf");
 
 lazy_static! {
     pub static ref DEJAVUSANS_MONO: RustFont<'static> =
@@ -47,9 +46,9 @@ impl CachedGlyph {
                 render[pos as usize] = o;
             });
             CachedGlyph {
-                origin: origin,
-                dimensions: dimensions,
-                render: render,
+                origin,
+                dimensions,
+                render,
             }
         } else {
             CachedGlyph {
@@ -92,8 +91,8 @@ impl Font {
     pub fn new(font: &'static RustFont, size: f32) -> Font {
         Font {
             glyphs: HashMap::new(),
-            font: font,
-            size: size,
+            font,
+            size,
         }
     }
 

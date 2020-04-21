@@ -8,8 +8,6 @@ use std::sync::{Arc, Mutex};
 
 use nix::poll::{PollFd, PollFlags};
 
-use dbus;
-
 fn get_upower_property(
     con: &dbus::Connection,
     device_path: &str,
@@ -44,7 +42,7 @@ struct DbusConnection(dbus::Connection);
 
 impl std::convert::AsRef<dbus::Connection> for DbusConnection {
     fn as_ref(&self) -> &dbus::Connection {
-        return &self.0;
+        &self.0
     }
 }
 
@@ -156,8 +154,8 @@ impl UpowerBattery {
             con: DbusConnection(con),
             dirty,
             sender,
-            capacity: capacity,
-            state: state,
+            capacity,
+            state,
             watch: fds[0],
         })
     }

@@ -34,9 +34,9 @@ impl BarWidget {
         Box::new(BarWidget {
             bar_impl: w,
             dirty: Arc::new(Mutex::new(true)),
-            font: font,
+            font,
             font_size: font_size as u32,
-            length: length,
+            length,
         })
     }
 
@@ -53,10 +53,10 @@ impl BarWidget {
 
         Ok(Box::new(BarWidget {
             bar_impl: im,
-            dirty: dirty,
-            font: font,
+            dirty,
+            font,
             font_size: font_size as u32,
-            length: length,
+            length,
         }))
     }
 }
@@ -119,8 +119,8 @@ impl Widget for BarWidget {
             (self.length - bar_off, self.font_size),
         )?;
         Ok(DrawReport {
-            width: width,
-            height: height,
+            width,
+            height,
             damage: vec![buf.get_signed_bounds()],
             full_damage: false,
         })

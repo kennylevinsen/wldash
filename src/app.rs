@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
@@ -50,9 +51,9 @@ impl AppInner {
             outputs: Vec::new(),
             shell: None,
             draw_tx: tx,
-            output_mode: output_mode,
+            output_mode,
             visible: true,
-            scale: scale,
+            scale,
         }
     }
 
@@ -71,7 +72,7 @@ impl AppInner {
             .create_surface(NewProxy::implement_dummy)
             .unwrap();
 
-        let this_is_stupid = Arc::new(Mutex::new(false));
+        let this_is_stupid = AtomicBool::new(false);
 
         let shell_surface = shell
             .get_layer_surface(
@@ -83,9 +84,7 @@ impl AppInner {
                     layer.implement_closure(
                         move |evt, layer| match evt {
                             zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
-                                let mut x = this_is_stupid.lock().unwrap();
-                                if !*x {
-                                    *x = true;
+                                if !this_is_stupid.compare_and_swap(false, true, Ordering::SeqCst) {
                                     *(configured_surfaces.lock().unwrap()) += 1;
                                     layer.ack_configure(serial);
                                     tx.send(Cmd::ForceDraw).unwrap();
@@ -132,7 +131,7 @@ impl AppInner {
 
         match self.output_mode {
             OutputMode::Active => {
-                if self.shell_surfaces.len() > 0 {
+                if !self.shell_surfaces.is_empty() {
                     return;
                 }
 
@@ -181,7 +180,7 @@ impl AppInner {
                 .outputs
                 .iter()
                 .filter(|(output_id, _)| *output_id != id)
-                .map(|(x, y)| (x.clone(), y.clone()))
+                .map(|(x, y)| (*x, y.clone()))
                 .collect();
             if output.1.as_ref().version() >= 3 {
                 output.1.release()
@@ -224,7 +223,7 @@ impl App {
 
         if !inner.visible
             || inner.shell_surfaces.len() != *inner.configured_surfaces.lock().unwrap()
-            || inner.surfaces.len() == 0
+            || inner.surfaces.is_empty()
         {
             // Not ready yet
             return Ok(());
@@ -269,7 +268,7 @@ impl App {
             &mut DrawContext {
                 buf: &mut buf,
                 bg: &self.bg,
-                time: &time,
+                time,
                 force,
             },
             (0, 0),
@@ -277,7 +276,7 @@ impl App {
 
         mmap.flush().unwrap();
 
-        if !force && !report.full_damage && report.damage.len() == 0 {
+        if !force && !report.full_damage && report.damage.is_empty() {
             // Nothing to do
             self.pools.never_mind();
             return Ok(());
@@ -352,7 +351,7 @@ impl App {
     }
 
     pub fn new(tx: Sender<Cmd>, output_mode: OutputMode, bg: Color, scale: u32) -> App {
-        let inner = Arc::new(Mutex::new(AppInner::new(tx.clone(), output_mode, scale)));
+        let inner = Arc::new(Mutex::new(AppInner::new(tx, output_mode, scale)));
 
         //
         // Set up modules
@@ -365,8 +364,7 @@ impl App {
         let display_wrapper = display
             .as_ref()
             .make_wrapper(&event_queue.get_token())
-            .unwrap()
-            .into();
+            .unwrap();
 
         //
         // Set up global manager
@@ -409,13 +407,12 @@ impl App {
 
         // wl_shm
         let shm_formats = Arc::new(Mutex::new(Vec::new()));
-        let shm_formats2 = shm_formats.clone();
         let shm = manager
             .instantiate_range(1, 1, |shm| {
                 shm.implement_closure(
                     move |evt, _| {
                         if let wl_shm::Event::Format { format } = evt {
-                            shm_formats2.lock().unwrap().push(format);
+                            shm_formats.lock().unwrap().push(format);
                         }
                     },
                     (),
@@ -450,21 +447,22 @@ impl App {
                 utf8,
                 state,
                 ..
-            } => match state {
-                KeyState::Pressed => match keysym {
-                    keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
-                    keysyms::XKB_KEY_c if modifiers_state.lock().unwrap().ctrl => {
-                        kbd_clone.lock().unwrap().push_back(Cmd::Exit)
+            } => {
+                if let KeyState::Pressed = state {
+                    match keysym {
+                        keysyms::XKB_KEY_Escape => kbd_clone.lock().unwrap().push_back(Cmd::Exit),
+                        keysyms::XKB_KEY_c if modifiers_state.lock().unwrap().ctrl => {
+                            kbd_clone.lock().unwrap().push_back(Cmd::Exit)
+                        }
+                        v => kbd_clone.lock().unwrap().push_back(Cmd::Keyboard {
+                            key: v,
+                            key_state: state,
+                            modifiers_state: *modifiers_state.lock().unwrap(),
+                            interpreted: utf8,
+                        }),
                     }
-                    v => kbd_clone.lock().unwrap().push_back(Cmd::Keyboard {
-                        key: v,
-                        key_state: state,
-                        modifiers_state: modifiers_state.lock().unwrap().clone(),
-                        interpreted: utf8,
-                    }),
-                },
-                _ => (),
-            },
+                }
+            }
             KbEvent::Modifiers { modifiers } => *modifiers_state.lock().unwrap() = modifiers,
             _ => (),
         })
@@ -522,18 +520,17 @@ impl App {
                             vert_scroll += value;
                         }
                     }
-                    wl_pointer::Event::Button { button, state, .. } => match state {
-                        wl_pointer::ButtonState::Released => {
+                    wl_pointer::Event::Button { button, state, .. } => {
+                        if let wl_pointer::ButtonState::Released = state {
                             btn = button;
                             btn_clicked = true;
                         }
-                        _ => {}
-                    },
+                    }
                     wl_pointer::Event::Frame => {
                         if vert_scroll != 0.0 || horiz_scroll != 0.0 {
                             pointer_clone.lock().unwrap().push_back(Cmd::MouseScroll {
                                 scroll: (horiz_scroll, vert_scroll),
-                                pos: pos,
+                                pos,
                             });
                             vert_scroll = 0.0;
                             horiz_scroll = 0.0;
@@ -542,7 +539,7 @@ impl App {
                             pointer_clone
                                 .lock()
                                 .unwrap()
-                                .push_back(Cmd::MouseClick { btn: btn, pos: pos });
+                                .push_back(Cmd::MouseClick { btn, pos });
                             btn_clicked = false;
                         }
                     }
@@ -556,13 +553,13 @@ impl App {
         display.flush().unwrap();
 
         App {
-            display: display,
-            event_queue: event_queue,
-            cmd_queue: cmd_queue,
-            pools: pools,
+            display,
+            event_queue,
+            cmd_queue,
+            pools,
             widget: None,
-            bg: bg,
-            inner: inner,
+            bg,
+            inner,
             last_damage: None,
             last_dim: (0, 0),
         }

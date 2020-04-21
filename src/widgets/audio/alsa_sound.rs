@@ -4,8 +4,8 @@ use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
 
 use alsa::mixer::{Mixer, Selem, SelemChannelId, SelemId};
 
-const CARD_NAME: &'static str = "default";
-const SELEM_NAME: &'static str = "Master";
+const CARD_NAME: &str = "default";
+const SELEM_NAME: &str = "Master";
 const SELEM_ID: u32 = 0u32;
 
 #[inline]
@@ -15,8 +15,8 @@ fn alsa_error_to_io_error(fail: &'static str, err: &alsa::Error) -> ::std::io::E
     let errno = err
         .errno()
         .map(|errno| format!("; errno = {}", errno))
-        .unwrap_or(String::new());
-    return ::std::io::Error::new(kind, format!("{}: {}{}", fail, func, errno));
+        .unwrap_or_default();
+    ::std::io::Error::new(kind, format!("{}: {}{}", fail, func, errno))
 }
 
 #[inline]

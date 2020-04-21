@@ -45,7 +45,7 @@ fn main() {
         Ok(dir) => dir + "/wldash",
         Err(_) => match env::var("HOME") {
             Ok(home) => home + "/.config/wldash",
-            Err(_) => panic!("unable to find user folder"),
+            _ => panic!("unable to find user folder"),
         },
     };
 
@@ -105,7 +105,7 @@ fn main() {
         },
         None => Mode::Start,
     };
-    if let Some(_) = args.next() {
+    if args.next().is_some() {
         // total = args.count + 2 (the two we skipped + the rest)
         eprintln!("expected 0 or 1 arguments, got {}", args.count() + 2);
         std::process::exit(1);
@@ -115,7 +115,7 @@ fn main() {
 
     match mode {
         Mode::ToggleVisible => {
-            if let Ok(mut socket) = UnixStream::connect(socket_path.clone()) {
+            if let Ok(mut socket) = UnixStream::connect(socket_path) {
                 socket.write_all(b"toggle_visible\n").unwrap();
                 return;
             };
@@ -129,13 +129,13 @@ fn main() {
             };
         }
         Mode::Start => {
-            if let Ok(_) = UnixStream::connect(socket_path.clone()) {
+            if UnixStream::connect(socket_path.clone()).is_ok() {
                 eprintln!("wldash is already running");
                 std::process::exit(1);
             };
         }
         Mode::Daemonize => {
-            if let Ok(_) = UnixStream::connect(socket_path.clone()) {
+            if UnixStream::connect(socket_path.clone()).is_ok() {
                 eprintln!("wldash is already running");
                 std::process::exit(1);
             };
@@ -161,9 +161,11 @@ fn main() {
     let tx_draw_mod = tx_draw.clone();
     let (mod_tx, mod_rx) = channel();
     std::thread::spawn(move || {
-        let n = Local::now().naive_local();
         // Print, write to a file, or send to an HTTP server.
-        match config.widget.construct(&n, tx_draw_mod) {
+        match config
+            .widget
+            .construct(Local::now().naive_local(), tx_draw_mod)
+        {
             Some(w) => mod_tx.send(w).unwrap(),
             None => panic!("no widget configured"),
         }

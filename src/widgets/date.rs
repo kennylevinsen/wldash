@@ -11,15 +11,15 @@ pub struct Date {
 }
 
 impl Date {
-    pub fn new(time: &NaiveDateTime, size: f32) -> Box<Date> {
+    pub fn new(time: NaiveDateTime, size: f32) -> Box<Date> {
         let mut date_cache = Font::new(&ROBOTO_REGULAR, size);
         date_cache
             .add_str_to_cache("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,/ ");
 
         Box::new(Date {
-            cur_time: time.clone(),
-            date_cache: date_cache,
-            size: size,
+            cur_time: time,
+            date_cache,
+            size,
         })
     }
 }
@@ -43,7 +43,7 @@ impl Widget for Date {
             return Ok(DrawReport::empty(width, height));
         }
 
-        self.cur_time = ctx.time.clone();
+        self.cur_time = ctx.time;
 
         let buf = &mut ctx.buf.subdimensions((pos.0, pos.1, width, height))?;
         buf.memset(ctx.bg);
@@ -61,8 +61,8 @@ impl Widget for Date {
         )?;
 
         Ok(DrawReport {
-            width: width,
-            height: height,
+            width,
+            height,
             damage: vec![(pos.0 as i32, pos.1 as i32, width as i32, height as i32)],
             full_damage: false,
         })

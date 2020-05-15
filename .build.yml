@@ -2,6 +2,7 @@ image: archlinux
 packages:
   - rust
   - libpulse
+  - alsa-lib
 sources:
   - https://git.sr.ht/~kennylevinsen/wldash
 tasks:

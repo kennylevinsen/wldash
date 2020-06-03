@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::draw::{Font, ROBOTO_REGULAR};
+use crate::draw::{Font, SANS};
 use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
 use chrono::{Duration, NaiveDateTime, Timelike};
@@ -12,7 +12,7 @@ pub struct Clock {
 
 impl Clock {
     pub fn new(time: NaiveDateTime, size: f32) -> Box<Clock> {
-        let mut clock_cache = Font::new(&ROBOTO_REGULAR, size);
+        let mut clock_cache = Font::new(&SANS, size);
         clock_cache.add_str_to_cache("0123456789:");
 
         Box::new(Clock {

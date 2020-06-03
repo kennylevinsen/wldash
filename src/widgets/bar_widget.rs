@@ -1,5 +1,5 @@
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
+use crate::draw::{draw_bar, draw_box, Font, SANS};
 use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
 
 use std::sync::{Arc, Mutex};
@@ -28,7 +28,7 @@ impl BarWidget {
         length: u32,
         w: Box<dyn BarWidgetImpl + Send>,
     ) -> Box<BarWidget> {
-        let mut font = Font::new(&ROBOTO_REGULAR, font_size);
+        let mut font = Font::new(&SANS, font_size);
         font.add_str_to_cache(w.name());
 
         Box::new(BarWidget {
@@ -48,7 +48,7 @@ impl BarWidget {
         let dirty = Arc::new(Mutex::new(true));
         let im = f(dirty.clone())?;
 
-        let mut font = Font::new(&ROBOTO_REGULAR, font_size);
+        let mut font = Font::new(&SANS, font_size);
         font.add_str_to_cache(im.name());
 
         Ok(Box::new(BarWidget {

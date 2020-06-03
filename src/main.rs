@@ -21,6 +21,7 @@ mod doublemempool;
 mod draw;
 mod widget;
 mod widgets;
+mod fonts;
 
 use app::{App, OutputMode};
 use cmd::Cmd;

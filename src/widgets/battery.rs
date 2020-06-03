@@ -76,7 +76,7 @@ impl UpowerBattery {
         let con = dbus::Connection::get_private(dbus::BusType::System).map_err(|_| {
             ::std::io::Error::new(::std::io::ErrorKind::Other, "unable to open dbus")
         })?;
-        let device_path = format!("/org/freedesktop/UPower/devices/battery_{}", device);
+        let device_path = format!("/org/freedesktop/UPower/devices/{}", device);
 
         let rule = format!(
             "type='signal',\
@@ -166,7 +166,7 @@ impl UpowerBattery {
         sender: Sender<Cmd>,
     ) -> Result<Box<BarWidget>, ::std::io::Error> {
         BarWidget::new(font_size, length, move |dirty| {
-            let d = UpowerBattery::from_device(dirty, sender, "BAT0")?;
+            let d = UpowerBattery::from_device(dirty, sender, "DisplayDevice")?;
             Ok(Box::new(d))
         })
     }

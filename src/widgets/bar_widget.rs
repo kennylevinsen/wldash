@@ -1,6 +1,9 @@
 use crate::color::Color;
-use crate::draw::{draw_bar, draw_box, Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
+use crate::draw::{draw_bar, draw_box, Font};
+use crate::{
+    fonts::FontRef,
+    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+};
 
 use std::sync::{Arc, Mutex};
 
@@ -14,21 +17,22 @@ pub trait BarWidgetImpl {
     fn toggle(&mut self);
 }
 
-pub struct BarWidget {
+pub struct BarWidget<'a> {
     bar_impl: Box<dyn BarWidgetImpl + Send>,
-    font: Font,
+    font: Font<'a>,
     font_size: u32,
     length: u32,
     dirty: Arc<Mutex<bool>>,
 }
 
-impl BarWidget {
+impl<'a> BarWidget<'a> {
     pub fn new_simple(
+        font: FontRef,
         font_size: f32,
         length: u32,
         w: Box<dyn BarWidgetImpl + Send>,
     ) -> Box<BarWidget> {
-        let mut font = Font::new(&ROBOTO_REGULAR, font_size);
+        let mut font = Font::new(font, font_size);
         font.add_str_to_cache(w.name());
 
         Box::new(BarWidget {
@@ -40,15 +44,20 @@ impl BarWidget {
         })
     }
 
-    pub fn new<F>(font_size: f32, length: u32, f: F) -> Result<Box<BarWidget>, ::std::io::Error>
+    pub fn new<F>(
+        font: FontRef<'a>,
+        font_size: f32,
+        length: u32,
+        f: F,
+    ) -> Result<Box<BarWidget>, ::std::io::Error>
     where
         F: FnOnce(Arc<Mutex<bool>>) -> Result<Box<dyn BarWidgetImpl + Send>, ::std::io::Error>,
-        F: Send + 'static + Clone,
+        F: Send + 'a + Clone,
     {
         let dirty = Arc::new(Mutex::new(true));
         let im = f(dirty.clone())?;
 
-        let mut font = Font::new(&ROBOTO_REGULAR, font_size);
+        let mut font = Font::new(font, font_size);
         font.add_str_to_cache(im.name());
 
         Ok(Box::new(BarWidget {
@@ -61,7 +70,7 @@ impl BarWidget {
     }
 }
 
-impl Widget for BarWidget {
+impl<'a> Widget for BarWidget<'a> {
     fn wait(&mut self, ctx: &mut WaitContext) {
         self.bar_impl.wait(ctx);
     }

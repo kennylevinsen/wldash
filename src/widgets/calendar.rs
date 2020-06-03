@@ -1,23 +1,26 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{Font, DEJAVUSANS_MONO, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
+use crate::draw::Font;
+use crate::{
+    fonts::FontRef,
+    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+};
 
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 
-pub struct Calendar {
+pub struct Calendar<'a> {
     cur_date: NaiveDate,
     dirty: bool,
     offset: f64,
     sections: u32,
     font_size: u32,
-    calendar_cache: Font,
-    month_cache: Font,
-    year_cache: Font,
-    day_cache: Font,
+    calendar_cache: Font<'a>,
+    month_cache: Font<'a>,
+    year_cache: Font<'a>,
+    day_cache: Font<'a>,
 }
 
-impl Calendar {
+impl<'a> Calendar<'a> {
     fn draw_month(
         &self,
         buf: &mut Buffer,
@@ -152,15 +155,21 @@ impl Calendar {
     }
 }
 
-impl Calendar {
-    pub fn new(time: NaiveDateTime, font_size: f32, sections: u32) -> Box<Calendar> {
-        let mut calendar_cache = Font::new(&DEJAVUSANS_MONO, font_size * 2.0);
+impl<'a> Calendar<'a> {
+    pub fn new(
+        time: NaiveDateTime,
+        font_primary: FontRef<'a>,
+        font_secondary: FontRef<'a>,
+        font_size: f32,
+        sections: u32,
+    ) -> Box<Calendar<'a>> {
+        let mut calendar_cache = Font::new(font_secondary, font_size * 2.0);
         calendar_cache.add_str_to_cache("0123456789");
-        let mut month_cache = Font::new(&ROBOTO_REGULAR, font_size * 4.0);
+        let mut month_cache = Font::new(font_primary, font_size * 4.0);
         month_cache.add_str_to_cache("JanuryFebMchApilJgstSmOoNvD");
-        let mut year_cache = Font::new(&DEJAVUSANS_MONO, font_size * 1.5);
+        let mut year_cache = Font::new(font_primary, font_size * 1.5);
         year_cache.add_str_to_cache("-0123456789");
-        let mut day_cache = Font::new(&DEJAVUSANS_MONO, font_size);
+        let mut day_cache = Font::new(font_primary, font_size);
         day_cache.add_str_to_cache("MONTUEWDHFRISA");
         Box::new(Calendar {
             cur_date: time.date(),
@@ -176,7 +185,7 @@ impl Calendar {
     }
 }
 
-impl Widget for Calendar {
+impl<'a> Widget for Calendar<'a> {
     fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}

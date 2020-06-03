@@ -1,6 +1,9 @@
 use crate::color::Color;
 use crate::widget::WaitContext;
-use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
+use crate::{
+    fonts::FontRef,
+    widgets::bar_widget::{BarWidget, BarWidgetImpl},
+};
 
 use std::fs;
 use std::fs::OpenOptions;
@@ -70,7 +73,12 @@ impl Backlight {
         Ok(())
     }
 
-    pub fn new(path: &str, font_size: f32, length: u32) -> Result<Box<BarWidget>, Error> {
+    pub fn new<'a>(
+        path: &str,
+        font: FontRef<'a>,
+        font_size: f32,
+        length: u32,
+    ) -> Result<Box<BarWidget<'a>>, Error> {
         let mut dev = Backlight {
             device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
             cur_brightness: 0,
@@ -79,7 +87,12 @@ impl Backlight {
 
         dev.update()?;
 
-        Ok(BarWidget::new_simple(font_size, length, Box::new(dev)))
+        Ok(BarWidget::new_simple(
+            font,
+            font_size,
+            length,
+            Box::new(dev),
+        ))
     }
 }
 

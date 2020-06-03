@@ -1,7 +1,10 @@
 use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::widget::WaitContext;
-use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
+use crate::{
+    fonts::FontRef,
+    widgets::bar_widget::{BarWidget, BarWidgetImpl},
+};
 
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
@@ -161,11 +164,12 @@ impl UpowerBattery {
     }
 
     pub fn new(
+        font: FontRef,
         font_size: f32,
         length: u32,
         sender: Sender<Cmd>,
     ) -> Result<Box<BarWidget>, ::std::io::Error> {
-        BarWidget::new(font_size, length, move |dirty| {
+        BarWidget::new(font, font_size, length, move |dirty| {
             let d = UpowerBattery::from_device(dirty, sender, "DisplayDevice")?;
             Ok(Box::new(d))
         })

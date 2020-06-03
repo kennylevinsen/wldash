@@ -2,8 +2,11 @@ use crate::buffer::Buffer;
 use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::desktop::{load_desktop_files, Desktop};
-use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
+use crate::draw::Font;
+use crate::{
+    fonts::FontRef,
+    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+};
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -14,7 +17,7 @@ use std::sync::mpsc::Sender;
 use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
 
-pub struct Launcher {
+pub struct Launcher<'a> {
     options: Vec<Desktop>,
     term_opener: String,
     app_opener: String,
@@ -23,15 +26,16 @@ pub struct Launcher {
     input: String,
     result: Option<String>,
     offset: usize,
-    font: RefCell<Font>,
+    font: RefCell<Font<'a>>,
     font_size: u32,
     length: u32,
     dirty: bool,
     tx: Sender<Cmd>,
 }
 
-impl Launcher {
+impl<'a> Launcher<'a> {
     pub fn new(
+        font: FontRef,
         font_size: f32,
         length: u32,
         listener: Sender<Cmd>,
@@ -48,7 +52,7 @@ impl Launcher {
             input: "".to_string(),
             result: None,
             offset: 0,
-            font: RefCell::new(Font::new(&ROBOTO_REGULAR, font_size)),
+            font: RefCell::new(Font::new(font, font_size)),
             font_size: font_size as u32,
             length,
             dirty: true,
@@ -244,7 +248,7 @@ impl Matcher {
     }
 }
 
-impl Widget for Launcher {
+impl<'a> Widget for Launcher<'a> {
     fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {

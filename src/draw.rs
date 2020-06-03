@@ -1,22 +1,8 @@
 use crate::buffer::Buffer;
-use crate::color::Color;
+use crate::{color::Color, fonts::FontRef};
 
+use rusttype::{point, Scale};
 use std::collections::HashMap;
-
-use lazy_static::lazy_static;
-use rusttype::{point, Font as RustFont, Scale};
-
-pub static DEJAVUSANS_MONO_FONT_DATA: &[u8] = include_bytes!("../fonts/dejavu/DejaVuSansMono.ttf");
-pub static ROBOTO_REGULAR_FONT_DATA: &[u8] = include_bytes!("../fonts/Roboto-Regular.ttf");
-
-lazy_static! {
-    pub static ref DEJAVUSANS_MONO: RustFont<'static> =
-        RustFont::from_bytes(DEJAVUSANS_MONO_FONT_DATA as &[u8])
-            .expect("error constructing DejaVuSansMono");
-    pub static ref ROBOTO_REGULAR: RustFont<'static> =
-        RustFont::from_bytes(ROBOTO_REGULAR_FONT_DATA as &[u8])
-            .expect("error constructing Roboto-Regular");
-}
 
 struct CachedGlyph {
     dimensions: (u32, u32),
@@ -25,7 +11,7 @@ struct CachedGlyph {
 }
 
 impl CachedGlyph {
-    fn new(font: &RustFont, size: f32, ch: char) -> CachedGlyph {
+    fn new(font: FontRef, size: f32, ch: char) -> CachedGlyph {
         let scale = Scale::uniform(size);
         let v_metrics = font.v_metrics(scale);
         let glyph = font
@@ -81,14 +67,14 @@ impl CachedGlyph {
     }
 }
 
-pub struct Font {
+pub struct Font<'a> {
     glyphs: HashMap<char, CachedGlyph>,
-    font: &'static RustFont<'static>,
+    font: FontRef<'a>,
     size: f32,
 }
 
-impl Font {
-    pub fn new(font: &'static RustFont, size: f32) -> Font {
+impl<'a> Font<'a> {
+    pub fn new(font: FontRef<'a>, size: f32) -> Font {
         Font {
             glyphs: HashMap::new(),
             font,

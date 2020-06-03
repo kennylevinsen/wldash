@@ -199,19 +199,19 @@ impl AppInner {
     }
 }
 
-pub struct App {
+pub struct App<'a> {
     pools: DoubleMemPool,
     display: Display,
     event_queue: EventQueue,
     cmd_queue: Arc<Mutex<VecDeque<Cmd>>>,
-    widget: Option<Box<dyn Widget + Send>>,
+    widget: Option<Box<dyn Widget + Send + 'a>>,
     bg: Color,
     inner: Arc<Mutex<AppInner>>,
     last_damage: Option<Vec<(i32, i32, i32, i32)>>,
     last_dim: (u32, u32),
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn redraw(&mut self, force: bool) -> Result<(), ::std::io::Error> {
         let widget = match self.widget {
             Some(ref mut widget) => widget,
@@ -341,16 +341,16 @@ impl App {
         &mut self.event_queue
     }
 
-    pub fn get_widget(&mut self) -> &mut Box<dyn Widget + Send> {
+    pub fn get_widget(&mut self) -> &mut Box<dyn Widget + Send + 'a> {
         self.widget.as_mut().unwrap()
     }
 
-    pub fn set_widget(&mut self, w: Box<dyn Widget + Send>) -> Result<(), ::std::io::Error> {
+    pub fn set_widget(&mut self, w: Box<dyn Widget + Send + 'a>) -> Result<(), ::std::io::Error> {
         self.widget = Some(w);
         self.redraw(true)
     }
 
-    pub fn new(tx: Sender<Cmd>, output_mode: OutputMode, bg: Color, scale: u32) -> App {
+    pub fn new(tx: Sender<Cmd>, output_mode: OutputMode, bg: Color, scale: u32) -> App<'a> {
         let inner = Arc::new(Mutex::new(AppInner::new(tx, output_mode, scale)));
 
         //

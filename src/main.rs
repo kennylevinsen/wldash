@@ -3,7 +3,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::mpsc::channel;
+use std::{collections::HashMap, sync::mpsc::channel};
 
 use chrono::{Duration, Local};
 use nix::poll::{poll, PollFd, PollFlags};
@@ -19,6 +19,7 @@ mod configfmt;
 mod desktop;
 mod doublemempool;
 mod draw;
+mod fonts;
 mod widget;
 mod widgets;
 
@@ -26,6 +27,7 @@ use app::{App, OutputMode};
 use cmd::Cmd;
 use config::Config;
 use configfmt::ConfigFmt;
+use fonts::{FontLoader, FontMap, FontSeeker};
 use widget::WaitContext;
 
 enum Mode {
@@ -78,6 +80,19 @@ fn main() {
         .unwrap_or_default();
 
     let scale = config.scale;
+
+    let fonts: FontMap = {
+        let load_font = |font_name| {
+            let path = FontSeeker::from_string(font_name);
+            FontLoader::from_path(&path).expect(&format!("Loading {} failed", path.display()))
+        };
+
+        config
+            .fonts
+            .iter()
+            .map(|(key, val)| (key.clone(), load_font(val)))
+            .collect::<HashMap<_, _>>()
+    };
 
     let mut args = env::args();
     let _ = args.next();
@@ -159,17 +174,12 @@ fn main() {
 
     let (tx_draw, rx_draw) = channel();
     let tx_draw_mod = tx_draw.clone();
-    let (mod_tx, mod_rx) = channel();
-    std::thread::spawn(move || {
-        // Print, write to a file, or send to an HTTP server.
-        match config
-            .widget
-            .construct(Local::now().naive_local(), tx_draw_mod)
-        {
-            Some(w) => mod_tx.send(w).unwrap(),
-            None => panic!("no widget configured"),
-        }
-    });
+
+    // Print, write to a file, or send to an HTTP server.
+    let widget = config
+        .widget
+        .construct(Local::now().naive_local(), tx_draw_mod, &fonts)
+        .expect("no widget configured");
 
     let mut app = App::new(tx_draw, output_mode, background, scale);
     if daemon {
@@ -177,7 +187,6 @@ fn main() {
     } else {
         app.show();
     }
-    let widget = mod_rx.recv().unwrap();
     app.set_widget(widget).unwrap();
 
     let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();

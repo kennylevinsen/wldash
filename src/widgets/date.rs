@@ -1,18 +1,21 @@
 use crate::color::Color;
-use crate::draw::{Font, ROBOTO_REGULAR};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
+use crate::draw::Font;
+use crate::{
+    fonts::FontRef,
+    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+};
 
 use chrono::{Datelike, NaiveDateTime};
 
-pub struct Date {
+pub struct Date<'a> {
     cur_time: NaiveDateTime,
-    date_cache: Font,
+    date_cache: Font<'a>,
     size: f32,
 }
 
-impl Date {
-    pub fn new(time: NaiveDateTime, size: f32) -> Box<Date> {
-        let mut date_cache = Font::new(&ROBOTO_REGULAR, size);
+impl<'a> Date<'a> {
+    pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> Box<Date> {
+        let mut date_cache = Font::new(font, size);
         date_cache
             .add_str_to_cache("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,/ ");
 
@@ -24,7 +27,7 @@ impl Date {
     }
 }
 
-impl Widget for Date {
+impl<'a> Widget for Date<'a> {
     fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}

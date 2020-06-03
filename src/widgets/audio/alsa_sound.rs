@@ -1,6 +1,9 @@
 use crate::color::Color;
 use crate::widget::WaitContext;
-use crate::widgets::bar_widget::{BarWidget, BarWidgetImpl};
+use crate::{
+    fonts::FontRef,
+    widgets::bar_widget::{BarWidget, BarWidgetImpl},
+};
 
 use alsa::mixer::{Mixer, Selem, SelemChannelId, SelemId};
 
@@ -34,15 +37,20 @@ pub struct Alsa {
 }
 
 impl Alsa {
-    pub fn new(font_size: f32, length: u32) -> ::std::io::Result<Box<BarWidget>> {
+    pub fn new(font: FontRef, font_size: f32, length: u32) -> ::std::io::Result<Box<BarWidget>> {
         let mixer = Mixer::new(CARD_NAME, true)
             .map_err(|err| alsa_error_to_io_error("Failed to create ALSA mixer", &err))?;
         let mixer = Self { mixer };
         mixer.get_master_volume()?; // probing
-        Ok(BarWidget::new_simple(font_size, length, Box::new(mixer)))
+        Ok(BarWidget::new_simple(
+            font,
+            font_size,
+            length,
+            Box::new(mixer),
+        ))
     }
     #[inline]
-    pub fn get_master<'a>(&'a self) -> ::std::io::Result<Selem<'a>> {
+    pub fn get_master(&self) -> ::std::io::Result<Selem> {
         let master_id = SelemId::new(SELEM_NAME, SELEM_ID);
         match self.mixer.find_selem(&master_id) {
             Some(master) => Ok(master),

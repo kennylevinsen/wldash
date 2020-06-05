@@ -1,6 +1,9 @@
 use crate::color::Color;
 use crate::widget::WaitContext;
-use crate::{fonts::FontRef, widgets::bar_widget::{BarWidget, BarWidgetImpl}};
+use crate::{
+    fonts::FontRef,
+    widgets::bar_widget::{BarWidget, BarWidgetImpl},
+};
 
 use std::fs;
 use std::fs::OpenOptions;

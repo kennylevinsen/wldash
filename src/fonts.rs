@@ -3,9 +3,10 @@
 use fontconfig::Fontconfig as FontConfig;
 use rusttype::Font;
 use std::{
+    collections::HashMap,
     fs::File,
     io::Read,
-    path::{Path, PathBuf}, collections::HashMap,
+    path::{Path, PathBuf},
 };
 
 /// FontMap is used to store different font configurations
@@ -13,7 +14,6 @@ pub type FontMap = Box<HashMap<String, rusttype::Font<'static>>>;
 
 /// FontRef is used to store Fonts on widgets.
 pub type FontRef = Box<rusttype::Font<'static>>;
-
 
 /// FontSeeker is a marker struct that is used to look up fonts
 pub(crate) struct FontSeeker;

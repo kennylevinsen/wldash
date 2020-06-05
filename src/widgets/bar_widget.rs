@@ -1,6 +1,9 @@
 use crate::color::Color;
 use crate::draw::{draw_bar, draw_box, Font};
-use crate::{fonts::FontRef, widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget}};
+use crate::{
+    fonts::FontRef,
+    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+};
 
 use std::sync::{Arc, Mutex};
 

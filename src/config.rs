@@ -79,11 +79,12 @@ impl Widget {
         tx: Sender<Cmd>,
         fonts: FontMap,
     ) -> Option<Box<dyn widget::Widget + Send>> {
-        let get_font = |font_name: &str| {
-            match fonts.get(font_name) {
-                Some(f) => Box::new(f.clone()),
-                None => panic!(format!("Font {} is missing from the configuration", font_name)),
-            }
+        let get_font = |font_name: &str| match fonts.get(font_name) {
+            Some(f) => Box::new(f.clone()),
+            None => panic!(format!(
+                "Font {} is missing from the configuration",
+                font_name
+            )),
         };
 
         match self {
@@ -120,9 +121,11 @@ impl Widget {
                 get_font(&font.or(Some("sans".to_string())).unwrap()),
                 font_size,
             )),
-            Widget::Date { font, font_size } => {
-                Some(widgets::date::Date::new(time, get_font(&font.or(Some("sans".to_string())).unwrap()), font_size))
-            }
+            Widget::Date { font, font_size } => Some(widgets::date::Date::new(
+                time,
+                get_font(&font.or(Some("sans".to_string())).unwrap()),
+                font_size,
+            )),
             Widget::Calendar {
                 font_primary,
                 font_secondary,
@@ -155,9 +158,17 @@ impl Widget {
                     url_opener
                 },
             )),
-            Widget::Battery { font, font_size, length } => {
-                match widgets::battery::UpowerBattery::new(get_font(&font.or(Some("sans".to_string())).unwrap()), font_size, length, tx)
-                {
+            Widget::Battery {
+                font,
+                font_size,
+                length,
+            } => {
+                match widgets::battery::UpowerBattery::new(
+                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    font_size,
+                    length,
+                    tx,
+                ) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
@@ -173,21 +184,43 @@ impl Widget {
                 } else {
                     &device
                 };
-                match widgets::backlight::Backlight::new(d, get_font(&font.or(Some("sans".to_string())).unwrap()), font_size, length) {
+                match widgets::backlight::Backlight::new(
+                    d,
+                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    font_size,
+                    length,
+                ) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
             }
             #[cfg(feature = "pulseaudio-widget")]
-            Widget::PulseAudio { font, font_size, length } => {
-                match widgets::audio::PulseAudio::new(get_font(&font.or(Some("sans".to_string())).unwrap()), font_size, length, tx) {
+            Widget::PulseAudio {
+                font,
+                font_size,
+                length,
+            } => {
+                match widgets::audio::PulseAudio::new(
+                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    font_size,
+                    length,
+                    tx,
+                ) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
             }
             #[cfg(feature = "alsa-widget")]
-            Widget::AlsaSound { font, font_size, length } => {
-                match widgets::audio::Alsa::new(get_font(&font.or(Some("sans".to_string())).unwrap()), font_size, length) {
+            Widget::AlsaSound {
+                font,
+                font_size,
+                length,
+            } => {
+                match widgets::audio::Alsa::new(
+                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    font_size,
+                    length,
+                ) {
                     Ok(w) => Some(w),
                     Err(_) => None,
                 }
@@ -229,8 +262,14 @@ impl Default for Config {
                         Widget::Margin {
                             margins: (0, 88, 0, 32),
                             widget: Box::new(Widget::VerticalLayout(vec![
-                                Widget::Date { font: None, font_size: 64.0 },
-                                Widget::Clock { font: None, font_size: 256.0 },
+                                Widget::Date {
+                                    font: None,
+                                    font_size: 64.0,
+                                },
+                                Widget::Clock {
+                                    font: None,
+                                    font_size: 256.0,
+                                },
                             ])),
                         },
                         Widget::VerticalLayout(vec![

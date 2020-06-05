@@ -1,6 +1,9 @@
 use crate::color::Color;
 use crate::draw::Font;
-use crate::{fonts::FontRef, widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget}};
+use crate::{
+    fonts::FontRef,
+    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+};
 
 use chrono::{Datelike, NaiveDateTime};
 

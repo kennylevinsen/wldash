@@ -3,10 +3,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::{
-    collections::HashMap,
-    sync::mpsc::channel,
-};
+use std::{collections::HashMap, sync::mpsc::channel};
 
 use chrono::{Duration, Local};
 use nix::poll::{poll, PollFd, PollFlags};
@@ -30,7 +27,7 @@ use app::{App, OutputMode};
 use cmd::Cmd;
 use config::Config;
 use configfmt::ConfigFmt;
-use fonts::{FontLoader, FontSeeker, FontMap};
+use fonts::{FontLoader, FontMap, FontSeeker};
 use widget::WaitContext;
 
 enum Mode {
@@ -90,16 +87,12 @@ fn main() {
             FontLoader::from_path(&path).expect(&format!("Loading {} failed", path.display()))
         }
 
-
-
         let fonts = config
             .fonts
             .iter()
             .map(|(key, val)| (key.clone(), load_font(val)))
             .collect::<HashMap<_, _>>();
 
-        
-        
         Box::new(fonts)
     };
 

@@ -10,7 +10,7 @@ use std::{
 };
 
 /// FontMap is used to store different font configurations
-pub type FontMap = Box<HashMap<String, rusttype::Font<'static>>>;
+pub type FontMap = HashMap<String, rusttype::Font<'static>>;
 
 /// FontRef is used to store Fonts on widgets.
 pub type FontRef = Box<rusttype::Font<'static>>;

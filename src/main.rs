@@ -87,13 +87,11 @@ fn main() {
             FontLoader::from_path(&path).expect(&format!("Loading {} failed", path.display()))
         }
 
-        let fonts = config
+        config
             .fonts
             .iter()
             .map(|(key, val)| (key.clone(), load_font(val)))
-            .collect::<HashMap<_, _>>();
-
-        Box::new(fonts)
+            .collect::<HashMap<_, _>>()
     };
 
     let mut args = env::args();

@@ -79,7 +79,12 @@ impl Widget {
         tx: Sender<Cmd>,
         fonts: FontMap,
     ) -> Option<Box<dyn widget::Widget + Send>> {
-        let get_font = |font_name: &str| Box::new(fonts.get(font_name).unwrap().clone());
+        let get_font = |font_name: &str| {
+            match fonts.get(font_name) {
+                Some(f) => Box::new(f.clone()),
+                None => panic!(format!("Font {} is missing from the configuration", font_name)),
+            }
+        };
 
         match self {
             Widget::Margin { margins, widget } => match widget.construct(time, tx, fonts) {

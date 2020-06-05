@@ -3,7 +3,10 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::os::unix::io::AsRawFd;
 use std::os::unix::net::{UnixListener, UnixStream};
-use std::sync::mpsc::channel;
+use std::{
+    collections::HashMap,
+    sync::mpsc::channel,
+};
 
 use chrono::{Duration, Local};
 use nix::poll::{poll, PollFd, PollFlags};
@@ -19,14 +22,15 @@ mod configfmt;
 mod desktop;
 mod doublemempool;
 mod draw;
+mod fonts;
 mod widget;
 mod widgets;
-mod fonts;
 
 use app::{App, OutputMode};
 use cmd::Cmd;
 use config::Config;
 use configfmt::ConfigFmt;
+use fonts::{FontLoader, FontSeeker, FontMap};
 use widget::WaitContext;
 
 enum Mode {
@@ -79,6 +83,25 @@ fn main() {
         .unwrap_or_default();
 
     let scale = config.scale;
+
+    let fonts: FontMap = {
+        fn load_font(font_name: &str) -> rusttype::Font<'static> {
+            let path = FontSeeker::from_string(font_name);
+            FontLoader::from_path(&path).expect(&format!("Loading {} failed", path.display()))
+        }
+
+
+
+        let fonts = config
+            .fonts
+            .iter()
+            .map(|(key, val)| (key.clone(), load_font(val)))
+            .collect::<HashMap<_, _>>();
+
+        
+        
+        Box::new(fonts)
+    };
 
     let mut args = env::args();
     let _ = args.next();
@@ -165,7 +188,7 @@ fn main() {
         // Print, write to a file, or send to an HTTP server.
         match config
             .widget
-            .construct(Local::now().naive_local(), tx_draw_mod)
+            .construct(Local::now().naive_local(), tx_draw_mod, fonts)
         {
             Some(w) => mod_tx.send(w).unwrap(),
             None => panic!("no widget configured"),

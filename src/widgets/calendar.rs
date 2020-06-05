@@ -1,7 +1,7 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::draw::{Font, MONO, SANS};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
+use crate::draw::Font;
+use crate::{fonts::FontRef, widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget}};
 
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 
@@ -153,14 +153,20 @@ impl Calendar {
 }
 
 impl Calendar {
-    pub fn new(time: NaiveDateTime, font_size: f32, sections: u32) -> Box<Calendar> {
-        let mut calendar_cache = Font::new(&MONO, font_size * 2.0);
+    pub fn new(
+        time: NaiveDateTime,
+        font_primary: FontRef,
+        font_secondary: FontRef,
+        font_size: f32,
+        sections: u32,
+    ) -> Box<Calendar> {
+        let mut calendar_cache = Font::new(font_secondary, font_size * 2.0);
         calendar_cache.add_str_to_cache("0123456789");
-        let mut month_cache = Font::new(&SANS, font_size * 4.0);
+        let mut month_cache = Font::new(font_primary.clone(), font_size * 4.0);
         month_cache.add_str_to_cache("JanuryFebMchApilJgstSmOoNvD");
-        let mut year_cache = Font::new(&MONO, font_size * 1.5);
+        let mut year_cache = Font::new(font_primary.clone(), font_size * 1.5);
         year_cache.add_str_to_cache("-0123456789");
-        let mut day_cache = Font::new(&MONO, font_size);
+        let mut day_cache = Font::new(font_primary, font_size);
         day_cache.add_str_to_cache("MONTUEWDHFRISA");
         Box::new(Calendar {
             cur_date: time.date(),

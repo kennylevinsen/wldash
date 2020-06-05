@@ -1,8 +1,19 @@
-//! Utility functions for fonts
+//! Utility module for fonts
 
-use rusttype::Font;
 use fontconfig::Fontconfig as FontConfig;
-use std::{fs::File, path::{PathBuf, Path}, io::Read};
+use rusttype::Font;
+use std::{
+    fs::File,
+    io::Read,
+    path::{Path, PathBuf}, collections::HashMap,
+};
+
+/// FontMap is used to store different font configurations
+pub type FontMap = Box<HashMap<String, rusttype::Font<'static>>>;
+
+/// FontRef is used to store Fonts on widgets.
+pub type FontRef = Box<rusttype::Font<'static>>;
+
 
 /// FontSeeker is a marker struct that is used to look up fonts
 pub(crate) struct FontSeeker;
@@ -22,7 +33,9 @@ pub(crate) struct FontLoader;
 impl FontLoader {
     /// Given a path, loads it as a Font, which can be rendered to the screen.
     pub(crate) fn from_path<P>(path: P) -> Result<Font<'static>, rusttype::Error>
-    where P: AsRef<Path> {
+    where
+        P: AsRef<Path>,
+    {
         let mut file = File::open(path).expect("Font file not found");
         let mut data = match file.metadata() {
             Ok(metadata) => Vec::with_capacity(metadata.len() as usize),

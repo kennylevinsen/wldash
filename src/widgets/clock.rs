@@ -1,6 +1,6 @@
 use crate::color::Color;
-use crate::draw::{Font, SANS};
-use crate::widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget};
+use crate::draw::Font;
+use crate::{fonts::FontRef, widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget}};
 
 use chrono::{Duration, NaiveDateTime, Timelike};
 
@@ -11,8 +11,8 @@ pub struct Clock {
 }
 
 impl Clock {
-    pub fn new(time: NaiveDateTime, size: f32) -> Box<Clock> {
-        let mut clock_cache = Font::new(&SANS, size);
+    pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> Box<Clock> {
+        let mut clock_cache = Font::new(font, size);
         clock_cache.add_str_to_cache("0123456789:");
 
         Box::new(Clock {

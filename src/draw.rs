@@ -1,17 +1,8 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
 
-use crate::fonts::{FontLoader, FontSeeker};
-
-use std::collections::HashMap;
 use rusttype::{point, Font as RustFont, Scale};
-
-use lazy_static::lazy_static;
-
-lazy_static!{
-    pub static ref MONO: RustFont<'static> = FontLoader::from_path(FontSeeker::from_string("mono")).unwrap();
-    pub static ref SANS: RustFont<'static> = FontLoader::from_path(FontSeeker::from_string("sans")).unwrap();
-}
+use std::collections::HashMap;
 
 struct CachedGlyph {
     dimensions: (u32, u32),
@@ -20,7 +11,7 @@ struct CachedGlyph {
 }
 
 impl CachedGlyph {
-    fn new(font: &RustFont, size: f32, ch: char) -> CachedGlyph {
+    fn new(font: Box<RustFont>, size: f32, ch: char) -> CachedGlyph {
         let scale = Scale::uniform(size);
         let v_metrics = font.v_metrics(scale);
         let glyph = font
@@ -78,12 +69,12 @@ impl CachedGlyph {
 
 pub struct Font {
     glyphs: HashMap<char, CachedGlyph>,
-    font: &'static RustFont<'static>,
+    font: Box<RustFont<'static>>,
     size: f32,
 }
 
 impl Font {
-    pub fn new(font: &'static RustFont, size: f32) -> Font {
+    pub fn new(font: Box<RustFont<'static>>, size: f32) -> Font {
         Font {
             glyphs: HashMap::new(),
             font,
@@ -94,7 +85,7 @@ impl Font {
     pub fn add_str_to_cache(&mut self, s: &str) {
         for ch in s.chars() {
             if self.glyphs.get(&ch).is_none() {
-                let glyph = CachedGlyph::new(self.font, self.size, ch);
+                let glyph = CachedGlyph::new(self.font.clone(), self.size, ch);
                 self.glyphs.insert(ch, glyph);
             }
         }

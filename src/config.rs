@@ -118,12 +118,12 @@ impl Widget {
             )),
             Widget::Clock { font, font_size } => Some(widgets::clock::Clock::new(
                 time,
-                get_font(&font.or(Some("sans".to_string())).unwrap()),
+                get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
                 font_size,
             )),
             Widget::Date { font, font_size } => Some(widgets::date::Date::new(
                 time,
-                get_font(&font.or(Some("sans".to_string())).unwrap()),
+                get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
                 font_size,
             )),
             Widget::Calendar {
@@ -133,8 +133,8 @@ impl Widget {
                 sections,
             } => Some(widgets::calendar::Calendar::new(
                 time,
-                get_font(&font_primary.or(Some("sans".to_string())).unwrap()),
-                get_font(&font_secondary.or(Some("mono".to_string())).unwrap()),
+                get_font(&font_primary.or_else(|| Some("sans".to_string())).unwrap()),
+                get_font(&font_secondary.or_else(|| Some("mono".to_string())).unwrap()),
                 font_size,
                 sections,
             )),
@@ -146,7 +146,7 @@ impl Widget {
                 term_opener,
                 url_opener,
             } => Some(widgets::launcher::Launcher::new(
-                get_font(&font.or(Some("sans".to_string())).unwrap()),
+                get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
                 font_size,
                 length,
                 tx,
@@ -164,7 +164,7 @@ impl Widget {
                 length,
             } => {
                 match widgets::battery::UpowerBattery::new(
-                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
                     font_size,
                     length,
                     tx,
@@ -186,7 +186,7 @@ impl Widget {
                 };
                 match widgets::backlight::Backlight::new(
                     d,
-                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
                     font_size,
                     length,
                 ) {
@@ -201,7 +201,7 @@ impl Widget {
                 length,
             } => {
                 match widgets::audio::PulseAudio::new(
-                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
                     font_size,
                     length,
                     tx,
@@ -217,7 +217,7 @@ impl Widget {
                 length,
             } => {
                 match widgets::audio::Alsa::new(
-                    get_font(&font.or(Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
                     font_size,
                     length,
                 ) {

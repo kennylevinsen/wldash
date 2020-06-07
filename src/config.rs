@@ -1,13 +1,13 @@
 use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::widget;
-use crate::{fonts::FontMap, widgets};
+use crate::{fonts::{FontRef, FontMap}, widgets};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
 use std::{collections::HashMap, sync::mpsc::Sender};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum Widget {
     Margin {
@@ -77,16 +77,8 @@ impl Widget {
         self,
         time: NaiveDateTime,
         tx: Sender<Cmd>,
-        fonts: FontMap,
+        fonts: &'static FontMap,
     ) -> Option<Box<dyn widget::Widget + Send>> {
-        let get_font = |font_name: &str| match fonts.get(font_name) {
-            Some(f) => Box::new(f.clone()),
-            None => panic!(format!(
-                "Font {} is missing from the configuration",
-                font_name
-            )),
-        };
-
         match self {
             Widget::Margin { margins, widget } => match widget.construct(time, tx, fonts) {
                 Some(w) => Some(widget::Margin::new(margins, w)),
@@ -103,7 +95,7 @@ impl Widget {
             Widget::HorizontalLayout(widgets) => Some(widget::HorizontalLayout::new(
                 widgets
                     .into_iter()
-                    .map(|x| x.construct(time, tx.clone(), fonts.clone()))
+                    .map(|x| x.construct(time, tx.clone(), fonts))
                     .filter(|x| x.is_some())
                     .map(|x| x.unwrap())
                     .collect(),
@@ -111,19 +103,19 @@ impl Widget {
             Widget::VerticalLayout(widgets) => Some(widget::VerticalLayout::new(
                 widgets
                     .into_iter()
-                    .map(|x| x.construct(time, tx.clone(), fonts.clone()))
+                    .map(|x| x.construct(time, tx.clone(), fonts))
                     .filter(|x| x.is_some())
                     .map(|x| x.unwrap())
                     .collect(),
             )),
             Widget::Clock { font, font_size } => Some(widgets::clock::Clock::new(
                 time,
-                get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
+                get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                 font_size,
             )),
             Widget::Date { font, font_size } => Some(widgets::date::Date::new(
                 time,
-                get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
+                get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                 font_size,
             )),
             Widget::Calendar {
@@ -133,8 +125,8 @@ impl Widget {
                 sections,
             } => Some(widgets::calendar::Calendar::new(
                 time,
-                get_font(&font_primary.or_else(|| Some("sans".to_string())).unwrap()),
-                get_font(&font_secondary.or_else(|| Some("mono".to_string())).unwrap()),
+                get_font(&font_primary.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
+                get_font(&font_secondary.or_else(|| Some("mono".to_string())).unwrap(), &fonts),
                 font_size,
                 sections,
             )),
@@ -146,7 +138,7 @@ impl Widget {
                 term_opener,
                 url_opener,
             } => Some(widgets::launcher::Launcher::new(
-                get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
+                get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                 font_size,
                 length,
                 tx,
@@ -164,7 +156,7 @@ impl Widget {
                 length,
             } => {
                 match widgets::battery::UpowerBattery::new(
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                     font_size,
                     length,
                     tx,
@@ -186,7 +178,7 @@ impl Widget {
                 };
                 match widgets::backlight::Backlight::new(
                     d,
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                     font_size,
                     length,
                 ) {
@@ -201,7 +193,7 @@ impl Widget {
                 length,
             } => {
                 match widgets::audio::PulseAudio::new(
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                     font_size,
                     length,
                     tx,
@@ -217,7 +209,7 @@ impl Widget {
                 length,
             } => {
                 match widgets::audio::Alsa::new(
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap()),
+                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                     font_size,
                     length,
                 ) {
@@ -327,5 +319,16 @@ impl Default for Config {
                 map
             },
         }
+    }
+}
+
+#[inline]
+fn get_font(name: &str, map: &'static FontMap) -> FontRef {
+    match map.get(name) {
+        Some(f) => f,
+        None => panic!(format!(
+            "Font {} is missing from the config", 
+            name
+        )),
     }
 }

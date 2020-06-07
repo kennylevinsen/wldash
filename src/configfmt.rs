@@ -1,6 +1,7 @@
 use serde::{de::DeserializeOwned, Serialize};
 use std::io::BufRead;
 
+
 pub enum ConfigFmt {
     #[cfg(feature = "yaml-cfg")]
     Yaml,

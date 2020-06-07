@@ -13,7 +13,7 @@ use std::{
 pub type FontMap = HashMap<String, rusttype::Font<'static>>;
 
 /// FontRef is used to store Fonts on widgets.
-pub type FontRef = Box<rusttype::Font<'static>>;
+pub type FontRef = &'static rusttype::Font<'static>;
 
 /// FontSeeker is a marker struct that is used to look up fonts
 pub(crate) struct FontSeeker;
@@ -32,7 +32,7 @@ pub(crate) struct FontLoader;
 
 impl FontLoader {
     /// Given a path, loads it as a Font, which can be rendered to the screen.
-    pub(crate) fn from_path<P>(path: P) -> Result<Font<'static>, rusttype::Error>
+    pub(crate) fn from_path<P>(path: P) -> Option<Font<'static>>
     where
         P: AsRef<Path>,
     {
@@ -42,6 +42,6 @@ impl FontLoader {
             Err(_) => vec![],
         };
         file.read_to_end(&mut data).unwrap();
-        Font::from_bytes(data)
+        Font::try_from_vec(data)
     }
 }

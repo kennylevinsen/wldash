@@ -15,7 +15,7 @@ pub struct Date {
 
 impl Date {
     pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> Box<Date> {
-        let mut date_cache = Font::new(font.clone(), size);
+        let mut date_cache = Font::new(font, size);
         date_cache
             .add_str_to_cache("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,/ ");
 

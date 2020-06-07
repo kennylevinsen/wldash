@@ -179,7 +179,7 @@ fn main() {
         // Print, write to a file, or send to an HTTP server.
         match config
             .widget
-            .construct(Local::now().naive_local(), tx_draw_mod, fonts)
+            .construct(Local::now().naive_local(), tx_draw_mod, &fonts)
         {
             Some(w) => mod_tx.send(w).unwrap(),
             None => panic!("no widget configured"),

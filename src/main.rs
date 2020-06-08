@@ -175,7 +175,6 @@ fn main() {
     let (tx_draw, rx_draw) = channel();
     let tx_draw_mod = tx_draw.clone();
     let (mod_tx, mod_rx) = channel();
-    // let fonts = &fonts;
     std::thread::spawn(move || {
         // Print, write to a file, or send to an HTTP server.
         match config

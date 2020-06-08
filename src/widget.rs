@@ -69,18 +69,18 @@ pub trait Widget {
     fn mouse_scroll(&mut self, scroll: (f64, f64), pos: (u32, u32));
 }
 
-pub struct VerticalLayout {
-    pub children: Vec<Box<dyn Widget + Send>>,
+pub struct VerticalLayout<'a> {
+    pub children: Vec<Box<dyn Widget + Send + 'a>>,
 }
 
 #[allow(dead_code)]
-impl VerticalLayout {
-    pub fn new(children: Vec<Box<dyn Widget + Send>>) -> Box<VerticalLayout> {
+impl<'a> VerticalLayout<'a> {
+    pub fn new(children: Vec<Box<dyn Widget + Send + 'a>>) -> Box<VerticalLayout> {
         Box::new(VerticalLayout { children })
     }
 }
 
-impl Widget for VerticalLayout {
+impl<'a> Widget for VerticalLayout<'a> {
     fn wait(&mut self, ctx: &mut WaitContext) {
         for child in &mut self.children {
             child.wait(ctx);
@@ -180,18 +180,18 @@ impl Widget for VerticalLayout {
     }
 }
 
-pub struct HorizontalLayout {
-    pub children: Vec<Box<dyn Widget + Send>>,
+pub struct HorizontalLayout<'a> {
+    pub children: Vec<Box<dyn Widget + Send + 'a>>,
 }
 
 #[allow(dead_code)]
-impl HorizontalLayout {
-    pub fn new(children: Vec<Box<dyn Widget + Send>>) -> Box<HorizontalLayout> {
+impl<'a> HorizontalLayout<'a> {
+    pub fn new(children: Vec<Box<dyn Widget + Send + 'a>>) -> Box<HorizontalLayout> {
         Box::new(HorizontalLayout { children })
     }
 }
 
-impl Widget for HorizontalLayout {
+impl<'a> Widget for HorizontalLayout<'a> {
     fn wait(&mut self, ctx: &mut WaitContext) {
         for child in &mut self.children {
             child.wait(ctx);
@@ -293,19 +293,19 @@ impl Widget for HorizontalLayout {
     }
 }
 
-pub struct Margin {
-    pub child: Box<dyn Widget + Send>,
+pub struct Margin<'a> {
+    pub child: Box<dyn Widget + Send + 'a>,
     pub margins: (u32, u32, u32, u32), // left, right, top, bottom
 }
 
 #[allow(dead_code)]
-impl Margin {
-    pub fn new(margins: (u32, u32, u32, u32), child: Box<dyn Widget + Send>) -> Box<Margin> {
+impl<'a> Margin<'a> {
+    pub fn new(margins: (u32, u32, u32, u32), child: Box<dyn Widget + Send + 'a>) -> Box<Margin> {
         Box::new(Margin { child, margins })
     }
 }
 
-impl Widget for Margin {
+impl<'a> Widget for Margin<'a> {
     fn wait(&mut self, ctx: &mut WaitContext) {
         self.child.wait(ctx)
     }
@@ -367,19 +367,19 @@ impl Widget for Margin {
     }
 }
 
-pub struct Fixed {
-    pub child: Box<dyn Widget + Send>,
+pub struct Fixed<'a> {
+    pub child: Box<dyn Widget + Send + 'a>,
     pub size: (u32, u32),
 }
 
 #[allow(dead_code)]
-impl Fixed {
-    pub fn new(size: (u32, u32), child: Box<dyn Widget + Send>) -> Box<Fixed> {
+impl<'a> Fixed<'a> {
+    pub fn new(size: (u32, u32), child: Box<dyn Widget + Send + 'a>) -> Box<Fixed> {
         Box::new(Fixed { child, size })
     }
 }
 
-impl Widget for Fixed {
+impl<'a> Widget for Fixed<'a> {
     fn wait(&mut self, ctx: &mut WaitContext) {
         self.child.wait(ctx)
     }

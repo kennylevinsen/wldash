@@ -67,14 +67,14 @@ impl CachedGlyph {
     }
 }
 
-pub struct Font {
+pub struct Font<'a> {
     glyphs: HashMap<char, CachedGlyph>,
-    font: FontRef,
+    font: FontRef<'a>,
     size: f32,
 }
 
-impl Font {
-    pub fn new(font: FontRef, size: f32) -> Font {
+impl<'a> Font<'a> {
+    pub fn new(font: FontRef<'a>, size: f32) -> Font {
         Font {
             glyphs: HashMap::new(),
             font,

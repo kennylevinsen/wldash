@@ -17,15 +17,15 @@ pub trait BarWidgetImpl {
     fn toggle(&mut self);
 }
 
-pub struct BarWidget {
+pub struct BarWidget<'a> {
     bar_impl: Box<dyn BarWidgetImpl + Send>,
-    font: Font,
+    font: Font<'a>,
     font_size: u32,
     length: u32,
     dirty: Arc<Mutex<bool>>,
 }
 
-impl BarWidget {
+impl<'a> BarWidget<'a> {
     pub fn new_simple(
         font: FontRef,
         font_size: f32,
@@ -45,14 +45,14 @@ impl BarWidget {
     }
 
     pub fn new<F>(
-        font: FontRef,
+        font: FontRef<'a>,
         font_size: f32,
         length: u32,
         f: F,
     ) -> Result<Box<BarWidget>, ::std::io::Error>
     where
         F: FnOnce(Arc<Mutex<bool>>) -> Result<Box<dyn BarWidgetImpl + Send>, ::std::io::Error>,
-        F: Send + 'static + Clone,
+        F: Send + 'a + Clone,
     {
         let dirty = Arc::new(Mutex::new(true));
         let im = f(dirty.clone())?;
@@ -70,7 +70,7 @@ impl BarWidget {
     }
 }
 
-impl Widget for BarWidget {
+impl<'a> Widget for BarWidget<'a> {
     fn wait(&mut self, ctx: &mut WaitContext) {
         self.bar_impl.wait(ctx);
     }

@@ -7,13 +7,13 @@ use crate::{
 
 use chrono::{Datelike, NaiveDateTime};
 
-pub struct Date {
+pub struct Date<'a> {
     cur_time: NaiveDateTime,
-    date_cache: Font,
+    date_cache: Font<'a>,
     size: f32,
 }
 
-impl Date {
+impl<'a> Date<'a> {
     pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> Box<Date> {
         let mut date_cache = Font::new(font, size);
         date_cache
@@ -27,7 +27,7 @@ impl Date {
     }
 }
 
-impl Widget for Date {
+impl<'a> Widget for Date<'a> {
     fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}

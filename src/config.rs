@@ -73,12 +73,12 @@ pub enum Widget {
 }
 
 impl Widget {
-    pub fn construct(
+    pub fn construct<'a>(
         self,
         time: NaiveDateTime,
         tx: Sender<Cmd>,
-        fonts: &'static FontMap,
-    ) -> Option<Box<dyn widget::Widget + Send>> {
+        fonts: &'a FontMap,
+    ) -> Option<Box<dyn widget::Widget + Send + 'a>> {
         match self {
             Widget::Margin { margins, widget } => match widget.construct(time, tx, fonts) {
                 Some(w) => Some(widget::Margin::new(margins, w)),
@@ -323,7 +323,7 @@ impl Default for Config {
 }
 
 #[inline]
-fn get_font(name: &str, map: &'static FontMap) -> FontRef {
+fn get_font<'a>(name: &str, map: &'a FontMap) -> FontRef<'a> {
     match map.get(name) {
         Some(f) => f,
         None => panic!(format!(

@@ -50,7 +50,7 @@ impl Alsa {
         ))
     }
     #[inline]
-    pub fn get_master<'a>(&'a self) -> ::std::io::Result<Selem<'a>> {
+    pub fn get_master(&self) -> ::std::io::Result<Selem> {
         let master_id = SelemId::new(SELEM_NAME, SELEM_ID);
         match self.mixer.find_selem(&master_id) {
             Some(master) => Ok(master),

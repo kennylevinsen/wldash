@@ -82,10 +82,10 @@ fn main() {
     let scale = config.scale;
 
     let fonts: FontMap = {
-        fn load_font(font_name: &str) -> rusttype::Font<'static> {
+        let load_font = |font_name | {
             let path = FontSeeker::from_string(font_name);
             FontLoader::from_path(&path).expect(&format!("Loading {} failed", path.display()))
-        }
+        };
 
         config
             .fonts
@@ -175,6 +175,7 @@ fn main() {
     let (tx_draw, rx_draw) = channel();
     let tx_draw_mod = tx_draw.clone();
     let (mod_tx, mod_rx) = channel();
+    // let fonts = &fonts;
     std::thread::spawn(move || {
         // Print, write to a file, or send to an HTTP server.
         match config

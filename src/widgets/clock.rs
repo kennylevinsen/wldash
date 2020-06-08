@@ -7,13 +7,13 @@ use crate::{
 
 use chrono::{Duration, NaiveDateTime, Timelike};
 
-pub struct Clock {
+pub struct Clock<'a> {
     cur_time: NaiveDateTime,
-    clock_cache: Font,
+    clock_cache: Font<'a>,
     size: f32,
 }
 
-impl Clock {
+impl<'a> Clock<'a> {
     pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> Box<Clock> {
         let mut clock_cache = Font::new(font, size);
         clock_cache.add_str_to_cache("0123456789:");
@@ -26,7 +26,7 @@ impl Clock {
     }
 }
 
-impl Widget for Clock {
+impl<'a> Widget for Clock<'a> {
     fn wait(&mut self, ctx: &mut WaitContext) {
         let target = (self.cur_time + Duration::seconds(60))
             .with_second(0)

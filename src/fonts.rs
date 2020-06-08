@@ -10,10 +10,10 @@ use std::{
 };
 
 /// FontMap is used to store different font configurations
-pub type FontMap = HashMap<String, rusttype::Font<'static>>;
+pub type FontMap<'a> = HashMap<String, rusttype::Font<'a>>;
 
 /// FontRef is used to store Fonts on widgets.
-pub type FontRef = &'static rusttype::Font<'static>;
+pub type FontRef<'a> = &'a rusttype::Font<'a>;
 
 /// FontSeeker is a marker struct that is used to look up fonts
 pub(crate) struct FontSeeker;
@@ -32,7 +32,7 @@ pub(crate) struct FontLoader;
 
 impl FontLoader {
     /// Given a path, loads it as a Font, which can be rendered to the screen.
-    pub(crate) fn from_path<P>(path: P) -> Option<Font<'static>>
+    pub(crate) fn from_path<'a, P>(path: P) -> Option<Font<'a>>
     where
         P: AsRef<Path>,
     {

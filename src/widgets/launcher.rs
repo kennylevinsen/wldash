@@ -17,7 +17,7 @@ use std::sync::mpsc::Sender;
 use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
 
-pub struct Launcher {
+pub struct Launcher<'a> {
     options: Vec<Desktop>,
     term_opener: String,
     app_opener: String,
@@ -26,14 +26,14 @@ pub struct Launcher {
     input: String,
     result: Option<String>,
     offset: usize,
-    font: RefCell<Font>,
+    font: RefCell<Font<'a>>,
     font_size: u32,
     length: u32,
     dirty: bool,
     tx: Sender<Cmd>,
 }
 
-impl Launcher {
+impl<'a> Launcher<'a> {
     pub fn new(
         font: FontRef,
         font_size: f32,
@@ -248,7 +248,7 @@ impl Matcher {
     }
 }
 
-impl Widget for Launcher {
+impl<'a> Widget for Launcher<'a> {
     fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {

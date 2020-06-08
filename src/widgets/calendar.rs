@@ -8,19 +8,19 @@ use crate::{
 
 use chrono::{Datelike, NaiveDate, NaiveDateTime};
 
-pub struct Calendar {
+pub struct Calendar<'a> {
     cur_date: NaiveDate,
     dirty: bool,
     offset: f64,
     sections: u32,
     font_size: u32,
-    calendar_cache: Font,
-    month_cache: Font,
-    year_cache: Font,
-    day_cache: Font,
+    calendar_cache: Font<'a>,
+    month_cache: Font<'a>,
+    year_cache: Font<'a>,
+    day_cache: Font<'a>,
 }
 
-impl Calendar {
+impl<'a> Calendar<'a> {
     fn draw_month(
         &self,
         buf: &mut Buffer,
@@ -155,14 +155,14 @@ impl Calendar {
     }
 }
 
-impl Calendar {
+impl<'a> Calendar<'a> {
     pub fn new(
         time: NaiveDateTime,
-        font_primary: FontRef,
-        font_secondary: FontRef,
+        font_primary: FontRef<'a>,
+        font_secondary: FontRef<'a>,
         font_size: f32,
         sections: u32,
-    ) -> Box<Calendar> {
+    ) -> Box<Calendar<'a>> {
         let mut calendar_cache = Font::new(font_secondary, font_size * 2.0);
         calendar_cache.add_str_to_cache("0123456789");
         let mut month_cache = Font::new(font_primary, font_size * 4.0);
@@ -185,7 +185,7 @@ impl Calendar {
     }
 }
 
-impl Widget for Calendar {
+impl<'a> Widget for Calendar<'a> {
     fn wait(&mut self, _: &mut WaitContext) {}
     fn enter(&mut self) {}
     fn leave(&mut self) {}

@@ -1,7 +1,10 @@
 use crate::cmd::Cmd;
 use crate::color::Color;
 use crate::widget;
-use crate::{fonts::{FontRef, FontMap}, widgets};
+use crate::{
+    fonts::{FontMap, FontRef},
+    widgets,
+};
 use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use std::default::Default;
@@ -125,8 +128,14 @@ impl Widget {
                 sections,
             } => Some(widgets::calendar::Calendar::new(
                 time,
-                get_font(&font_primary.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
-                get_font(&font_secondary.or_else(|| Some("mono".to_string())).unwrap(), &fonts),
+                get_font(
+                    &font_primary.or_else(|| Some("sans".to_string())).unwrap(),
+                    &fonts,
+                ),
+                get_font(
+                    &font_secondary.or_else(|| Some("mono".to_string())).unwrap(),
+                    &fonts,
+                ),
                 font_size,
                 sections,
             )),
@@ -326,9 +335,6 @@ impl Default for Config {
 fn get_font<'a>(name: &str, map: &'a FontMap) -> FontRef<'a> {
     match map.get(name) {
         Some(f) => f,
-        None => panic!(format!(
-            "Font {} is missing from the config", 
-            name
-        )),
+        None => panic!(format!("Font {} is missing from the config", name)),
     }
 }

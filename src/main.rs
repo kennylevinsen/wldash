@@ -82,7 +82,7 @@ fn main() {
     let scale = config.scale;
 
     let fonts: FontMap = {
-        let load_font = |font_name | {
+        let load_font = |font_name| {
             let path = FontSeeker::from_string(font_name);
             FontLoader::from_path(&path).expect(&format!("Loading {} failed", path.display()))
         };
@@ -175,16 +175,21 @@ fn main() {
     let (tx_draw, rx_draw) = channel();
     let tx_draw_mod = tx_draw.clone();
     let (mod_tx, mod_rx) = channel();
-    std::thread::spawn(move || {
-        // Print, write to a file, or send to an HTTP server.
-        match config
-            .widget
-            .construct(Local::now().naive_local(), tx_draw_mod, &fonts)
-        {
-            Some(w) => mod_tx.send(w).unwrap(),
-            None => panic!("no widget configured"),
-        }
-    });
+
+    crossbeam::scope(|scope| {
+        let fonts = &fonts;
+        scope.spawn(move |_| {
+            // Print, write to a file, or send to an HTTP server.
+            match config
+                .widget
+                .construct(Local::now().naive_local(), tx_draw_mod, &fonts)
+            {
+                Some(w) => mod_tx.send(w).unwrap(),
+                None => panic!("no widget configured"),
+            }
+        });
+    })
+    .unwrap();
 
     let mut app = App::new(tx_draw, output_mode, background, scale);
     if daemon {

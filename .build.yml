@@ -3,6 +3,7 @@ packages:
   - rust
   - libpulse
   - alsa-lib
+  - fontconfig
 sources:
   - https://git.sr.ht/~kennylevinsen/wldash
 tasks:

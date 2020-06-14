@@ -272,6 +272,7 @@ impl<'a> App<'a> {
                 force,
             },
             (0, 0),
+            size,
         )?;
 
         mmap.flush().unwrap();

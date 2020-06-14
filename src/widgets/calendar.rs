@@ -203,6 +203,7 @@ impl<'a> Widget for Calendar<'a> {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        _expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
         let (width, height) = self.size();
         if ctx.time.date() == self.cur_date && !ctx.force && !self.dirty {

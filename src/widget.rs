@@ -56,6 +56,7 @@ pub trait Widget {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error>;
 
     fn keyboard_input(
@@ -115,16 +116,20 @@ impl<'a> Widget for VerticalLayout<'a> {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
-        let mut offset = pos.1;
+        let mut offset = 0;
         let mut width = 0;
         let mut damage = Vec::new();
         let mut full_damage = false;
-
         for child in &mut self.children {
-            let mut report = child.draw(ctx, (pos.0, offset))?;
+            let mut report = child.draw(
+                ctx,
+                (pos.0, offset + pos.1),
+                (expansion.0, expansion.1 - offset),
+            )?;
             if report.width > width {
-                width = report.width;
+                width = report.width
             }
             offset += report.height;
             full_damage |= report.full_damage;
@@ -133,7 +138,7 @@ impl<'a> Widget for VerticalLayout<'a> {
 
         Ok(DrawReport {
             width,
-            height: offset - pos.1,
+            height: offset,
             damage,
             full_damage,
         })
@@ -189,6 +194,19 @@ impl<'a> HorizontalLayout<'a> {
     pub fn new(children: Vec<Box<dyn Widget + Send + 'a>>) -> Box<HorizontalLayout> {
         Box::new(HorizontalLayout { children })
     }
+
+    fn height(&self) -> u32 {
+        let mut height = 0;
+
+        for child in &self.children {
+            let size = child.size();
+            if size.1 > height {
+                height = size.1;
+            }
+        }
+
+        height
+    }
 }
 
 impl<'a> Widget for HorizontalLayout<'a> {
@@ -226,16 +244,20 @@ impl<'a> Widget for HorizontalLayout<'a> {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
-        let mut offset = pos.0;
+        let mut offset = 0;
         let mut height = 0;
         let mut damage = Vec::new();
         let mut full_damage = false;
-
         for child in &mut self.children {
-            let mut report = child.draw(ctx, (offset, pos.1))?;
+            let mut report = child.draw(
+                ctx,
+                (offset + pos.0, pos.1),
+                (expansion.0 - offset, expansion.1),
+            )?;
             if report.height > height {
-                height = report.height;
+                height = report.height
             }
             offset += report.width;
             full_damage |= report.full_damage;
@@ -243,7 +265,7 @@ impl<'a> Widget for HorizontalLayout<'a> {
         }
 
         Ok(DrawReport {
-            width: offset - pos.0,
+            width: offset,
             height,
             damage,
             full_damage,
@@ -327,10 +349,17 @@ impl<'a> Widget for Margin<'a> {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
-        let report = self
-            .child
-            .draw(ctx, (pos.0 + self.margins.0, pos.1 + self.margins.2))?;
+        let expansion = (
+            expansion.0 - self.margins.0 - self.margins.1,
+            expansion.1 - self.margins.2 - self.margins.3,
+        );
+        let report = self.child.draw(
+            ctx,
+            (pos.0 + self.margins.0, pos.1 + self.margins.2),
+            expansion,
+        )?;
         Ok(DrawReport {
             width: report.width + self.margins.0 + self.margins.1,
             height: report.height + self.margins.2 + self.margins.3,
@@ -397,8 +426,9 @@ impl<'a> Widget for Fixed<'a> {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
-        let report = self.child.draw(ctx, pos)?;
+        let report = self.child.draw(ctx, pos, expansion)?;
         Ok(DrawReport {
             width: self.size.0,
             height: self.size.1,

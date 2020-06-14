@@ -60,7 +60,12 @@ impl<'a> Launcher<'a> {
         })
     }
 
-    fn draw_launcher(&self, buf: &mut Buffer, bg: &Color) -> Result<(), ::std::io::Error> {
+    fn draw_launcher(
+        &self,
+        buf: &mut Buffer,
+        bg: &Color,
+        width: u32,
+    ) -> Result<(), ::std::io::Error> {
         let mut x_off = if !self.input.is_empty() {
             let c = if self.matches.is_empty() {
                 Color::new(1.0, 0.5, 0.5, 1.0)
@@ -77,7 +82,7 @@ impl<'a> Launcher<'a> {
             0
         };
 
-        let mut width_remaining: i32 = (self.length - x_off) as i32;
+        let mut width_remaining: i32 = (width - x_off) as i32;
         for (idx, m) in self.matches.iter().enumerate() {
             let mut b = match buf.offset((x_off, 0)) {
                 Ok(b) => b,
@@ -266,8 +271,12 @@ impl<'a> Widget for Launcher<'a> {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
-        let (width, height) = self.size();
+        if self.length == 0 {
+            self.length = expansion.0;
+        }
+        let (width, height) = (self.length, self.font_size);
         if !self.dirty && !ctx.force {
             return Ok(DrawReport::empty(width, height));
         }
@@ -313,7 +322,7 @@ impl<'a> Widget for Launcher<'a> {
         match self.input.chars().next() {
             Some('=') => self.draw_calc(buf, ctx.bg),
             Some('!') => self.draw_shell(buf, ctx.bg),
-            _ => self.draw_launcher(buf, ctx.bg),
+            _ => self.draw_launcher(buf, ctx.bg, width),
         }?;
 
         Ok(DrawReport {

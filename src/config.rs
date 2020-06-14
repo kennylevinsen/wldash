@@ -282,7 +282,7 @@ impl Default for Config {
                                 widget: Box::new(Widget::Battery {
                                     font: None,
                                     font_size: 24.0,
-                                    length: 600,
+                                    length: 0,
                                 }),
                             },
                             Widget::Margin {
@@ -291,7 +291,7 @@ impl Default for Config {
                                     device: "intel_backlight".to_string(),
                                     font: None,
                                     font_size: 24.0,
-                                    length: 600,
+                                    length: 0,
                                 }),
                             },
                             #[cfg(feature = "pulseaudio-widget")]
@@ -300,7 +300,7 @@ impl Default for Config {
                                 widget: Box::new(Widget::PulseAudio {
                                     font: None,
                                     font_size: 24.0,
-                                    length: 600,
+                                    length: 0,
                                 }),
                             },
                         ]),
@@ -314,7 +314,7 @@ impl Default for Config {
                     Widget::Launcher {
                         font: None,
                         font_size: 32.0,
-                        length: 1200,
+                        length: 0,
                         app_opener: "".to_string(),
                         term_opener: "".to_string(),
                         url_opener: "".to_string(),

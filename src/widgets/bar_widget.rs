@@ -83,8 +83,12 @@ impl<'a> Widget for BarWidget<'a> {
         &mut self,
         ctx: &mut DrawContext,
         pos: (u32, u32),
+        expansion: (u32, u32),
     ) -> Result<DrawReport, ::std::io::Error> {
-        let (width, height) = self.size();
+        if self.length == 0 {
+            self.length = expansion.0;
+        }
+        let (width, height) = (self.length, self.font_size);
         {
             let mut d = self.dirty.lock().unwrap();
             if !*d && !ctx.force {
@@ -105,7 +109,7 @@ impl<'a> Widget for BarWidget<'a> {
         draw_bar(
             &mut buf.offset((bar_off, 0))?,
             &c,
-            self.length - bar_off,
+            width - bar_off,
             self.font_size,
             val,
         )?;
@@ -117,7 +121,7 @@ impl<'a> Widget for BarWidget<'a> {
             draw_bar(
                 &mut buf.offset((bar_off, 0))?,
                 &c,
-                self.length - bar_off,
+                width - bar_off,
                 self.font_size,
                 val,
             )?;
@@ -125,7 +129,7 @@ impl<'a> Widget for BarWidget<'a> {
         draw_box(
             &mut buf.offset((bar_off, 0))?,
             &c,
-            (self.length - bar_off, self.font_size),
+            (width - bar_off, self.font_size),
         )?;
         Ok(DrawReport {
             width,

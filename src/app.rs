@@ -231,7 +231,10 @@ impl<'a> App<'a> {
 
         let (last, pool) = match self.pools.pool() {
             Some((last, pool)) => (last, pool),
-            None => return Ok(()),
+            None => {
+                self.pools.never_mind();
+                return Ok(());
+            }
         };
 
         let size = widget.size();

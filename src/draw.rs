@@ -124,6 +124,27 @@ impl<'a> Font<'a> {
         Ok((x_off as u32, self.size as u32))
     }
 
+    pub fn auto_widest(&mut self, s: &str) -> Result<u32, ::std::io::Error> {
+        self.add_str_to_cache(s);
+        let mut max = 0;
+        for ch in s.chars() {
+            let glyph = match self.glyphs.get(&ch) {
+                Some(glyph) => glyph,
+                None => {
+                    return Err(::std::io::Error::new(
+                        ::std::io::ErrorKind::Other,
+                        format!("glyph for {:} not in cache", ch),
+                    ))
+                }
+            };
+            let width = glyph.dimensions.0 as i32 + glyph.origin.0;
+            if width > max {
+                max = width
+            }
+        }
+        Ok(max as u32)
+    }
+
     pub fn auto_draw_text(
         &mut self,
         buf: &mut Buffer,

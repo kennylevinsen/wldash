@@ -11,18 +11,25 @@ pub struct Clock<'a> {
     cur_time: NaiveDateTime,
     clock_cache: Font<'a>,
     size: f32,
+    digit: u32,
+    colon: u32,
 }
 
 impl<'a> Clock<'a> {
-    pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> Box<Clock> {
+    pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> ::std::io::Result<Box<Clock>> {
         let mut clock_cache = Font::new(font, size);
         clock_cache.add_str_to_cache("0123456789:");
 
-        Box::new(Clock {
+        let digit = clock_cache.auto_widest("123456789")?;
+        let colon = (clock_cache.auto_widest(":")? as f32 * 1.25) as u32;
+
+        Ok(Box::new(Clock {
             cur_time: time,
             clock_cache,
             size,
-        })
+            digit,
+            colon,
+        }))
     }
 }
 
@@ -38,9 +45,7 @@ impl<'a> Widget for Clock<'a> {
     fn enter(&mut self) {}
     fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {
-        let digit = (self.size * 0.45).ceil() as u32;
-        let colon = (self.size * 0.20).ceil() as u32;
-        (digit * 4 + colon, self.size.ceil() as u32)
+        (self.digit * 4 + self.colon, self.size.ceil() as u32)
     }
 
     fn draw(
@@ -62,8 +67,8 @@ impl<'a> Widget for Clock<'a> {
         let buf = &mut ctx.buf.subdimensions((pos.0, pos.1, width, height))?;
         buf.memset(ctx.bg);
 
-        let digit = (self.size * 0.45).ceil() as u32;
-        let colon = (self.size * 0.20).ceil() as u32;
+        let digit = self.digit;
+        let colon = self.colon;
         self.clock_cache.draw_text_fixed_width(
             buf,
             ctx.bg,

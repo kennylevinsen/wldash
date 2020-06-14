@@ -246,6 +246,13 @@ impl Default for OutputMode {
     }
 }
 
+fn default_fonts() -> HashMap<String, String> {
+    let mut map = HashMap::with_capacity(2);
+    map.insert("mono".to_string(), "mono".to_string());
+    map.insert("sans".to_string(), "sans".to_string());
+    map
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
@@ -253,6 +260,8 @@ pub struct Config {
     pub scale: u32,
     pub background: Color,
     pub widget: Widget,
+
+    #[serde(default = "default_fonts")]
     pub fonts: HashMap<String, String>,
 }
 
@@ -324,12 +333,7 @@ impl Default for Config {
             output_mode: Default::default(),
             scale: 1,
             background: Color::new(0.0, 0.0, 0.0, 0.9),
-            fonts: {
-                let mut map = HashMap::with_capacity(2);
-                map.insert("mono".to_string(), "mono".to_string());
-                map.insert("sans".to_string(), "sans".to_string());
-                map
-            },
+            fonts: default_fonts(),
         }
     }
 }

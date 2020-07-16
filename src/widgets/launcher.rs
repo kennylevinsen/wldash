@@ -18,6 +18,7 @@ use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
 
 pub struct Launcher<'a> {
+    cursor: usize,
     options: Vec<Desktop>,
     term_opener: String,
     app_opener: String,
@@ -44,6 +45,7 @@ impl<'a> Launcher<'a> {
         url: String,
     ) -> Box<Launcher> {
         Box::new(Launcher {
+            cursor: 0,
             options: load_desktop_files(),
             term_opener: term,
             app_opener: app,
@@ -72,6 +74,19 @@ impl<'a> Launcher<'a> {
             } else {
                 Color::new(1.0, 1.0, 1.0, 1.0)
             };
+
+            let dim =
+                self.font
+                    .borrow_mut()
+                    .auto_draw_text(buf, bg, &c, &self.input[..self.cursor])?;
+
+            let cursor_placement = dim.0;
+            // draw cursor
+            for i in 1..self.font_size {
+                buf.put((cursor_placement, i), &Color::new(1.0, 1.0, 1.0, 1.0))
+                    .unwrap();
+            }
+
             let dim = self
                 .font
                 .borrow_mut()
@@ -343,11 +358,18 @@ impl<'a> Widget for Launcher<'a> {
         match key {
             keysyms::XKB_KEY_u if modifiers.ctrl => self.leave(),
             keysyms::XKB_KEY_BackSpace => {
-                if !self.input.is_empty() {
-                    self.input = self.input[..self.input.len() - 1].to_string();
+                if !self.input.is_empty() && self.cursor > 0 {
+                    self.cursor -= 1;
+                    self.input.remove(self.cursor);
                     self.offset = 0;
                     self.result = None;
                     self.dirty = true
+                }
+            }
+            keysyms::XKB_KEY_Delete => {
+                if !self.input.is_empty() && self.cursor < self.input.len() {
+                    self.input.remove(self.cursor);
+                    self.dirty = true;
                 }
             }
             keysyms::XKB_KEY_Return => {
@@ -358,6 +380,7 @@ impl<'a> Widget for Launcher<'a> {
                         }
                     }
                     Some('!') => {
+                        self.cursor = 0;
                         let _ = Command::new("sh")
                             .arg("-c")
                             .arg(self.input.chars().skip(1).collect::<String>())
@@ -365,6 +388,7 @@ impl<'a> Widget for Launcher<'a> {
                         self.tx.send(Cmd::Exit).unwrap();
                     }
                     _ => {
+                        self.cursor = 0;
                         if self.matches.len() > self.offset {
                             let d = &self.matches[self.offset];
                             if let Some(exec) = &d.exec {
@@ -420,9 +444,22 @@ impl<'a> Widget for Launcher<'a> {
                     self.dirty = true;
                 }
             }
+            keysyms::XKB_KEY_Left => {
+                if self.cursor > 0 {
+                    self.cursor -= 1;
+                    self.dirty = true;
+                }
+            }
+            keysyms::XKB_KEY_Right => {
+                if self.cursor < self.input.len() {
+                    self.cursor += 1;
+                    self.dirty = true;
+                }
+            }
             _ => {
                 if let Some(v) = interpreted {
-                    self.input += &v;
+                    self.input.insert_str(self.cursor, &v);
+                    self.cursor += 1;
                     self.offset = 0;
                     self.result = None;
                     self.dirty = true;

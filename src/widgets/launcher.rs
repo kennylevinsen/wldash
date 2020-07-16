@@ -408,13 +408,13 @@ impl<'a> Widget for Launcher<'a> {
                     }
                 };
             }
-            keysyms::XKB_KEY_Right => {
+            keysyms::XKB_KEY_Tab => {
                 if !self.matches.is_empty() && self.offset < self.matches.len() - 1 {
                     self.offset += 1;
                     self.dirty = true;
                 }
             }
-            keysyms::XKB_KEY_Left => {
+            keysyms::XKB_KEY_ISO_Left_Tab => {
                 if !self.matches.is_empty() && self.offset > 0 {
                     self.offset -= 1;
                     self.dirty = true;

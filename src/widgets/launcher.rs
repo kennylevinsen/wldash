@@ -75,10 +75,13 @@ impl<'a> Launcher<'a> {
                 Color::new(1.0, 1.0, 1.0, 1.0)
             };
 
-            let dim = self
-                .font
-                .borrow_mut()
-                .auto_draw_text_with_cursor(buf, bg, &c, &self.input, self.cursor)?;
+            let dim = self.font.borrow_mut().auto_draw_text_with_cursor(
+                buf,
+                bg,
+                &c,
+                &self.input,
+                self.cursor,
+            )?;
 
             dim.0 + self.font_size / 4
         } else {

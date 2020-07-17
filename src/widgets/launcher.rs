@@ -75,22 +75,10 @@ impl<'a> Launcher<'a> {
                 Color::new(1.0, 1.0, 1.0, 1.0)
             };
 
-            let dim =
-                self.font
-                    .borrow_mut()
-                    .auto_draw_text(buf, bg, &c, &self.input[..self.cursor])?;
-
-            let cursor_placement = dim.0;
-            // draw cursor
-            for i in 1..self.font_size {
-                buf.put((cursor_placement, i), &Color::new(1.0, 1.0, 1.0, 1.0))
-                    .unwrap();
-            }
-
             let dim = self
                 .font
                 .borrow_mut()
-                .auto_draw_text(buf, bg, &c, &self.input)?;
+                .auto_draw_text_with_cursor(buf, bg, &c, &self.input, self.cursor)?;
 
             dim.0 + self.font_size / 4
         } else {
@@ -457,6 +445,7 @@ impl<'a> Widget for Launcher<'a> {
                 }
             }
             _ => {
+                println!("{}", key);
                 if let Some(v) = interpreted {
                     self.input.insert_str(self.cursor, &v);
                     self.cursor += 1;

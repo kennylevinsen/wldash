@@ -124,6 +124,58 @@ impl<'a> Font<'a> {
         Ok((x_off as u32, self.size as u32))
     }
 
+    pub fn draw_text_with_cursor(
+        &self,
+        buf: &mut Buffer,
+        bg: &Color,
+        c: &Color,
+        s: &str,
+        cursor: usize,
+    ) -> Result<(u32, u32), ::std::io::Error> {
+        let mut x_off: i32 = 0;
+        let mut off: i32 = 0;
+        let mut glyphs = Vec::with_capacity(s.len());
+        for ch in s.chars() {
+            let glyph = match self.glyphs.get(&ch) {
+                Some(glyph) => glyph,
+                None => {
+                    return Err(::std::io::Error::new(
+                        ::std::io::ErrorKind::Other,
+                        format!("glyph for {:} not in cache", ch),
+                    ))
+                }
+            };
+            glyphs.push(glyph);
+            if glyph.origin.1 < off {
+                off = glyph.origin.1
+            }
+        }
+        for (i, glyph) in glyphs.iter().enumerate() {
+            glyph.draw(buf, (x_off, -off), bg, c);
+            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
+            if i + 1 == cursor {
+                let height = buf.get_bounds().3;
+                self.draw_cursor(buf, c, x_off as u32, height)?;
+            }
+        }
+
+        Ok((x_off as u32, self.size as u32))
+    }
+
+    pub fn draw_cursor(
+        &self,
+        buf: &mut Buffer,
+        c: &Color,
+        offset: u32,
+        height: u32,
+    ) -> Result<(), ::std::io::Error> {
+        // draw cursor
+        for i in 1..height {
+            buf.put((offset, i), c)?
+        }
+        Ok(())
+    }
+
     pub fn auto_widest(&mut self, s: &str) -> Result<u32, ::std::io::Error> {
         self.add_str_to_cache(s);
         let mut max = 0;
@@ -154,6 +206,18 @@ impl<'a> Font<'a> {
     ) -> Result<(u32, u32), ::std::io::Error> {
         self.add_str_to_cache(s);
         self.draw_text(buf, bg, c, s)
+    }
+
+    pub fn auto_draw_text_with_cursor(
+        &mut self,
+        buf: &mut Buffer,
+        bg: &Color,
+        c: &Color,
+        s: &str,
+        cursor: usize,
+    ) -> Result<(u32, u32), ::std::io::Error> {
+        self.add_str_to_cache(s);
+        self.draw_text_with_cursor(buf, bg, c, s, cursor)
     }
 
     pub fn draw_text_fixed_width(

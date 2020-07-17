@@ -453,7 +453,6 @@ impl<'a> Widget for Launcher<'a> {
                 }
             }
             _ => {
-                println!("{}", key);
                 if let Some(v) = interpreted {
                     let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
                     if self.cursor == indices.len() {

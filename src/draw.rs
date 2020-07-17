@@ -150,13 +150,17 @@ impl<'a> Font<'a> {
                 off = glyph.origin.1
             }
         }
+
+        let height = buf.get_bounds().3;
         for (i, glyph) in glyphs.iter().enumerate() {
-            glyph.draw(buf, (x_off, -off), bg, c);
-            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
-            if i + 1 == cursor {
-                let height = buf.get_bounds().3;
+            if i == cursor {
                 self.draw_cursor(buf, c, x_off as u32, height)?;
             }
+            glyph.draw(buf, (x_off, -off), bg, c);
+            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
+        }
+        if cursor == glyphs.len() {
+            self.draw_cursor(buf, c, x_off as u32, height)?;
         }
 
         Ok((x_off as u32, self.size as u32))

@@ -16,6 +16,7 @@ use std::sync::mpsc::Sender;
 
 use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use smithay_client_toolkit::keyboard::keysyms;
+use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Launcher<'a> {
     cursor: usize,
@@ -349,17 +350,21 @@ impl<'a> Widget for Launcher<'a> {
         match key {
             keysyms::XKB_KEY_u if modifiers.ctrl => self.leave(),
             keysyms::XKB_KEY_BackSpace => {
-                if !self.input.is_empty() && self.cursor > 0 {
+                let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+                if !indices.is_empty() && self.cursor > 0 {
                     self.cursor -= 1;
-                    self.input.remove(self.cursor);
+                    indices.remove(self.cursor);
+                    self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
                     self.offset = 0;
                     self.result = None;
                     self.dirty = true
                 }
             }
             keysyms::XKB_KEY_Delete => {
-                if !self.input.is_empty() && self.cursor < self.input.len() {
-                    self.input.remove(self.cursor);
+                let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+                if !indices.is_empty() && self.cursor < indices.len() {
+                    indices.remove(self.cursor);
+                    self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
                     self.dirty = true;
                 }
             }
@@ -450,7 +455,13 @@ impl<'a> Widget for Launcher<'a> {
             _ => {
                 println!("{}", key);
                 if let Some(v) = interpreted {
-                    self.input.insert_str(self.cursor, &v);
+                    let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+                    if self.cursor == indices.len() {
+                        self.input += &v;
+                    } else {
+                        let index_at = indices[self.cursor].0;
+                        self.input.insert_str(index_at, &v);
+                    }
                     self.cursor += 1;
                     self.offset = 0;
                     self.result = None;

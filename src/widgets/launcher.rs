@@ -384,7 +384,6 @@ impl<'a> Widget for Launcher<'a> {
                         self.tx.send(Cmd::Exit).unwrap();
                     }
                     _ => {
-                        self.cursor = 0;
                         if self.matches.len() > self.offset {
                             let d = &self.matches[self.offset];
                             if let Some(exec) = &d.exec {

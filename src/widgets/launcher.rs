@@ -265,6 +265,7 @@ impl<'a> Widget for Launcher<'a> {
     fn enter(&mut self) {}
     fn leave(&mut self) {
         self.input = "".to_string();
+        self.cursor = 0;
         self.offset = 0;
         self.result = None;
         self.dirty = true;

@@ -139,11 +139,12 @@ impl<'a> Launcher<'a> {
             + self.font_size / 4;
 
         let x_off = if !self.input.is_empty() {
-            let dim = self.font.borrow_mut().auto_draw_text(
+            let dim = self.font.borrow_mut().auto_draw_text_with_cursor(
                 &mut buf.offset((x_off, 0))?,
                 bg,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &self.input[1..],
+                self.cursor - 1,
             )?;
 
             x_off + dim.0 + self.font_size / 4
@@ -177,11 +178,12 @@ impl<'a> Launcher<'a> {
             + self.font_size / 4;
 
         if !self.input.is_empty() {
-            self.font.borrow_mut().auto_draw_text(
+            self.font.borrow_mut().auto_draw_text_with_cursor(
                 &mut buf.offset((x_off, 0))?,
                 bg,
                 &Color::new(1.0, 1.0, 1.0, 1.0),
                 &self.input[1..],
+                self.cursor - 1,
             )?;
         };
 

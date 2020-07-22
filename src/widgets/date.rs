@@ -11,19 +11,33 @@ pub struct Date<'a> {
     cur_time: NaiveDateTime,
     date_cache: Font<'a>,
     size: f32,
+    ch_width: u32,
+    digit_width: u32,
+    spacing_width: u32,
 }
 
 impl<'a> Date<'a> {
-    pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> Box<Date> {
+    pub fn new(time: NaiveDateTime, font: FontRef, size: f32) -> ::std::io::Result<Box<Date>> {
         let mut date_cache = Font::new(font, size);
-        date_cache
-            .add_str_to_cache("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,/ ");
+        let chs = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        let digits = "0123456789,/ ";
+        let spacings = ",/ ";
 
-        Box::new(Date {
+        date_cache.add_str_to_cache(chs);
+        date_cache.add_str_to_cache(digits);
+        date_cache.add_str_to_cache(spacings);
+        let ch_width = date_cache.auto_widest(chs)?;
+        let digit_width = date_cache.auto_widest(digits)?;
+        let spacing_width = date_cache.auto_widest(spacings)?;
+
+        Ok(Box::new(Date {
             cur_time: time,
             date_cache,
             size,
-        })
+            ch_width,
+            digit_width,
+            spacing_width,
+        }))
     }
 }
 
@@ -32,7 +46,10 @@ impl<'a> Widget for Date<'a> {
     fn enter(&mut self) {}
     fn leave(&mut self) {}
     fn size(&self) -> (u32, u32) {
-        ((6.5 * self.size).ceil() as u32, self.size.ceil() as u32)
+        (
+            (3 * self.ch_width + 8 * self.digit_width + 4 * self.spacing_width) as u32,
+            self.size.ceil() as u32,
+        )
     }
 
     fn draw(

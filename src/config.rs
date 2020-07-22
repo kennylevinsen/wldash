@@ -119,11 +119,14 @@ impl Widget {
                 Ok(w) => Some(w),
                 Err(_) => None,
             },
-            Widget::Date { font, font_size } => Some(widgets::date::Date::new(
+            Widget::Date { font, font_size } => match widgets::date::Date::new(
                 time,
                 get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
                 font_size,
-            )),
+            ) {
+                Ok(w) => Some(w),
+                Err(_) => None,
+            },
             Widget::Calendar {
                 font_primary,
                 font_secondary,

@@ -7,6 +7,12 @@ use std::fs;
 use std::io::Error as io_error;
 use std::io::ErrorKind;
 
+#[cfg(feature = "from-stdin")]
+extern crate atty;
+
+#[cfg(feature = "from-stdin")]
+use std::io::BufRead;
+
 #[derive(Clone, Debug, Eq, Hash)]
 pub struct Desktop {
     pub entry_type: String,
@@ -88,6 +94,15 @@ impl PartialEq for Desktop {
 }
 
 pub fn load_desktop_files() -> Vec<Desktop> {
+    #[cfg(feature = "from-stdin")]
+    if !atty::is(atty::Stream::Stdin) {
+        return load_from_stdin();
+    }
+    load_from_xdg()
+}
+
+#[inline(always)]
+fn load_from_xdg() -> Vec<Desktop> {
     let home = env::var_os("HOME").unwrap().into_string().unwrap();
 
     let xdg_data_home = match env::var_os("XDG_DATA_HOME") {
@@ -98,7 +113,7 @@ pub fn load_desktop_files() -> Vec<Desktop> {
         Some(s) => s.into_string().unwrap(),
         None => "/usr/local/share:/usr/share".to_string(),
     };
-
+    
     std::iter::once(xdg_data_home.as_str())
         .chain(xdg_data_dirs.split(':'))
         .map(|p| Desktop::parse_dir(&format!("{}/applications", p)))
@@ -107,5 +122,15 @@ pub fn load_desktop_files() -> Vec<Desktop> {
         .filter(|d| {
             !d.hidden && !d.no_display && (d.entry_type == "Application" || d.entry_type == "Link")
         })
+        .collect()
+}
+
+#[cfg(feature = "from-stdin")]
+#[inline(always)]
+fn load_from_stdin() -> Vec<Desktop> {
+    std::io::stdin()
+        .lock()
+        .lines()
+        .filter_map(|s| s.ok().as_ref().and_then(|s| Desktop::parse(s.as_str()).ok()))
         .collect()
 }

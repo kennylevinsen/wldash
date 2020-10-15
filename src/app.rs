@@ -99,6 +99,7 @@ impl AppInner {
             .unwrap();
 
         shell_surface.set_keyboard_interactivity(1);
+        shell_surface.set_size(1, 1);
         surface.set_buffer_scale(scale as i32);
         surface.commit();
         (surface, shell_surface)

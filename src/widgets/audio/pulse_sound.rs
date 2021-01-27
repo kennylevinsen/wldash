@@ -16,13 +16,13 @@ use std::thread;
 
 use libpulse_binding::callbacks::ListResult;
 use libpulse_binding::context::{
-    flags, introspect::ServerInfo, introspect::SinkInfo, subscribe::subscription_masks,
-    subscribe::Facility, subscribe::Operation as SubscribeOperation, Context, State as PulseState,
+    introspect::ServerInfo, introspect::SinkInfo, subscribe::Facility, subscribe::InterestMaskSet,
+    subscribe::Operation as SubscribeOperation, Context, FlagSet, State as PulseState,
 };
 use libpulse_binding::mainloop::standard::IterateResult;
 use libpulse_binding::mainloop::standard::Mainloop;
 use libpulse_binding::proplist::{properties, Proplist};
-use libpulse_binding::volume::{ChannelVolumes, Volume, VOLUME_MAX, VOLUME_NORM};
+use libpulse_binding::volume::{ChannelVolumes, Volume};
 
 struct PulseAudioConnection {
     mainloop: Rc<RefCell<Mainloop>>,
@@ -79,7 +79,7 @@ impl PulseAudioConnection {
 
         context
             .borrow_mut()
-            .connect(None, flags::NOFLAGS, None)
+            .connect(None, FlagSet::NOFLAGS, None)
             .map_err(|_e| {
                 ::std::io::Error::new(
                     ::std::io::ErrorKind::Other,
@@ -158,60 +158,75 @@ impl PulseAudioClient {
                         Ok(req) => {
                             let mut introspector = conn.context.borrow_mut().introspect();
 
-                            match req {
+                            let done = Arc::new(Mutex::new(false));
+                            let done_reader = done.clone();
+                            let s = match req {
                                 PulseAudioClientRequest::GetDefaultDevice(s) => {
                                     introspector.get_server_info(move |info| {
+                                        *done.lock().unwrap() = true;
                                         PulseAudioClient::server_info_callback(
                                             cl.clone(),
                                             l.clone(),
                                             info,
                                         );
-                                        if let Some(s) = &s {
-                                            let _ = s.send(true);
-                                        }
                                     });
+                                    s
                                 }
                                 PulseAudioClientRequest::GetSinkInfoByIndex(s, index) => {
                                     introspector.get_sink_info_by_index(index, move |res| {
+                                        *done.lock().unwrap() = true;
                                         PulseAudioClient::sink_info_callback(
                                             cl.clone(),
                                             l.clone(),
                                             res,
                                         );
-                                        if let Some(s) = &s {
-                                            let _ = s.send(true);
-                                        }
                                     });
+                                    s
                                 }
                                 PulseAudioClientRequest::GetSinkInfoByName(s, name) => {
                                     introspector.get_sink_info_by_name(&name, move |res| {
+                                        *done.lock().unwrap() = true;
                                         PulseAudioClient::sink_info_callback(
                                             cl.clone(),
                                             l.clone(),
                                             res,
                                         );
-                                        if let Some(s) = &s {
-                                            let _ = s.send(true);
-                                        }
                                     });
+                                    s
                                 }
                                 PulseAudioClientRequest::SetSinkVolumeByName(s, name, volumes) => {
-                                    introspector.set_sink_volume_by_name(&name, &volumes, None);
-                                    if let Some(s) = &s {
-                                        let _ = s.send(true);
-                                    }
+                                    introspector.set_sink_volume_by_name(
+                                        &name,
+                                        &volumes,
+                                        Some(Box::new(move |_| {
+                                            *done.lock().unwrap() = true;
+                                        })),
+                                    );
+                                    s
                                 }
                                 PulseAudioClientRequest::SetSinkMuteByName(s, name, mute) => {
-                                    introspector.set_sink_mute_by_name(&name, mute, None);
-                                    if let Some(s) = &s {
-                                        let _ = s.send(true);
-                                    }
+                                    introspector.set_sink_mute_by_name(
+                                        &name,
+                                        mute,
+                                        Some(Box::new(move |_| {
+                                            *done.lock().unwrap() = true;
+                                        })),
+                                    );
+                                    s
                                 }
                             };
 
                             // send request and receive response
-                            conn.iterate(true).unwrap();
-                            conn.iterate(true).unwrap();
+                            loop {
+                                if *done_reader.lock().unwrap() {
+                                    break;
+                                }
+                                conn.iterate(true).unwrap();
+                            }
+
+                            if let Some(s) = s {
+                                let _ = s.send(true);
+                            }
                         }
                     }
                 }
@@ -241,10 +256,9 @@ impl PulseAudioClient {
                             .unwrap()
                             .subscribe_callback(facility, operation, index)
                     })));
-                conn.context.borrow_mut().subscribe(
-                    subscription_masks::SERVER | subscription_masks::SINK,
-                    |_| {},
-                );
+                conn.context
+                    .borrow_mut()
+                    .subscribe(InterestMaskSet::SERVER | InterestMaskSet::SINK, |_| {});
 
                 conn.mainloop.borrow_mut().run().unwrap();
             });
@@ -355,7 +369,7 @@ impl PulseAudioSoundDevice {
             };
 
             inner.volume = Some(sink_info.volume);
-            inner.volume_avg = sink_info.volume.avg().0 as f32 / VOLUME_NORM.0 as f32;
+            inner.volume_avg = sink_info.volume.avg().0 as f32 / Volume::NORMAL.0 as f32;
             inner.muted = sink_info.mute;
 
             listener();
@@ -407,9 +421,9 @@ impl PulseAudioSoundDevice {
         };
 
         // apply step to volumes
-        let step = (step * VOLUME_NORM.0 as f32).round() as i32;
+        let step = (step * Volume::NORMAL.0 as f32).round() as i32;
         if step > 0 {
-            volume.inc_clamp(Volume(step as u32), VOLUME_MAX);
+            volume.inc_clamp(Volume(step as u32), Volume::MAX);
         } else {
             volume.decrease(Volume(-step as u32));
         }
@@ -421,7 +435,7 @@ impl PulseAudioSoundDevice {
 
         // update volumes
         inner.volume = Some(volume);
-        inner.volume_avg = volume.avg().0 as f32 / VOLUME_NORM.0 as f32;
+        inner.volume_avg = volume.avg().0 as f32 / Volume::NORMAL.0 as f32;
         self.client
             .lock()
             .unwrap()
@@ -444,7 +458,7 @@ impl PulseAudioSoundDevice {
         };
 
         // apply step to volumes
-        volume.scale(Volume((val * VOLUME_NORM.0 as f32).round() as u32));
+        volume.scale(Volume((val * Volume::NORMAL.0 as f32).round() as u32));
 
         let name = inner
             .name
@@ -453,7 +467,7 @@ impl PulseAudioSoundDevice {
 
         // update volumes
         inner.volume = Some(volume);
-        inner.volume_avg = volume.avg().0 as f32 / VOLUME_NORM.0 as f32;
+        inner.volume_avg = volume.avg().0 as f32 / Volume::NORMAL.0 as f32;
         self.client
             .lock()
             .unwrap()

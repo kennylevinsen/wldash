@@ -12,6 +12,7 @@ use timerfd::{SetTimeFlags, TimerFd, TimerState};
 
 mod app;
 mod buffer;
+mod keyboard;
 mod cmd;
 mod color;
 mod config;
@@ -22,6 +23,9 @@ mod draw;
 mod fonts;
 mod widget;
 mod widgets;
+
+#[macro_use]
+extern crate dlib;
 
 use app::{App, OutputMode};
 use cmd::Cmd;
@@ -202,7 +206,7 @@ fn main() {
         });
 
     let mut timer = TimerFd::new().unwrap();
-    let ev_fd = PollFd::new(app.event_queue().get_connection_fd(), PollFlags::POLLIN);
+    let ev_fd = PollFd::new(app.event_queue().display().get_connection_fd(), PollFlags::POLLIN);
     let rx_fd = PollFd::new(rx_pipe.as_raw_fd(), PollFlags::POLLIN);
     let tm_fd = PollFd::new(timer.as_raw_fd(), PollFlags::POLLIN);
     let ipc_fd = PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN);
@@ -223,6 +227,11 @@ fn main() {
                 Cmd::Draw => {
                     app.redraw(false).expect("Failed to draw");
                     app.flush_display();
+                }
+                Cmd::KeyboardTest => {
+                    if let Some(cmd) = app.key_repeat() {
+                        q.lock().unwrap().push_back(cmd);
+                    }
                 }
                 Cmd::ForceDraw => {
                     app.redraw(true).expect("Failed to draw");
@@ -279,6 +288,7 @@ fn main() {
                 wait_ctx.target_time = None;
 
                 app.get_widget().wait(&mut wait_ctx);
+                app.set_keyboard_repeat(&mut wait_ctx);
 
                 if let Some(target_time) = wait_ctx.target_time {
                     let n = Local::now().naive_local();
@@ -313,7 +323,7 @@ fn main() {
                     }
 
                     app.event_queue()
-                        .dispatch_pending()
+                        .dispatch_pending(&mut (), |_, _, _|{})
                         .expect("Failed to dispatch all messages.");
                 }
 
@@ -365,7 +375,9 @@ fn main() {
                         .contains(PollFlags::POLLIN)
                 {
                     timer.read();
-                    q.lock().unwrap().push_back(Cmd::Draw);
+                    let mut qq = q.lock().unwrap();
+                    qq.push_back(Cmd::KeyboardTest);
+                    qq.push_back(Cmd::Draw);
                 }
             }
         }

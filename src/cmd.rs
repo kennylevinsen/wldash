@@ -1,5 +1,6 @@
-use smithay_client_toolkit::keyboard::{KeyState, ModifiersState};
+use crate::keyboard::{KeyState, ModifiersState};
 
+#[derive(Clone)]
 pub enum Cmd {
     Exit,
     Draw,
@@ -13,6 +14,7 @@ pub enum Cmd {
         scroll: (f64, f64),
         pos: (u32, u32),
     },
+    KeyboardTest,
     Keyboard {
         key: u32,
         key_state: KeyState,

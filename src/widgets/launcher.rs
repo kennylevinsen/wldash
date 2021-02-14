@@ -15,7 +15,7 @@ use std::process::Command;
 use std::sync::mpsc::Sender;
 
 use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
-use smithay_client_toolkit::keyboard::keysyms;
+use crate::keyboard::keysyms;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Launcher<'a> {

@@ -352,6 +352,22 @@ impl<'a> Widget for Launcher<'a> {
     ) {
         match key {
             keysyms::XKB_KEY_u if modifiers.ctrl => self.leave(),
+            keysyms::XKB_KEY_a if modifiers.ctrl => {
+                self.cursor = 0;
+                self.dirty = true;
+            }
+            keysyms::XKB_KEY_e if modifiers.ctrl => {
+                self.cursor = self.input.len();
+                self.dirty = true;
+            }
+            keysyms::XKB_KEY_Home => {
+                self.cursor = 0;
+                self.dirty = true;
+            }
+            keysyms::XKB_KEY_End => {
+                self.cursor = self.input.len();
+                self.dirty = true;
+            }
             keysyms::XKB_KEY_BackSpace => {
                 let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
                 if !indices.is_empty() && self.cursor > 0 {

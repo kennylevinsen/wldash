@@ -1,8 +1,8 @@
 use crate::buffer::Buffer;
 use crate::color::Color;
+pub use crate::keyboard::{KeyState, ModifiersState};
 use chrono::NaiveDateTime;
 use nix::poll::PollFd;
-pub use crate::keyboard::{KeyState, ModifiersState};
 
 pub struct DrawContext<'a> {
     pub buf: &'a mut Buffer<'a>,

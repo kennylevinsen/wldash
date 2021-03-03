@@ -228,7 +228,6 @@ fn create_shm_fd() -> io::Result<RawFd> {
     }
 }
 
-
 pub struct DoubleMemPool {
     pool1: MemPool,
     pool2: MemPool,

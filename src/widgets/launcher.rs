@@ -14,8 +14,8 @@ use std::collections::HashMap;
 use std::process::Command;
 use std::sync::mpsc::Sender;
 
-use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use crate::keyboard::keysyms;
+use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Launcher<'a> {

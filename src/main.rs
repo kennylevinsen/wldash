@@ -12,7 +12,6 @@ use timerfd::{SetTimeFlags, TimerFd, TimerState};
 
 mod app;
 mod buffer;
-mod keyboard;
 mod cmd;
 mod color;
 mod config;
@@ -21,6 +20,7 @@ mod desktop;
 mod doublemempool;
 mod draw;
 mod fonts;
+mod keyboard;
 mod widget;
 mod widgets;
 
@@ -206,7 +206,10 @@ fn main() {
         });
 
     let mut timer = TimerFd::new().unwrap();
-    let ev_fd = PollFd::new(app.event_queue().display().get_connection_fd(), PollFlags::POLLIN);
+    let ev_fd = PollFd::new(
+        app.event_queue().display().get_connection_fd(),
+        PollFlags::POLLIN,
+    );
     let rx_fd = PollFd::new(rx_pipe.as_raw_fd(), PollFlags::POLLIN);
     let tm_fd = PollFd::new(timer.as_raw_fd(), PollFlags::POLLIN);
     let ipc_fd = PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN);
@@ -323,7 +326,7 @@ fn main() {
                     }
 
                     app.event_queue()
-                        .dispatch_pending(&mut (), |_, _, _|{})
+                        .dispatch_pending(&mut (), |_, _, _| {})
                         .expect("Failed to dispatch all messages.");
                 }
 

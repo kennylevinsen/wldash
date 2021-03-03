@@ -5,11 +5,9 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{Duration, Local, NaiveDateTime};
 
-use crate::keyboard::{
-    keysyms, map_keyboard, Event as KbEvent, KeyState, ModifiersState,
-};
+use crate::keyboard::{keysyms, map_keyboard, Event as KbEvent, KeyState, ModifiersState};
 
-use wayland_client::protocol::{wl_compositor, wl_output, wl_pointer, wl_shm, wl_surface, wl_seat};
+use wayland_client::protocol::{wl_compositor, wl_output, wl_pointer, wl_seat, wl_shm, wl_surface};
 use wayland_client::{Display, EventQueue, GlobalEvent, GlobalManager, Main};
 use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
     zwlr_layer_shell_v1, zwlr_layer_surface_v1,
@@ -17,7 +15,7 @@ use wayland_protocols::wlr::unstable::layer_shell::v1::client::{
 
 use crate::buffer::Buffer;
 use crate::color::Color;
-use crate::widget::{WaitContext, DrawContext, Widget};
+use crate::widget::{DrawContext, WaitContext, Widget};
 
 use crate::cmd::Cmd;
 use crate::doublemempool::DoubleMemPool;
@@ -68,28 +66,26 @@ impl AppInner {
         Main<wl_surface::WlSurface>,
         Main<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
     ) {
-        let surface = compositor
-            .create_surface();
+        let surface = compositor.create_surface();
 
         let this_is_stupid = AtomicBool::new(false);
 
-        let shell_surface = shell
-            .get_layer_surface(
-                &surface,
-                output,
-                zwlr_layer_shell_v1::Layer::Overlay,
-                "".to_string());
-        shell_surface.quick_assign(move |layer, event, _| match event {
-                zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
-                    if !this_is_stupid.compare_and_swap(false, true, Ordering::SeqCst) {
-                        *(configured_surfaces.lock().unwrap()) += 1;
-                        layer.ack_configure(serial);
-                        tx.send(Cmd::ForceDraw).unwrap();
-                    }
-                }
-                _ => unreachable!(),
-            },
+        let shell_surface = shell.get_layer_surface(
+            &surface,
+            output,
+            zwlr_layer_shell_v1::Layer::Overlay,
+            "".to_string(),
         );
+        shell_surface.quick_assign(move |layer, event, _| match event {
+            zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
+                if !this_is_stupid.compare_and_swap(false, true, Ordering::SeqCst) {
+                    *(configured_surfaces.lock().unwrap()) += 1;
+                    layer.ack_configure(serial);
+                    tx.send(Cmd::ForceDraw).unwrap();
+                }
+            }
+            _ => unreachable!(),
+        });
 
         shell_surface.set_keyboard_interactivity(1);
         shell_surface.set_size(1, 1);
@@ -401,8 +397,7 @@ impl<'a> App<'a> {
                     version,
                 } => {
                     if let "wl_output" = &interface[..] {
-                        let output = registry
-                            .bind(version, id);
+                        let output = registry.bind(version, id);
                         inner_global.lock().unwrap().add_output(id, output);
                     }
                 }
@@ -415,8 +410,8 @@ impl<'a> App<'a> {
 
         // double sync to retrieve the global list
         // and the globals metadata
-        event_queue.sync_roundtrip(&mut(), |_, _, _|{}).unwrap();
-        event_queue.sync_roundtrip(&mut(), |_, _, _|{}).unwrap();
+        event_queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
+        event_queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
 
         // wl_compositor
         let compositor = manager
@@ -435,10 +430,8 @@ impl<'a> App<'a> {
         //
         // Get our seat
         //
-        let seat: Main<wl_seat::WlSeat> = manager
-            .instantiate_range(1, 6)
-            .unwrap();
-        event_queue.sync_roundtrip(&mut(), |_, _, _|{}).unwrap();
+        let seat: Main<wl_seat::WlSeat> = manager.instantiate_range(1, 6).unwrap();
+        event_queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
 
         //
         // Keyboard processing
@@ -453,7 +446,7 @@ impl<'a> App<'a> {
             num_lock: false,
         }));
 
-        let keyboard = Arc::new(Mutex::new(AppKeyboard{
+        let keyboard = Arc::new(Mutex::new(AppKeyboard {
             current: None,
             delay: 0,
             rate: 0,
@@ -485,7 +478,10 @@ impl<'a> App<'a> {
                             let mut kbd = kb2.lock().unwrap();
                             kbd.current = Some(ev.clone());
                             kbd.next = if kbd.delay > 0 {
-                                Some(Local::now().naive_local() + Duration::milliseconds(kbd.delay.into()))
+                                Some(
+                                    Local::now().naive_local()
+                                        + Duration::milliseconds(kbd.delay.into()),
+                                )
                             } else {
                                 None
                             };
@@ -496,10 +492,10 @@ impl<'a> App<'a> {
                 } else {
                     kb2.lock().unwrap().next = None;
                 }
-            },
+            }
             KbEvent::Leave { .. } => {
                 kb2.lock().unwrap().next = None;
-            },
+            }
             KbEvent::RepeatInfo { delay, rate } => {
                 let mut kbd = kb2.lock().unwrap();
                 kbd.delay = delay;
@@ -513,15 +509,16 @@ impl<'a> App<'a> {
         //
         // Prepare shell so that we can create our shell surface
         //
-        inner.lock().unwrap().set_shell(Some(
-            if let Ok(layer) = manager.instantiate_exact(1) {
+        inner
+            .lock()
+            .unwrap()
+            .set_shell(Some(if let Ok(layer) = manager.instantiate_exact(1) {
                 layer
             } else {
                 panic!("server didn't advertise `zwlr_layer_shell_v1`");
-            },
-        ));
+            }));
 
-        event_queue.sync_roundtrip(&mut(), |_, _, _|{}).unwrap();
+        event_queue.sync_roundtrip(&mut (), |_, _, _| {}).unwrap();
 
         //
         // Cursor processing

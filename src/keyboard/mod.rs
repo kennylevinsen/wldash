@@ -23,8 +23,8 @@ use wayland_client::{
 };
 
 mod ffi;
-mod state;
 pub mod keysyms;
+mod state;
 
 use self::state::KbState;
 pub use self::state::{ModifiersState, RMLVO};
@@ -118,10 +118,7 @@ where
     let callback = Rc::new(RefCell::new(callback));
 
     // prepare the handler
-    let mut kbd_handler = KbdHandler {
-        callback,
-        state,
-    };
+    let mut kbd_handler = KbdHandler { callback, state };
 
     keyboard.quick_assign(move |keyboard, event, data| {
         kbd_handler.event(keyboard.detach(), event, data)
@@ -331,8 +328,17 @@ impl KbdHandler {
         }
     }
 
-    fn repeat_info(&mut self, object: wl_keyboard::WlKeyboard, rate: i32, delay: i32, dispatch_data: wayland_client::DispatchData) {
-        (&mut *self.callback.borrow_mut())(Event::RepeatInfo { rate, delay }, object, dispatch_data);
+    fn repeat_info(
+        &mut self,
+        object: wl_keyboard::WlKeyboard,
+        rate: i32,
+        delay: i32,
+        dispatch_data: wayland_client::DispatchData,
+    ) {
+        (&mut *self.callback.borrow_mut())(
+            Event::RepeatInfo { rate, delay },
+            object,
+            dispatch_data,
+        );
     }
 }
-

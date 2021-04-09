@@ -8,16 +8,16 @@ struct CachedGlyph {
     dimensions: (u32, u32),
     origin: (i32, i32),
     render: Vec<f32>,
+    advance: i32,
 }
 
 impl CachedGlyph {
     fn new(font: FontRef, size: f32, ch: char) -> CachedGlyph {
         let scale = Scale::uniform(size);
         let v_metrics = font.v_metrics(scale);
-        let glyph = font
-            .glyph(ch)
-            .scaled(scale)
-            .positioned(point(0.0, v_metrics.ascent));
+        let glyph = font.glyph(ch).scaled(scale);
+        let advance = glyph.h_metrics().advance_width as i32;
+        let glyph = glyph.positioned(point(0.0, v_metrics.ascent));
 
         if let Some(bounding_box) = glyph.pixel_bounding_box() {
             let origin = (bounding_box.min.x, bounding_box.min.y);
@@ -35,12 +35,14 @@ impl CachedGlyph {
                 origin,
                 dimensions,
                 render,
+                advance,
             }
         } else {
             CachedGlyph {
                 origin: (0, 0),
-                dimensions: ((size / 4.0) as u32, 0),
+                dimensions: (0, 0),
                 render: Vec::new(),
+                advance: (size / 4.0) as i32,
             }
         }
     }
@@ -118,7 +120,7 @@ impl<'a> Font<'a> {
         }
         for glyph in glyphs {
             glyph.draw(buf, (x_off, -off), bg, c);
-            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
+            x_off += glyph.advance;
         }
 
         Ok((x_off as u32, self.size as u32))
@@ -157,7 +159,7 @@ impl<'a> Font<'a> {
                 self.draw_cursor(buf, c, x_off as u32, height)?;
             }
             glyph.draw(buf, (x_off, -off), bg, c);
-            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
+            x_off += glyph.advance;
         }
         if cursor == glyphs.len() {
             self.draw_cursor(buf, c, x_off as u32, height)?;
@@ -193,7 +195,7 @@ impl<'a> Font<'a> {
                     ))
                 }
             };
-            let width = glyph.dimensions.0 as i32 + glyph.origin.0;
+            let width = glyph.advance;
             if width > max {
                 max = width
             }
@@ -285,7 +287,7 @@ impl<'a> Font<'a> {
         }
         for (idx, glyph) in glyphs.into_iter().enumerate() {
             glyph.draw(buf, (x_off, -off), bg, &color[idx]);
-            x_off += glyph.dimensions.0 as i32 + glyph.origin.0;
+            x_off += glyph.advance;
         }
 
         Ok((x_off as u32, self.size as u32))

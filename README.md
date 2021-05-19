@@ -66,3 +66,7 @@ The launcher also accepts prefix operators to change its mode:
 - Configurability
 - Cleanup and reorganization
 - Proper line editor for the launcher
+
+## How to discuss
+
+Go to #kennylevinsen @ irc.libera.chat to discuss, or use [~kennylevinsen/public-inbox@lists.sr.ht](https://lists.sr.ht/~kennylevinsen/public-inbox).

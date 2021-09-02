@@ -345,6 +345,6 @@ impl Default for Config {
 fn get_font<'a>(name: &str, map: &'a FontMap) -> FontRef<'a> {
     match map.get(name) {
         Some(f) => f,
-        None => panic!(format!("Font {} is missing from the config", name)),
+        None => panic!("Font {} is missing from the config", name),
     }
 }

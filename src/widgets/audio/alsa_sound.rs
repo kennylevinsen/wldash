@@ -99,7 +99,7 @@ impl BarWidgetImpl for Alsa {
     fn value(&self) -> f32 {
         match self.get_master_volume() {
             Ok(v) => v,
-            Err(e) => panic!(e),
+            Err(e) => panic!("{}", e),
         }
     }
     fn color(&self) -> Color {
@@ -107,12 +107,12 @@ impl BarWidgetImpl for Alsa {
     }
     fn inc(&mut self, diff: f32) {
         if let Err(e) = self.inc_master_volume(diff) {
-            panic!(e)
+            panic!("{}", e)
         }
     }
     fn set(&mut self, abs: f32) {
         if let Err(e) = self.set_master_volume(abs) {
-            panic!(e)
+            panic!("{}", e)
         }
     }
     fn toggle(&mut self) {}

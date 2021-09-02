@@ -15,7 +15,8 @@ use std::process::Command;
 use std::sync::mpsc::Sender;
 
 use crate::keyboard::keysyms;
-use fuzzy_matcher::skim::{fuzzy_indices, fuzzy_match};
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
 use unicode_segmentation::UnicodeSegmentation;
 
 pub struct Launcher<'a> {
@@ -90,15 +91,16 @@ impl<'a> Launcher<'a> {
         };
 
         let mut width_remaining: i32 = (width - x_off) as i32;
+        let fuzzy_matcher = SkimMatcherV2::default();
         for (idx, m) in self.matches.iter().enumerate() {
             let mut b = match buf.offset((x_off, 0)) {
                 Ok(b) => b,
                 Err(_) => break,
             };
             let size = if idx == self.offset && !self.input.is_empty() {
-                let (_, indices) =
-                    fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
-                        .unwrap_or((0, vec![]));
+                let (_, indices) = fuzzy_matcher
+                    .fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
+                    .unwrap_or((0, vec![]));
                 let mut colors = Vec::with_capacity(m.name.len());
                 for pos in 0..m.name.len() {
                     if indices.contains(&pos) {
@@ -223,7 +225,8 @@ impl Matcher {
     }
 
     fn try_match(&mut self, dtop: Desktop, val: &str, input: &str, prio: f32) {
-        if let Some(ma) = fuzzy_match(val, input) {
+        let fuzzy_matcher = SkimMatcherV2::default();
+        if let Some(ma) = fuzzy_matcher.fuzzy_match(val, input) {
             let ma = ((ma as f32) * prio) as i64;
             if let Some(ma_old) = self.matches.get(&dtop) {
                 // Skip over new matches for the same program that are worse

@@ -78,7 +78,8 @@ impl AppInner {
         );
         shell_surface.quick_assign(move |layer, event, _| match event {
             zwlr_layer_surface_v1::Event::Configure { serial, .. } => {
-                if !this_is_stupid.compare_and_swap(false, true, Ordering::SeqCst) {
+                if this_is_stupid.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst).is_ok()
+                {
                     *(configured_surfaces.lock().unwrap()) += 1;
                     layer.ack_configure(serial);
                     tx.send(Cmd::ForceDraw).unwrap();

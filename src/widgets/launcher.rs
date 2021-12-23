@@ -420,12 +420,13 @@ impl<'a> Widget for Launcher<'a> {
                                     &self.app_opener
                                 };
 
+                                let mut lexed = shlex::split(&exec).unwrap();
                                 let lexed = if !prefix.is_empty() {
                                     let mut prefix = shlex::split(prefix).unwrap();
-                                    prefix.push(exec);
+                                    prefix.append(&mut lexed);
                                     prefix
                                 } else {
-                                    shlex::split(&exec).unwrap()
+                                    lexed
                                 };
                                 if !lexed.is_empty() {
                                     let _ =

@@ -400,7 +400,7 @@ impl<'a> App<'a> {
                     version,
                 } => {
                     if let "wl_output" = &interface[..] {
-                        let output = registry.bind(version, id);
+                        let output = registry.bind(std::cmp::min(version, 3), id);
                         inner_global.lock().unwrap().add_output(id, output);
                     }
                 }

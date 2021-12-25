@@ -1,5 +1,6 @@
 extern crate ini;
 use ini::{Ini, ParseOption};
+use itertools::Itertools;
 use std::cmp::Ordering;
 use std::env;
 use std::error::Error;
@@ -107,5 +108,6 @@ pub fn load_desktop_files() -> Vec<Desktop> {
         .filter(|d| {
             !d.hidden && !d.no_display && (d.entry_type == "Application" || d.entry_type == "Link")
         })
+        .unique_by(|x| x.name.clone())
         .collect()
 }

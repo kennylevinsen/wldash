@@ -3,9 +3,9 @@ use ini::{Ini, ParseOption};
 use std::cmp::Ordering;
 use std::env;
 use std::error::Error;
-use std::fs;
 use std::io::Error as io_error;
 use std::io::ErrorKind;
+use walkdir::WalkDir;
 
 #[derive(Clone, Debug, Eq, Hash)]
 pub struct Desktop {
@@ -56,7 +56,7 @@ impl Desktop {
 
     fn parse_dir(d: &str) -> Result<Vec<Desktop>, Box<dyn Error>> {
         let mut files: Vec<Desktop> = Vec::with_capacity(16);
-        for entry in fs::read_dir(d)? {
+        for entry in WalkDir::new(d) {
             let entry = entry?;
             let path = entry.path();
 

@@ -97,7 +97,7 @@ impl<'a> Launcher<'a> {
                 Ok(b) => b,
                 Err(_) => break,
             };
-            let size = if idx == self.offset && !self.input.is_empty() {
+            let size = if idx == self.offset {
                 let (_, indices) = fuzzy_matcher
                     .fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
                     .unwrap_or((0, vec![]));

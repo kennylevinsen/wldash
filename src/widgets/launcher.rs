@@ -14,6 +14,7 @@ use std::collections::HashMap;
 use std::process::Command;
 use std::sync::mpsc::Sender;
 
+use crate::data::Data;
 use crate::keyboard::keysyms;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
@@ -34,6 +35,7 @@ pub struct Launcher<'a> {
     length: u32,
     dirty: bool,
     tx: Sender<Cmd>,
+    counter: Data,
 }
 
 impl<'a> Launcher<'a> {
@@ -61,6 +63,7 @@ impl<'a> Launcher<'a> {
             length,
             dirty: true,
             tx: listener,
+            counter: Data::load().unwrap_or_default(),
         })
     }
 
@@ -101,6 +104,7 @@ impl<'a> Launcher<'a> {
                 let (_, indices) = fuzzy_matcher
                     .fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
                     .unwrap_or((0, vec![]));
+
                 let mut colors = Vec::with_capacity(m.name.len());
                 for pos in 0..m.name.len() {
                     if indices.contains(&pos) {
@@ -215,12 +219,14 @@ fn wlcopy(s: &str) -> Result<(), String> {
 
 struct Matcher {
     matches: HashMap<Desktop, i64>,
+    counter: Data,
 }
 
 impl Matcher {
-    fn new() -> Self {
+    fn new(counter: Data) -> Self {
         Self {
             matches: HashMap::new(),
+            counter,
         }
     }
 
@@ -248,9 +254,12 @@ impl Matcher {
             .collect::<Vec<(i64, Desktop)>>();
 
         m.sort_by(|(ma1, d1), (ma2, d2)| {
-            if ma1 > ma2 {
+            let count1 = self.counter.entries.get(&d1.name).unwrap_or(&0);
+            let count2 = self.counter.entries.get(&d2.name).unwrap_or(&0);
+
+            if ma1 + count1 > ma2 + count2 {
                 Ordering::Less
-            } else if ma1 < ma2 {
+            } else if ma1 + count1 < ma2 + count2 {
                 Ordering::Greater
             } else if d1.name.len() < d2.name.len() {
                 Ordering::Less
@@ -306,7 +315,7 @@ impl<'a> Widget for Launcher<'a> {
             }
             Some('!') => (),
             _ => {
-                let mut matcher = Matcher::new();
+                let mut matcher = Matcher::new(self.counter.clone());
 
                 for desktop in self.options.iter() {
                     matcher.try_match(
@@ -428,6 +437,10 @@ impl<'a> Widget for Launcher<'a> {
                                 } else {
                                     lexed
                                 };
+
+                                *self.counter.entries.entry(d.name.clone()).or_insert(0) += 1;
+                                self.counter.save().expect("Unable to save data");
+
                                 if !lexed.is_empty() {
                                     let _ =
                                         Command::new(lexed[0].clone()).args(&lexed[1..]).spawn();

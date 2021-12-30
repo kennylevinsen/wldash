@@ -16,6 +16,7 @@ mod cmd;
 mod color;
 mod config;
 mod configfmt;
+mod data;
 mod desktop;
 mod doublemempool;
 mod draw;

@@ -37,8 +37,8 @@
 				{"launcher": {
 					"font_size": 32.0,
 					"length": 1200, 
-	            "app_opener": "swaymsg exec ",
-	            "term_opener": "alacritty -e ",
+	            "app_opener": "swaymsg exec -- ",
+	            "term_opener": "foot --",
 	            "url_opener": "xdg-open "
 	         }}
 			]}

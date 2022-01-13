@@ -21,7 +21,7 @@ impl<'a> Clock<'a> {
         clock_cache.add_str_to_cache("0123456789:");
 
         let digit = clock_cache.auto_widest("123456789")?;
-        let colon = (clock_cache.auto_widest(":")? as f32 * 1.25) as u32;
+        let colon = clock_cache.auto_widest(":")?;
 
         Ok(Box::new(Clock {
             cur_time: time,

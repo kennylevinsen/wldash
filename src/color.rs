@@ -8,9 +8,27 @@ pub struct Color {
     opacity: f32,
 }
 
+#[inline]
+fn validate_color(color: &Color) {
+    validate_color_range(color.red);
+    validate_color_range(color.green);
+    validate_color_range(color.blue);
+    validate_color_range(color.opacity);
+}
+
+#[inline]
+fn validate_color_range(value: f32) {
+    if value < 0.0 || value > 1.0 {
+        panic!("Invalid color value! Valid values are in the [0.0; 1.0] range.");
+    }
+}
+
 impl Color {
     pub fn new(red: f32, green: f32, blue: f32, opacity: f32) -> Color {
-        let (red, green, blue, opacity) = clamp(red, green, blue, opacity);
+        validate_color_range(red);
+        validate_color_range(green);
+        validate_color_range(blue);
+        validate_color_range(opacity);
         Color {
             red,
             green,
@@ -20,6 +38,8 @@ impl Color {
     }
 
     pub fn blend(&self, other: &Color, ratio: f32) -> Color {
+        validate_color(self);
+        validate_color(other);
         let ratio = clamp_f32(ratio, 0.0, 1.0);
 
         Color {
@@ -32,6 +52,7 @@ impl Color {
 
     #[inline]
     pub fn as_argb8888(&self) -> u32 {
+        validate_color(self);
         ((255.0 * self.opacity) as u32 & 0xFF) << 24
             | ((255.0 * self.red) as u32 & 0xFF) << 16
             | ((255.0 * self.green) as u32 & 0xFF) << 8

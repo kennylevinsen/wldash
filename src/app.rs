@@ -90,7 +90,7 @@ impl AppInner {
             _ => unreachable!(),
         });
 
-        shell_surface.set_keyboard_interactivity(1);
+        shell_surface.set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::Exclusive);
         shell_surface.set_size(1, 1);
         surface.set_buffer_scale(scale as i32);
         surface.commit();

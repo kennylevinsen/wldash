@@ -221,7 +221,7 @@ impl<'a> Widget for Calendar<'a> {
         let cals = self.sections - 1;
         let pre_cals = cals / 2;
         for _ in 0..pre_cals {
-            t = t.pred().with_day(1).unwrap();
+            t = t.pred_opt().unwrap().with_day(1).unwrap();
         }
 
         if o != 0 {

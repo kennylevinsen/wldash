@@ -15,11 +15,7 @@ const SELEM_ID: u32 = 0u32;
 fn alsa_error_to_io_error(fail: &'static str, err: &alsa::Error) -> ::std::io::Error {
     let kind = ::std::io::ErrorKind::Other;
     let func = err.func();
-    let errno = err
-        .errno()
-        .map(|errno| format!("; errno = {}", errno))
-        .unwrap_or_default();
-    ::std::io::Error::new(kind, format!("{}: {}{}", fail, func, errno))
+    ::std::io::Error::new(kind, format!("{}: {}{}", fail, func, err.errno()))
 }
 
 #[inline]

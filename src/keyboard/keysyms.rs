@@ -13,7 +13,8 @@ pub const XKB_KEY_Down: u32 = 0xff54; /* Move down, down arrow */
 pub const XKB_KEY_End: u32 = 0xff57; /* EOL */
 
 //pub const XKB_KEY_ISO_Left_Tab: u32 = 0xfe20;
-pub const XKB_KEY_e: u32 = 0x0065; /* U+0065 LATIN SMALL LETTER E */
 pub const XKB_KEY_a: u32 = 0x0061; /* U+0061 LATIN SMALL LETTER A */
+pub const XKB_KEY_e: u32 = 0x0065; /* U+0065 LATIN SMALL LETTER E */
 //pub const XKB_KEY_c: u32 = 0x0063; /* U+0063 LATIN SMALL LETTER C */
-//pub const XKB_KEY_u: u32 = 0x0075; /* U+0075 LATIN SMALL LETTER U */
+pub const XKB_KEY_k: u32 = 0x006b;  /* U+006B LATIN SMALL LETTER K */
+pub const XKB_KEY_u: u32 = 0x0075; /* U+0075 LATIN SMALL LETTER U */

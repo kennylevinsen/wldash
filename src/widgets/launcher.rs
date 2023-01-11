@@ -130,20 +130,46 @@ impl Prompt {
 
     fn backspace(&mut self) {
         let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
-        if !indices.is_empty() && self.cursor > 0 {
-            self.cursor -= 1;
-            indices.remove(self.cursor);
-            self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
+        if indices.is_empty() {
+            self.mode = PromptMode::Normal;
+            return;
+        }
+        if self.cursor == 0 {
+            return;
+        }
+        self.cursor -= 1;
+        indices.remove(self.cursor);
+        self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
+    }
+
+    fn delete(&mut self) {
+        let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if indices.is_empty() {
+            self.mode = PromptMode::Normal;
+            return;
+        }
+        if self.cursor >= indices.len() {
+            return;
+        }
+
+        indices.remove(self.cursor);
+        self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
+    }
+
+    fn clear_right(&mut self) {
+        let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if !indices.is_empty() {
+            self.input = indices[0..self.cursor].iter().fold("".into(), |acc, el| acc + el.1);
         } else {
             self.mode = PromptMode::Normal;
         }
     }
 
-    fn delete(&mut self) {
-        let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
-        if !indices.is_empty() && self.cursor < indices.len() {
-            indices.remove(self.cursor);
-            self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
+    fn clear_left(&mut self) {
+        let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if !indices.is_empty() {
+            self.input = indices[self.cursor..indices.len()].iter().fold("".into(), |acc, el| acc + el.1);
+            self.cursor = 0;
         } else {
             self.mode = PromptMode::Normal;
         }
@@ -524,6 +550,16 @@ impl Widget for Interface {
         match event.keysym {
             keysyms::XKB_KEY_a if event.modifiers.ctrl => self.inner.prompt.home(),
             keysyms::XKB_KEY_e if event.modifiers.ctrl => self.inner.prompt.end(),
+            keysyms::XKB_KEY_u if event.modifiers.ctrl => {
+                self.inner.prompt.clear_left();
+                self.inner.selection = 0;
+                widget.update(&self.inner);
+            },
+            keysyms::XKB_KEY_k if event.modifiers.ctrl => {
+                self.inner.prompt.clear_right();
+                self.inner.selection = 0;
+                widget.update(&self.inner);
+            },
             keysyms::XKB_KEY_Home => self.inner.prompt.home(),
             keysyms::XKB_KEY_End => self.inner.prompt.end(),
             keysyms::XKB_KEY_BackSpace => {

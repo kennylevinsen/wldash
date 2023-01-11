@@ -34,7 +34,7 @@ use widgets::{
     Margin, VerticalLayout, Widget, WidgetUpdater,
 };
 
-use std::{cell::RefCell, env, mem, rc::Rc, thread};
+use std::{cell::RefCell, env, mem, rc::Rc, thread, process::exit};
 
 enum MaybeFontMap {
     Waiting(thread::JoinHandle<FontMap>),
@@ -66,6 +66,7 @@ impl MaybeFontMap {
 struct State {
     running: bool,
     dirty: bool,
+    activated: bool,
     base_surface: Option<wl_surface::WlSurface>,
     wm_base: Option<xdg_wm_base::XdgWmBase>,
     xdg_surface: Option<(xdg_surface::XdgSurface, xdg_toplevel::XdgToplevel)>,
@@ -193,6 +194,7 @@ fn main() {
     let mut state = State {
         running: true,
         dirty: true,
+        activated: false,
         base_surface: None,
         wm_base: None,
         xdg_surface: None,
@@ -459,10 +461,19 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         match event {
-            xdg_toplevel::Event::Configure { width, height, .. } => {
+            xdg_toplevel::Event::Configure { width, height, states, .. } => {
                 if (width, height) == (0, 0) {
                     return;
                 }
+                let activated = states.iter().find(|&st| *st as u32 == xdg_toplevel::State::Activated as u32).is_some();
+
+                if activated {
+                    state.activated = true;
+                } else if state.activated && !activated {
+                    exit(0);
+                }
+
+
                 if state.dimensions != (width, height) {
                     state.bufmgr.clear_buffers();
                     state.dimensions = (width, height);

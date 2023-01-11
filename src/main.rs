@@ -30,7 +30,7 @@ use color::Color;
 use fonts::FontMap;
 use keyboard::Keyboard;
 use widgets::{
-    Battery, Clock, Date, Geometry, HorizontalLayout, IndexedLayout, Interface, Layout, Line,
+    Battery, Backlight, Clock, Date, Geometry, HorizontalLayout, IndexedLayout, Interface, Layout, Line,
     Margin, VerticalLayout, Widget, WidgetUpdater,
 };
 
@@ -150,6 +150,7 @@ fn main() {
     let line = Box::new(Line::new());
     let launcher = Box::new(Interface::new());
     let battery = Box::new(Battery::new(ping_sender));
+    let backlight = Box::new(Backlight::new("intel_backlight"));
 
     let mut event_loop: EventLoop<State> =
         EventLoop::try_new().expect("Failed to initialize the event loop!");
@@ -200,7 +201,7 @@ fn main() {
         configured: false,
         dimensions: (320, 240),
         bufmgr: bufmgr,
-        widgets: vec![clock, date, battery, line, launcher],
+        widgets: vec![clock, date, battery, backlight, line, launcher],
         keyboard: Keyboard::new(),
         fonts: MaybeFontMap::Waiting(font_thread),
     };
@@ -474,14 +475,22 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                                         widget: Box::new(IndexedLayout { widget_idx: 1 }),
                                         margin: (16, 8, 0, 0),
                                     }),
-                                    Box::new(Margin {
-                                        widget: Box::new(IndexedLayout { widget_idx: 2 }),
-                                        margin: (16, 8, 8, 0),
+                                    Box::new(VerticalLayout{
+                                        widgets: vec![
+                                            Box::new(Margin {
+                                                widget: Box::new(IndexedLayout { widget_idx: 2 }),
+                                                margin: (16, 8, 8, 0),
+                                            }),
+                                            Box::new(Margin {
+                                                widget: Box::new(IndexedLayout { widget_idx: 3 }),
+                                                margin: (16, 8, 8, 0),
+                                            }),
+                                        ],
                                     }),
                                 ],
                             }),
-                            Box::new(IndexedLayout { widget_idx: 3 }),
                             Box::new(IndexedLayout { widget_idx: 4 }),
+                            Box::new(IndexedLayout { widget_idx: 5 }),
                         ],
                     };
 

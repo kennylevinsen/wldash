@@ -1,14 +1,14 @@
+mod backlight;
 mod bar_widget;
 mod battery;
-mod backlight;
 mod clock;
 mod date;
 mod launcher;
 mod line;
 mod widget;
 
-pub use battery::Battery;
 pub use backlight::Backlight;
+pub use battery::Battery;
 pub use clock::Clock;
 pub use date::Date;
 pub use launcher::Interface;

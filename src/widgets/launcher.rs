@@ -110,11 +110,11 @@ impl Prompt {
                 "!" => {
                     self.mode = PromptMode::Shell;
                     return;
-                },
+                }
                 "=" => {
                     self.mode = PromptMode::Calc;
                     return;
-                },
+                }
                 _ => (),
             }
         }
@@ -159,7 +159,9 @@ impl Prompt {
     fn clear_right(&mut self) {
         let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
         if !indices.is_empty() {
-            self.input = indices[0..self.cursor].iter().fold("".into(), |acc, el| acc + el.1);
+            self.input = indices[0..self.cursor]
+                .iter()
+                .fold("".into(), |acc, el| acc + el.1);
         } else {
             self.mode = PromptMode::Normal;
         }
@@ -168,7 +170,9 @@ impl Prompt {
     fn clear_left(&mut self) {
         let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
         if !indices.is_empty() {
-            self.input = indices[self.cursor..indices.len()].iter().fold("".into(), |acc, el| acc + el.1);
+            self.input = indices[self.cursor..indices.len()]
+                .iter()
+                .fold("".into(), |acc, el| acc + el.1);
             self.cursor = 0;
         } else {
             self.mode = PromptMode::Normal;
@@ -186,7 +190,12 @@ impl Prompt {
 
 trait InterfaceWidget {
     fn trigger(&mut self, intf: &InnerInterface);
-    fn draw(&mut self, intf: &InnerInterface, fonts: &mut FontMap, view: &mut BufferView) -> Geometry;
+    fn draw(
+        &mut self,
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry;
     fn update(&mut self, intf: &InnerInterface);
 }
 
@@ -266,7 +275,12 @@ impl InterfaceWidget for Launcher {
         self.matches = matcher.matches();
     }
 
-    fn draw(&mut self, intf: &InnerInterface, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
+    fn draw(
+        &mut self,
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry {
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
 
@@ -290,13 +304,8 @@ impl InterfaceWidget for Launcher {
         .unwrap();
 
         let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
-        font.auto_draw_text(
-            &mut prompt_line,
-            &bg,
-            &fg,
-            ">",
-        )
-        .unwrap();
+        font.auto_draw_text(&mut prompt_line, &bg, &fg, ">")
+            .unwrap();
 
         // Draw entries
         let dimfg = Color::new(0.5, 0.5, 0.5, 1.0);
@@ -331,8 +340,11 @@ impl InterfaceWidget for Launcher {
             }
         }
 
-        let content_height = min(intf.geometry.height, (self.matches.len() + 1) as u32 * line_height + 16);
-        Geometry{
+        let content_height = min(
+            intf.geometry.height,
+            (self.matches.len() + 1) as u32 * line_height + 16,
+        );
+        Geometry {
             x: intf.geometry.x,
             y: intf.geometry.y + intf.geometry.height - content_height,
             width: intf.geometry.width,
@@ -341,7 +353,7 @@ impl InterfaceWidget for Launcher {
     }
 }
 
-struct Shell ();
+struct Shell();
 
 impl InterfaceWidget for Shell {
     fn trigger(&mut self, intf: &InnerInterface) {
@@ -359,7 +371,12 @@ impl InterfaceWidget for Shell {
 
     fn update(&mut self, _intf: &InnerInterface) {}
 
-    fn draw(&mut self, intf: &InnerInterface, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
+    fn draw(
+        &mut self,
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry {
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
 
@@ -382,15 +399,10 @@ impl InterfaceWidget for Shell {
         )
         .unwrap();
         let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
-        font.auto_draw_text(
-            &mut prompt_line,
-            &bg,
-            &Color::new(1., 0.75, 0.5, 1.),
-            "!",
-        )
-        .unwrap();
+        font.auto_draw_text(&mut prompt_line, &bg, &Color::new(1., 0.75, 0.5, 1.), "!")
+            .unwrap();
 
-        Geometry{
+        Geometry {
             x: intf.geometry.x,
             y: intf.geometry.y + intf.geometry.height - line_height,
             width: intf.geometry.width,
@@ -412,16 +424,22 @@ impl InterfaceWidget for Calc {
     }
 
     fn update(&mut self, intf: &InnerInterface) {
-        let res = rcalc_lib::parse::eval(&intf.prompt.input, &mut rcalc_lib::parse::CalcState::new())
-            .map(|x| format!("{}", x))
-            .map_err(|x| format!("{}", x));
+        let res =
+            rcalc_lib::parse::eval(&intf.prompt.input, &mut rcalc_lib::parse::CalcState::new())
+                .map(|x| format!("{}", x))
+                .map_err(|x| format!("{}", x));
         self.result = match res {
             Ok(v) => Some(v),
             Err(_) => None,
         };
     }
 
-    fn draw(&mut self, intf: &InnerInterface, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
+    fn draw(
+        &mut self,
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry {
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
 
@@ -435,28 +453,25 @@ impl InterfaceWidget for Calc {
 
         // Draw prompt
         let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
-        let res_off = font.auto_draw_text_with_cursor(
-            &mut prompt_line,
-            &bg,
-            &fg,
-            &format!("   {} ", &intf.prompt.input),
-            intf.prompt.cursor + 3,
-        )
-        .unwrap();
+        let res_off = font
+            .auto_draw_text_with_cursor(
+                &mut prompt_line,
+                &bg,
+                &fg,
+                &format!("   {} ", &intf.prompt.input),
+                intf.prompt.cursor + 3,
+            )
+            .unwrap();
 
         let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
-        font.auto_draw_text(
-            &mut prompt_line,
-            &bg,
-            &Color::new(1., 0.75, 0.5, 1.),
-            "=",
-        )
-        .unwrap();
+        font.auto_draw_text(&mut prompt_line, &bg, &Color::new(1., 0.75, 0.5, 1.), "=")
+            .unwrap();
 
         if let Some(res) = &self.result {
             let resfg = Color::new(1.0, 0.65, 0., 1.0);
             let mut result_line = view.offset((res_off.0, prompt_offset)).unwrap();
-            font.auto_draw_text(&mut result_line, &bg, &resfg, &format!(" = {}", &res)).unwrap();
+            font.auto_draw_text(&mut result_line, &bg, &resfg, &format!(" = {}", &res))
+                .unwrap();
         }
 
         for m in self.old.iter().rev() {
@@ -466,11 +481,15 @@ impl InterfaceWidget for Calc {
             }
             prompt_offset -= LAUNCHER_SIZE.ceil() as u32;
             let mut result_line = view.offset((0, prompt_offset)).unwrap();
-            font.auto_draw_text(&mut result_line, &bg, &dimfg, &m).unwrap();
+            font.auto_draw_text(&mut result_line, &bg, &dimfg, &m)
+                .unwrap();
         }
 
-        let content_height = min(intf.geometry.height, (self.old.len() + 1) as u32 * line_height + 16);
-        Geometry{
+        let content_height = min(
+            intf.geometry.height,
+            (self.old.len() + 1) as u32 * line_height + 16,
+        );
+        Geometry {
             x: intf.geometry.x,
             y: intf.geometry.y + intf.geometry.height - content_height,
             width: intf.geometry.width,
@@ -495,14 +514,14 @@ pub struct Interface {
 
 impl Interface {
     pub fn new() -> Interface {
-        Interface{
+        Interface {
             launcher: Launcher::new(),
-            shell: Shell{},
-            calc: Calc{
+            shell: Shell {},
+            calc: Calc {
                 old: Vec::new(),
                 result: None,
             },
-            inner: InnerInterface{
+            inner: InnerInterface {
                 dirty: false,
                 geometry: Default::default(),
                 selection: 0,
@@ -554,12 +573,12 @@ impl Widget for Interface {
                 self.inner.prompt.clear_left();
                 self.inner.selection = 0;
                 widget.update(&self.inner);
-            },
+            }
             keysyms::XKB_KEY_k if event.modifiers.ctrl => {
                 self.inner.prompt.clear_right();
                 self.inner.selection = 0;
                 widget.update(&self.inner);
-            },
+            }
             keysyms::XKB_KEY_Home => self.inner.prompt.home(),
             keysyms::XKB_KEY_End => self.inner.prompt.end(),
             keysyms::XKB_KEY_BackSpace => {
@@ -599,4 +618,3 @@ impl Widget for Interface {
         self.launcher.next_token = Some(token.to_string());
     }
 }
-

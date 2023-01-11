@@ -1,4 +1,4 @@
-use std::cmp::{min, max};
+use std::cmp::{max, min};
 use std::fmt;
 
 use crate::{buffer::BufferView, fonts::FontMap, keyboard::KeyEvent};
@@ -23,7 +23,7 @@ impl fmt::Display for Geometry {
 
 impl Geometry {
     pub fn new() -> Geometry {
-        Geometry{
+        Geometry {
             x: 0,
             y: 0,
             width: 0,
@@ -35,7 +35,8 @@ impl Geometry {
         let x = min(self.x, other.x);
         let y = min(self.y, other.y);
         Geometry {
-            x, y,
+            x,
+            y,
             width: max(self.width + self.x, other.width + other.x) - x,
             height: max(self.height + self.y, other.height + other.height) - y,
         }
@@ -148,7 +149,7 @@ impl<U> Layout<U> for Margin<U> {
         geometry: &Geometry,
         user_data: &mut U,
     ) -> Geometry {
-        let geo = Geometry{
+        let geo = Geometry {
             x: geometry.x + self.margin.0,
             y: geometry.y + self.margin.1,
             width: geometry.width - self.margin.0 - self.margin.2,

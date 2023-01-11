@@ -1,15 +1,12 @@
 use std::{
     fs,
-    io::{ErrorKind, Error},
+    io::{Error, ErrorKind},
     path::{Path, PathBuf},
 };
 
 use crate::{
     color::Color,
-    widgets::bar_widget::{
-        BarWidget,
-        BarWidgetImpl,
-    },
+    widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
 
 fn read_file_as_u64(path: &Path) -> Result<u64, Error> {
@@ -33,7 +30,7 @@ impl Backlight {
     }
 
     pub fn new(path: &str) -> BarWidget {
-        let mut dev = Backlight{
+        let mut dev = Backlight {
             device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
             cur: 0,
             max: 0,

@@ -30,11 +30,11 @@ use color::Color;
 use fonts::FontMap;
 use keyboard::Keyboard;
 use widgets::{
-    Battery, Backlight, Clock, Date, Geometry, HorizontalLayout, IndexedLayout, Interface, Layout, Line,
-    Margin, VerticalLayout, Widget, WidgetUpdater,
+    Backlight, Battery, Clock, Date, Geometry, HorizontalLayout, IndexedLayout, Interface, Layout,
+    Line, Margin, VerticalLayout, Widget, WidgetUpdater,
 };
 
-use std::{cell::RefCell, env, mem, rc::Rc, thread, process::exit};
+use std::{cell::RefCell, env, mem, process::exit, rc::Rc, thread};
 
 enum MaybeFontMap {
     Waiting(thread::JoinHandle<FontMap>),
@@ -143,7 +143,7 @@ fn main() {
     let bufmgr = BufferManager {
         buffers: Vec::new(),
     };
-    
+
     let (ping_sender, ping_source) = calloop::ping::make_ping().unwrap();
 
     let clock = Box::new(Clock::new());
@@ -212,7 +212,7 @@ fn main() {
     for _ in 0..state.widgets.len() {
         damage.push(Geometry::new());
     }
-   
+
     while state.running {
         event_loop
             .dispatch(None, &mut state)
@@ -461,18 +461,25 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         match event {
-            xdg_toplevel::Event::Configure { width, height, states, .. } => {
+            xdg_toplevel::Event::Configure {
+                width,
+                height,
+                states,
+                ..
+            } => {
                 if (width, height) == (0, 0) {
                     return;
                 }
-                let activated = states.iter().find(|&st| *st as u32 == xdg_toplevel::State::Activated as u32).is_some();
+                let activated = states
+                    .iter()
+                    .find(|&st| *st as u32 == xdg_toplevel::State::Activated as u32)
+                    .is_some();
 
                 if activated {
                     state.activated = true;
                 } else if state.activated && !activated {
                     exit(0);
                 }
-
 
                 if state.dimensions != (width, height) {
                     state.bufmgr.clear_buffers();
@@ -486,7 +493,7 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                                         widget: Box::new(IndexedLayout { widget_idx: 1 }),
                                         margin: (16, 8, 0, 0),
                                     }),
-                                    Box::new(VerticalLayout{
+                                    Box::new(VerticalLayout {
                                         widgets: vec![
                                             Box::new(Margin {
                                                 widget: Box::new(IndexedLayout { widget_idx: 2 }),

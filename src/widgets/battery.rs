@@ -1,25 +1,19 @@
 use std::{
+    sync::{Arc, Mutex},
     thread,
     time::Duration,
-    sync::{Arc, Mutex},
 };
 
 use calloop::ping::Ping;
 
 use dbus::blocking::{
+    stdintf::org_freedesktop_dbus::{Properties, PropertiesPropertiesChanged},
     LocalConnection,
-    stdintf::org_freedesktop_dbus::{
-        Properties,
-        PropertiesPropertiesChanged,
-    },
 };
 
 use crate::{
     color::Color,
-    widgets::bar_widget::{
-        BarWidget,
-        BarWidgetImpl,
-    },
+    widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
 
 enum UpowerBatteryState {
@@ -40,59 +34,75 @@ fn start_monitor(inner: Arc<Mutex<InnerBattery>>, ping: Ping) {
     thread::Builder::new()
         .name("battmon".to_string())
         .spawn(move || {
-        let conn = LocalConnection::new_system().unwrap();
-        let device_path = "/org/freedesktop/UPower/devices/DisplayDevice";
-        let proxy = conn.with_proxy("org.freedesktop.UPower", device_path, Duration::from_millis(500));
+            let conn = LocalConnection::new_system().unwrap();
+            let device_path = "/org/freedesktop/UPower/devices/DisplayDevice";
+            let proxy = conn.with_proxy(
+                "org.freedesktop.UPower",
+                device_path,
+                Duration::from_millis(500),
+            );
 
-        let capacity: f64 = proxy.get("org.freedesktop.UPower.Device", "Percentage").expect("unable to get property");
-        let state: u32 = proxy.get("org.freedesktop.UPower.Device", "State").expect("unable to get state");
+            let capacity: f64 = proxy
+                .get("org.freedesktop.UPower.Device", "Percentage")
+                .expect("unable to get property");
+            let state: u32 = proxy
+                .get("org.freedesktop.UPower.Device", "State")
+                .expect("unable to get state");
 
-        {
-            let mut inner = inner.lock().unwrap();
-            inner.value = capacity as f32 / 100.;
-            inner.state = match state {
-                1 => UpowerBatteryState::Charging,
-                2 => UpowerBatteryState::Discharging,
-                3 => UpowerBatteryState::Empty,
-                4 => UpowerBatteryState::Full,
-                5 => UpowerBatteryState::NotCharging,
-                6 => UpowerBatteryState::Discharging,
-                _ => UpowerBatteryState::Unknown,
-            }
-        }
-
-
-        proxy.match_signal(move |c: PropertiesPropertiesChanged, _: &LocalConnection, _: &dbus::Message| {
-            if c.interface_name != "org.freedesktop.UPower.Device" {
-                return true;
-            }
-            let mut inner = inner.lock().unwrap();
-            for (key, value) in c.changed_properties {
-                match key.as_str() {
-                    "State" => {
-                        inner.state = match value.0.as_u64().unwrap() {
-                            1 => UpowerBatteryState::Charging,
-                            2 => UpowerBatteryState::Discharging,
-                            3 => UpowerBatteryState::Empty,
-                            4 => UpowerBatteryState::Full,
-                            5 => UpowerBatteryState::NotCharging,
-                            6 => UpowerBatteryState::Discharging,
-                            _ => UpowerBatteryState::Unknown,
-                        };
-                        ping.ping();
-                    },
-                    "Percentage" => {
-                        inner.value = value.0.as_f64().unwrap() as f32 / 100.;
-                        ping.ping();
-                    },
-                    _ => (),
+            {
+                let mut inner = inner.lock().unwrap();
+                inner.value = capacity as f32 / 100.;
+                inner.state = match state {
+                    1 => UpowerBatteryState::Charging,
+                    2 => UpowerBatteryState::Discharging,
+                    3 => UpowerBatteryState::Empty,
+                    4 => UpowerBatteryState::Full,
+                    5 => UpowerBatteryState::NotCharging,
+                    6 => UpowerBatteryState::Discharging,
+                    _ => UpowerBatteryState::Unknown,
                 }
             }
-            true
-        }).unwrap();
 
-        loop { conn.process(Duration::from_millis(60000)).unwrap(); }
-    }).unwrap();
+            proxy
+                .match_signal(
+                    move |c: PropertiesPropertiesChanged,
+                          _: &LocalConnection,
+                          _: &dbus::Message| {
+                        if c.interface_name != "org.freedesktop.UPower.Device" {
+                            return true;
+                        }
+                        let mut inner = inner.lock().unwrap();
+                        for (key, value) in c.changed_properties {
+                            match key.as_str() {
+                                "State" => {
+                                    inner.state = match value.0.as_u64().unwrap() {
+                                        1 => UpowerBatteryState::Charging,
+                                        2 => UpowerBatteryState::Discharging,
+                                        3 => UpowerBatteryState::Empty,
+                                        4 => UpowerBatteryState::Full,
+                                        5 => UpowerBatteryState::NotCharging,
+                                        6 => UpowerBatteryState::Discharging,
+                                        _ => UpowerBatteryState::Unknown,
+                                    };
+                                    ping.ping();
+                                }
+                                "Percentage" => {
+                                    inner.value = value.0.as_f64().unwrap() as f32 / 100.;
+                                    ping.ping();
+                                }
+                                _ => (),
+                            }
+                        }
+                        true
+                    },
+                )
+                .unwrap();
+
+            loop {
+                conn.process(Duration::from_millis(60000)).unwrap();
+            }
+        })
+        .unwrap();
 }
 
 pub struct Battery {
@@ -102,8 +112,8 @@ pub struct Battery {
 
 impl Battery {
     pub fn new(ping: Ping) -> BarWidget {
-        let battery = Battery{
-            inner: Arc::new(Mutex::new(InnerBattery{
+        let battery = Battery {
+            inner: Arc::new(Mutex::new(InnerBattery {
                 value: 0.,
                 state: UpowerBatteryState::Unknown,
             })),
@@ -113,7 +123,6 @@ impl Battery {
         BarWidget::new(Box::new(battery))
     }
 }
-
 
 impl BarWidgetImpl for Battery {
     fn get_dirty(&self) -> bool {

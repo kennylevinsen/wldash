@@ -1,7 +1,4 @@
-use std::{
-    cmp::min,
-    default::Default,
-};
+use std::{cmp::min, default::Default};
 
 use crate::{
     buffer::BufferView,
@@ -94,4 +91,3 @@ impl Widget for BarWidget {
         self.geometry
     }
 }
-

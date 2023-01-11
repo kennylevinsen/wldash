@@ -6,6 +6,14 @@ use std::{
 
 use calloop::ping::Ping;
 
+use dbus::blocking::{
+    LocalConnection,
+    stdintf::org_freedesktop_dbus::{
+        Properties,
+        PropertiesPropertiesChanged,
+    },
+};
+
 use crate::{
     color::Color,
     widgets::bar_widget::{
@@ -29,10 +37,9 @@ struct InnerBattery {
 }
 
 fn start_monitor(inner: Arc<Mutex<InnerBattery>>, ping: Ping) {
-    thread::spawn(move || {
-        use dbus::blocking::LocalConnection;
-        use dbus::blocking::stdintf::org_freedesktop_dbus::Properties;
-        use dbus::blocking::stdintf::org_freedesktop_dbus::PropertiesPropertiesChanged;
+    thread::Builder::new()
+        .name("battmon".to_string())
+        .spawn(move || {
         let conn = LocalConnection::new_system().unwrap();
         let device_path = "/org/freedesktop/UPower/devices/DisplayDevice";
         let proxy = conn.with_proxy("org.freedesktop.UPower", device_path, Duration::from_millis(500));
@@ -85,7 +92,7 @@ fn start_monitor(inner: Arc<Mutex<InnerBattery>>, ping: Ping) {
         }).unwrap();
 
         loop { conn.process(Duration::from_millis(60000)).unwrap(); }
-    });
+    }).unwrap();
 }
 
 pub struct Battery {
@@ -109,7 +116,6 @@ impl Battery {
 
 
 impl BarWidgetImpl for Battery {
-    fn update(&mut self) {}
     fn get_dirty(&self) -> bool {
         self.dirty
     }
@@ -127,10 +133,12 @@ impl BarWidgetImpl for Battery {
         let inner = self.inner.lock().unwrap();
         match inner.state {
             UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => {
-                if inner.value > 0.1 {
+                if inner.value > 0.25 {
                     Color::new(1.0, 1.0, 1.0, 1.0)
-                } else {
+                } else if inner.value > 0.1 {
                     Color::new(1.0, 0.5, 0.0, 1.0)
+                } else {
+                    Color::new(1.0, 0.0, 0.0, 1.0)
                 }
             }
             UpowerBatteryState::Charging | UpowerBatteryState::Full => {

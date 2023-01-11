@@ -17,7 +17,6 @@ const BAR_SIZE: f32 = 24.;
 pub trait BarWidgetImpl {
     fn get_dirty(&self) -> bool;
     fn set_dirty(&mut self, dirty: bool);
-    fn update(&mut self);
     fn name(&self) -> &'static str;
     fn value(&self) -> f32;
     fn color(&self) -> Color;

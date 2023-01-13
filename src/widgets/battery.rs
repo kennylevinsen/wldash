@@ -111,7 +111,7 @@ pub struct Battery {
 }
 
 impl Battery {
-    pub fn new(ping: Ping) -> BarWidget {
+    pub fn new(ping: Ping, font: &'static str, size: f32) -> BarWidget {
         let battery = Battery {
             inner: Arc::new(Mutex::new(InnerBattery {
                 value: 0.,
@@ -120,7 +120,7 @@ impl Battery {
             dirty: false,
         };
         start_monitor(battery.inner.clone(), ping);
-        BarWidget::new(Box::new(battery))
+        BarWidget::new(Box::new(battery), font, size)
     }
 }
 

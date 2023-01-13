@@ -9,10 +9,9 @@ use crate::{
 
 use chrono::{Local, Timelike};
 
-const CLOCK_FONT: &str = "sans";
-const CLOCK_SIZE: f32 = 96.;
-
 pub struct Clock {
+    font: &'static str,
+    size: f32,
     dirty: bool,
     geometry: Geometry,
     digit_width: u32,
@@ -20,8 +19,9 @@ pub struct Clock {
 }
 
 impl<'a> Clock {
-    pub fn new() -> Clock {
+    pub fn new(font: &'static str, size: f32) -> Clock {
         Clock {
+            font, size,
             dirty: true,
             geometry: Default::default(),
             digit_width: 0,
@@ -49,7 +49,7 @@ impl<'a> Widget for Clock {
 
         let digit = self.digit_width;
         let colon = self.colon_width;
-        let font = fonts.get_font(CLOCK_FONT, CLOCK_SIZE);
+        let font = fonts.get_font(self.font, self.size);
         font.draw_text_fixed_width(
             view,
             &bg,
@@ -62,14 +62,14 @@ impl<'a> Widget for Clock {
     }
 
     fn geometry_update(&mut self, fonts: &mut FontMap, geometry: &Geometry) -> Geometry {
-        let font = fonts.get_font(CLOCK_FONT, CLOCK_SIZE);
+        let font = fonts.get_font(self.font, self.size);
         self.digit_width = font.auto_widest("0123456789").unwrap();
         self.colon_width = font.auto_widest(":").unwrap();
         self.geometry = Geometry {
             x: geometry.x,
             y: geometry.y,
             width: self.digit_width * 4 + self.colon_width,
-            height: CLOCK_SIZE.ceil() as u32,
+            height: self.size.ceil() as u32,
         };
         self.geometry
     }

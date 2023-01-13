@@ -1,7 +1,11 @@
-use std::cmp::{min, Ordering};
-use std::collections::HashMap;
-use std::default::Default;
-use std::process::{exit, Command};
+use std::{
+    cmp::{min, max, Ordering},
+    collections::HashMap,
+    default::Default,
+    process::{exit, Command},
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use crate::{
     buffer::BufferView,
@@ -16,12 +20,6 @@ use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use unicode_segmentation::UnicodeSegmentation;
 use wayland_client::{protocol::wl_keyboard, WEnum};
-
-use std::sync::{Arc, Mutex};
-use std::thread;
-
-const LAUNCHER_FONT: &str = "monospace";
-const LAUNCHER_SIZE: f32 = 32.;
 
 struct Matcher {
     matches: HashMap<Desktop, i64>,
@@ -284,7 +282,7 @@ impl InterfaceWidget for Launcher {
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
 
-        let line_height = LAUNCHER_SIZE.ceil() as u32;
+        let line_height = intf.size.ceil() as u32;
 
         // Draw line
         let mut prompt_offset = intf.geometry.height - line_height;
@@ -292,9 +290,8 @@ impl InterfaceWidget for Launcher {
         let mut prompt_border = prompt_line.limit((intf.geometry.width, 1)).unwrap();
         prompt_border.memset(&fg);
 
-        // Draw prompt
-        let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
-        font.auto_draw_text_with_cursor(
+        let font = fonts.get_font(intf.font, intf.size);
+        let mut x_max = font.auto_draw_text_with_cursor(
             &mut prompt_line,
             &bg,
             &fg,
@@ -303,7 +300,6 @@ impl InterfaceWidget for Launcher {
         )
         .unwrap();
 
-        let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
         font.auto_draw_text(&mut prompt_line, &bg, &fg, ">")
             .unwrap();
 
@@ -332,11 +328,11 @@ impl InterfaceWidget for Launcher {
                         colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
                     }
                 }
-                font.auto_draw_text_individual_colors(&mut line, &bg, &colors, &m.name)
-                    .unwrap();
+                x_max = max(x_max, font.auto_draw_text_individual_colors(&mut line, &bg, &colors, &m.name)
+                    .unwrap());
             } else {
-                font.auto_draw_text(&mut line, &bg, &dimfg, &m.name)
-                    .unwrap();
+                x_max = max(x_max, font.auto_draw_text(&mut line, &bg, &dimfg, &m.name)
+                    .unwrap());
             }
         }
 
@@ -347,7 +343,7 @@ impl InterfaceWidget for Launcher {
         Geometry {
             x: intf.geometry.x,
             y: intf.geometry.y + intf.geometry.height - content_height,
-            width: intf.geometry.width,
+            width: x_max.0+1,
             height: content_height,
         }
     }
@@ -380,7 +376,7 @@ impl InterfaceWidget for Shell {
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
 
-        let line_height = LAUNCHER_SIZE.ceil() as u32;
+        let line_height = intf.size.ceil() as u32;
 
         // Draw line
         let prompt_offset = intf.geometry.height - line_height;
@@ -389,8 +385,8 @@ impl InterfaceWidget for Shell {
         prompt_border.memset(&fg);
 
         // Draw prompt
-        let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
-        font.auto_draw_text_with_cursor(
+        let font = fonts.get_font(intf.font, intf.size);
+        let x_max = font.auto_draw_text_with_cursor(
             &mut prompt_line,
             &bg,
             &fg,
@@ -398,14 +394,13 @@ impl InterfaceWidget for Shell {
             intf.prompt.cursor + 3,
         )
         .unwrap();
-        let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
         font.auto_draw_text(&mut prompt_line, &bg, &Color::new(1., 0.75, 0.5, 1.), "!")
             .unwrap();
 
         Geometry {
             x: intf.geometry.x,
             y: intf.geometry.y + intf.geometry.height - line_height,
-            width: intf.geometry.width,
+            width: x_max.0 + 1,
             height: line_height,
         }
     }
@@ -443,16 +438,16 @@ impl InterfaceWidget for Calc {
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
 
-        let line_height = LAUNCHER_SIZE.ceil() as u32;
+        let line_height = intf.size.ceil() as u32;
 
         // Draw line
-        let mut prompt_offset = intf.geometry.height - (LAUNCHER_SIZE.ceil() as u32);
+        let mut prompt_offset = intf.geometry.height - (line_height);
         let mut prompt_line = view.offset((0, prompt_offset)).unwrap();
         let mut prompt_border = prompt_line.limit((intf.geometry.width, 1)).unwrap();
         prompt_border.memset(&fg);
 
         // Draw prompt
-        let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
+        let font = fonts.get_font(intf.font, intf.size);
         let res_off = font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
@@ -463,7 +458,6 @@ impl InterfaceWidget for Calc {
             )
             .unwrap();
 
-        let font = fonts.get_font(LAUNCHER_FONT, LAUNCHER_SIZE);
         font.auto_draw_text(&mut prompt_line, &bg, &Color::new(1., 0.75, 0.5, 1.), "=")
             .unwrap();
 
@@ -476,10 +470,10 @@ impl InterfaceWidget for Calc {
 
         for m in self.old.iter().rev() {
             let dimfg = Color::new(0.5, 0.5, 0.5, 1.0);
-            if prompt_offset < LAUNCHER_SIZE.ceil() as u32 {
+            if prompt_offset < line_height {
                 break;
             }
-            prompt_offset -= LAUNCHER_SIZE.ceil() as u32;
+            prompt_offset -= line_height;
             let mut result_line = view.offset((0, prompt_offset)).unwrap();
             font.auto_draw_text(&mut result_line, &bg, &dimfg, &m)
                 .unwrap();
@@ -499,6 +493,8 @@ impl InterfaceWidget for Calc {
 }
 
 struct InnerInterface {
+    font: &'static str,
+    size: f32,
     dirty: bool,
     geometry: Geometry,
     selection: usize,
@@ -513,7 +509,7 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub fn new() -> Interface {
+    pub fn new(font: &'static str, size: f32) -> Interface {
         Interface {
             launcher: Launcher::new(),
             shell: Shell {},
@@ -522,6 +518,7 @@ impl Interface {
                 result: None,
             },
             inner: InnerInterface {
+                font, size,
                 dirty: false,
                 geometry: Default::default(),
                 selection: 0,

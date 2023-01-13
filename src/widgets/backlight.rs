@@ -29,7 +29,7 @@ impl Backlight {
         self.max = read_file_as_u64(self.device_path.join("max_brightness").as_path()).unwrap();
     }
 
-    pub fn new(path: &str) -> BarWidget {
+    pub fn new(path: &str, font: &'static str, size: f32) -> BarWidget {
         let mut dev = Backlight {
             device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
             cur: 0,
@@ -38,7 +38,7 @@ impl Backlight {
         };
 
         dev.update();
-        BarWidget::new(Box::new(dev))
+        BarWidget::new(Box::new(dev), font, size)
     }
 }
 

@@ -4,12 +4,17 @@ use crate::draw;
 use fontconfig::Fontconfig as FontConfig;
 use rusttype::Font;
 use std::{
+    cell::RefCell,
+    mem,
+    rc::Rc,
+    thread,
     collections::HashMap,
     fs::File,
     hash,
     io::Read,
     path::{Path, PathBuf},
 };
+
 
 /// FontRef is used to store Fonts on widgets.
 pub type FontRef<'a> = &'a rusttype::Font<'a>;
@@ -126,3 +131,31 @@ impl FontMap {
             .expect("no font at specified size")
     }
 }
+
+pub enum MaybeFontMap {
+    Waiting(thread::JoinHandle<FontMap>),
+    Ready(Rc<RefCell<FontMap>>),
+    Invalid,
+}
+
+impl MaybeFontMap {
+    pub fn unwrap(&self) -> Rc<RefCell<FontMap>> {
+        match self {
+            MaybeFontMap::Ready(f) => f.clone(),
+            _ => panic!("fontmap not yet ready"),
+        }
+    }
+
+    pub fn resolve(&mut self) {
+        if matches!(self, MaybeFontMap::Waiting(_)) {
+            let s = mem::replace(self, MaybeFontMap::Invalid);
+            match s {
+                MaybeFontMap::Waiting(handle) => {
+                    *self = MaybeFontMap::Ready(Rc::new(RefCell::new(handle.join().unwrap())));
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+

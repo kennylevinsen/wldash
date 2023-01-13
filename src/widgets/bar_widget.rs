@@ -8,9 +8,6 @@ use crate::{
     widgets::{Geometry, Widget},
 };
 
-const BAR_FONT: &str = "sans";
-const BAR_SIZE: f32 = 24.;
-
 pub trait BarWidgetImpl {
     fn get_dirty(&self) -> bool;
     fn set_dirty(&mut self, dirty: bool);
@@ -20,15 +17,17 @@ pub trait BarWidgetImpl {
 }
 
 pub struct BarWidget {
+    font: &'static str,
+    size: f32,
     geometry: Geometry,
     inner_widget: Box<dyn BarWidgetImpl>,
 }
 
 impl BarWidget {
-    pub fn new(inner_widget: Box<dyn BarWidgetImpl>) -> BarWidget {
+    pub fn new(inner_widget: Box<dyn BarWidgetImpl>, font: &'static str, size: f32) -> BarWidget {
         BarWidget {
             geometry: Default::default(),
-            inner_widget,
+            inner_widget, font, size,
         }
     }
 }
@@ -47,13 +46,13 @@ impl Widget for BarWidget {
     }
 
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
-        let font = fonts.get_font(BAR_FONT, BAR_SIZE);
+        let font = fonts.get_font(self.font, self.size);
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
 
         font.auto_draw_text(view, &bg, &fg, self.inner_widget.name())
             .unwrap();
-        let size = BAR_SIZE.ceil() as u32;
+        let size = self.size.ceil() as u32;
         let bar_offset = 4 * size;
         let val = self.inner_widget.value();
 
@@ -86,7 +85,7 @@ impl Widget for BarWidget {
             x: x,
             y: geometry.y,
             width: w,
-            height: BAR_SIZE.ceil() as u32,
+            height: self.size.ceil() as u32,
         };
         self.geometry
     }

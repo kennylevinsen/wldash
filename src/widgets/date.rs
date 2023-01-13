@@ -9,17 +9,17 @@ use crate::{
 
 use chrono::{Datelike, Local};
 
-const DATE_FONT: &str = "sans";
-const DATE_SIZE: f32 = 40.;
-
 pub struct Date {
+    font: &'static str,
+    size: f32,
     dirty: bool,
     geometry: Geometry,
 }
 
 impl Date {
-    pub fn new() -> Date {
+    pub fn new(font: &'static str, size: f32) -> Date {
         Date {
+            font, size,
             dirty: true,
             geometry: Default::default(),
         }
@@ -43,7 +43,7 @@ impl<'a> Widget for Date {
         let fg = Color::new(1., 1., 1., 1.);
         let bg = Color::new(0., 0., 0., 1.);
         let mut date_line = view.offset((0, 8)).unwrap();
-        let font = fonts.get_font(DATE_FONT, DATE_SIZE);
+        let font = fonts.get_font(self.font, self.size);
         font.auto_draw_text(
             &mut date_line,
             &bg,
@@ -61,11 +61,12 @@ impl<'a> Widget for Date {
     }
 
     fn geometry_update(&mut self, _fonts: &mut FontMap, geometry: &Geometry) -> Geometry {
+        let width = (3. + 2. + 2. + 2. + 4.) * self.size / 2.;
         self.geometry = Geometry {
             x: geometry.x,
             y: geometry.y,
-            width: 256,
-            height: DATE_SIZE.ceil() as u32,
+            width: width.ceil() as u32,
+            height: self.size.ceil() as u32,
         };
         self.geometry
     }

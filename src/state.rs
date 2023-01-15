@@ -1,7 +1,11 @@
 use std::{
     env,
     process::exit,
+    rc::Rc,
+    sync::{Arc, Mutex},
 };
+
+use calloop::ping::Ping;
 
 use wayland_client::{
     protocol::{
@@ -18,31 +22,93 @@ use wayland_protocols::xdg::{
 
 use crate::{
     buffer::BufferManager,
-    fonts::MaybeFontMap,
-    keyboard::Keyboard,
-    widgets::{
-        Geometry, HorizontalLayout, IndexedLayout, Layout, Margin, VerticalLayout, Widget,
-    },
+    fonts::{FontMap, MaybeFontMap},
+    keyboard::{KeyEvent, Keyboard},
+    widgets::{Geometry, Layout, Widget, WidgetUpdater},
 };
+
+pub enum Event {
+    NewMinute,
+    PowerUpdate,
+    KeyEvent(KeyEvent),
+    TokenUpdate(String),
+}
+
+pub struct Events {
+    dirty: bool,
+    events: Vec<Event>,
+    ping: Ping,
+}
+
+impl Events {
+    pub fn new(ping: Ping) -> Arc<Mutex<Events>> {
+        Arc::new(Mutex::new(Events {
+            dirty: false,
+            events: Vec::new(),
+            ping,
+        }))
+    }
+
+    pub fn add_event(&mut self, ev: Event) {
+        self.events.push(ev);
+        if !self.dirty {
+            self.dirty = true;
+            self.ping.ping();
+        }
+    }
+
+    pub fn flush(&mut self) -> Vec<Event> {
+        self.dirty = false;
+        self.events.drain(..).collect()
+    }
+}
 
 pub struct State {
     pub running: bool,
     pub dirty: bool,
-    pub activated: bool,
+    activated: bool,
     pub base_surface: Option<wl_surface::WlSurface>,
-    pub wm_base: Option<xdg_wm_base::XdgWmBase>,
-    pub xdg_surface: Option<(xdg_surface::XdgSurface, xdg_toplevel::XdgToplevel)>,
-    pub wl_shm: Option<wl_shm::WlShm>,
-    pub xdg_activation: Option<xdg_activation_v1::XdgActivationV1>,
+    wm_base: Option<xdg_wm_base::XdgWmBase>,
+    xdg_surface: Option<(xdg_surface::XdgSurface, xdg_toplevel::XdgToplevel)>,
+    wl_shm: Option<wl_shm::WlShm>,
+    xdg_activation: Option<xdg_activation_v1::XdgActivationV1>,
     pub configured: bool,
     pub dimensions: (i32, i32),
     pub bufmgr: BufferManager,
     pub widgets: Vec<Box<dyn Widget>>,
-    pub keyboard: Keyboard,
+    keyboard: Keyboard,
     pub fonts: MaybeFontMap,
+    pub events: Arc<Mutex<Events>>,
+    layout: Rc<Box<dyn Layout>>,
 }
 
 impl State {
+    pub fn new(
+        widgets: Vec<Box<dyn Widget>>,
+        layout: Rc<Box<dyn Layout>>,
+        fonts: MaybeFontMap,
+        events: Arc<Mutex<Events>>,
+    ) -> State {
+        State {
+            running: true,
+            dirty: true,
+            activated: false,
+            base_surface: None,
+            wm_base: None,
+            xdg_surface: None,
+            wl_shm: None,
+            xdg_activation: None,
+            configured: false,
+            dimensions: (320, 240),
+            bufmgr: BufferManager::new(),
+            keyboard: Keyboard::new(),
+            widgets,
+            fonts,
+            events,
+            layout,
+        }
+    }
+
     pub fn add_buffer(&mut self, qh: &QueueHandle<Self>) {
         self.bufmgr.add_buffer(
             self.wl_shm.as_ref().expect("missing wl_shm"),
@@ -65,6 +131,17 @@ impl State {
             }
             _ => (),
         }
+    }
+}
+
+impl WidgetUpdater for State {
+    fn geometry_update(
+        &mut self,
+        idx: usize,
+        fonts: &mut FontMap,
+        geometry: &Geometry,
+    ) -> Geometry {
+        self.widgets[idx].geometry_update(fonts, geometry)
     }
 }
 
@@ -264,36 +341,9 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                 if state.dimensions != (width, height) {
                     state.bufmgr.clear_buffers();
                     state.dimensions = (width, height);
-                    let mut layout = VerticalLayout {
-                        widgets: vec![
-                            Box::new(HorizontalLayout {
-                                widgets: vec![
-                                    Box::new(IndexedLayout { widget_idx: 0 }),
-                                    Box::new(Margin {
-                                        widget: Box::new(IndexedLayout { widget_idx: 1 }),
-                                        margin: (16, 8, 0, 0),
-                                    }),
-                                    Box::new(VerticalLayout {
-                                        widgets: vec![
-                                            Box::new(Margin {
-                                                widget: Box::new(IndexedLayout { widget_idx: 2 }),
-                                                margin: (16, 8, 8, 0),
-                                            }),
-                                            Box::new(Margin {
-                                                widget: Box::new(IndexedLayout { widget_idx: 3 }),
-                                                margin: (16, 8, 8, 0),
-                                            }),
-                                        ],
-                                    }),
-                                ],
-                            }),
-                            Box::new(IndexedLayout { widget_idx: 4 }),
-                            Box::new(IndexedLayout { widget_idx: 5 }),
-                        ],
-                    };
-
                     state.fonts.resolve();
                     let fonts = state.fonts.unwrap();
+                    let layout = state.layout.clone();
                     layout.geometry_update(
                         &mut fonts.borrow_mut(),
                         &Geometry {
@@ -355,8 +405,9 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
                     return;
                 }
                 let k = state.keyboard.key(serial, time, key, kbstate);
+                let ev = Event::KeyEvent(k);
                 for widget in state.widgets.iter_mut() {
-                    widget.keyboard_input(&k);
+                    widget.event(&ev);
                 }
                 state.dirty = true;
             }
@@ -372,6 +423,7 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
                     .modifiers(mods_depressed, mods_latched, mods_locked, group);
             }
             wl_keyboard::Event::Keymap { format, fd, size } => {
+                // TODO: Keymap loading blocks xdg configure, consider delaying
                 state.keyboard.keymap(format, fd, size);
             }
             _ => (),
@@ -402,8 +454,9 @@ impl Dispatch<xdg_activation_token_v1::XdgActivationTokenV1, ()> for State {
     ) {
         match event {
             xdg_activation_token_v1::Event::Done { token } => {
+                let ev = Event::TokenUpdate(token);
                 for widget in state.widgets.iter_mut() {
-                    widget.token_update(&token);
+                    widget.event(&ev);
                 }
             }
             _ => (),

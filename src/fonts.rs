@@ -1,24 +1,24 @@
 //! Utility module for fonts
 
 use crate::draw;
-use fontconfig::Fontconfig as FontConfig;
+//use fontconfig::Fontconfig as FontConfig;
 use rusttype::Font;
 use std::{
     cell::RefCell,
-    mem,
-    rc::Rc,
-    thread,
     collections::HashMap,
     fs::File,
     hash,
     io::Read,
+    mem,
     path::{Path, PathBuf},
+    rc::Rc,
+    thread,
 };
-
 
 /// FontRef is used to store Fonts on widgets.
 pub type FontRef<'a> = &'a rusttype::Font<'a>;
 
+/*
 /// FontSeeker is a marker struct that is used to look up fonts
 pub(crate) struct FontSeeker;
 
@@ -30,7 +30,7 @@ impl FontSeeker {
         fc.find(name, None).unwrap().path
     }
 }
-
+*/
 /// FontLoader is a marker struct that is used to load files
 pub(crate) struct FontLoader;
 
@@ -113,7 +113,8 @@ impl FontMap {
             let path = if v.0.starts_with("/") {
                 std::path::PathBuf::from(v.0)
             } else {
-                FontSeeker::from_string(v.0)
+                //FontSeeker::from_string(v.0)
+                panic!("required FontSeeker");
             };
             let fontref = Box::leak(Box::new(
                 FontLoader::from_path(path).expect("unable to load font"),
@@ -158,4 +159,3 @@ impl MaybeFontMap {
         }
     }
 }
-

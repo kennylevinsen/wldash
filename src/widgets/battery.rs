@@ -4,8 +4,6 @@ use std::{
     time::Duration,
 };
 
-use calloop::ping::Ping;
-
 use dbus::blocking::{
     stdintf::org_freedesktop_dbus::{Properties, PropertiesPropertiesChanged},
     LocalConnection,
@@ -13,6 +11,7 @@ use dbus::blocking::{
 
 use crate::{
     color::Color,
+    state::{Event, Events},
     widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
 
@@ -28,9 +27,10 @@ enum UpowerBatteryState {
 struct InnerBattery {
     value: f32,
     state: UpowerBatteryState,
+    dirty: bool,
 }
 
-fn start_monitor(inner: Arc<Mutex<InnerBattery>>, ping: Ping) {
+fn start_monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) {
     thread::Builder::new()
         .name("battmon".to_string())
         .spawn(move || {
@@ -84,11 +84,15 @@ fn start_monitor(inner: Arc<Mutex<InnerBattery>>, ping: Ping) {
                                         6 => UpowerBatteryState::Discharging,
                                         _ => UpowerBatteryState::Unknown,
                                     };
-                                    ping.ping();
+                                    inner.dirty = true;
+                                    let mut events = events.lock().unwrap();
+                                    events.add_event(Event::PowerUpdate);
                                 }
                                 "Percentage" => {
                                     inner.value = value.0.as_f64().unwrap() as f32 / 100.;
-                                    ping.ping();
+                                    inner.dirty = true;
+                                    let mut events = events.lock().unwrap();
+                                    events.add_event(Event::PowerUpdate);
                                 }
                                 _ => (),
                             }
@@ -107,35 +111,32 @@ fn start_monitor(inner: Arc<Mutex<InnerBattery>>, ping: Ping) {
 
 pub struct Battery {
     inner: Arc<Mutex<InnerBattery>>,
-    dirty: bool,
 }
 
 impl Battery {
-    pub fn new(ping: Ping, font: &'static str, size: f32) -> BarWidget {
+    pub fn new(events: Arc<Mutex<Events>>, font: &'static str, size: f32) -> BarWidget {
         let battery = Battery {
             inner: Arc::new(Mutex::new(InnerBattery {
                 value: 0.,
                 state: UpowerBatteryState::Unknown,
+                dirty: false,
             })),
-            dirty: false,
         };
-        start_monitor(battery.inner.clone(), ping);
+        start_monitor(battery.inner.clone(), events);
         BarWidget::new(Box::new(battery), font, size)
     }
 }
 
 impl BarWidgetImpl for Battery {
     fn get_dirty(&self) -> bool {
-        self.dirty
-    }
-    fn set_dirty(&mut self, dirty: bool) {
-        self.dirty = dirty
+        self.inner.lock().unwrap().dirty
     }
     fn name(&self) -> &'static str {
         "battery"
     }
     fn value(&self) -> f32 {
-        let inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock().unwrap();
+        inner.dirty = false;
         inner.value
     }
     fn color(&self) -> Color {

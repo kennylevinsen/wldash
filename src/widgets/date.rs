@@ -4,6 +4,7 @@ use crate::{
     buffer::BufferView,
     color::Color,
     fonts::FontMap,
+    state::Event,
     widgets::{Geometry, Widget},
 };
 
@@ -19,7 +20,8 @@ pub struct Date {
 impl Date {
     pub fn new(font: &'static str, size: f32) -> Date {
         Date {
-            font, size,
+            font,
+            size,
             dirty: true,
             geometry: Default::default(),
         }
@@ -27,15 +29,21 @@ impl Date {
 }
 
 impl<'a> Widget for Date {
-    fn set_dirty(&mut self, dirty: bool) {
-        self.dirty = dirty;
-    }
     fn get_dirty(&self) -> bool {
         self.dirty
     }
 
     fn geometry(&self) -> Geometry {
         self.geometry
+    }
+
+    fn event(&mut self, event: &Event) {
+        match event {
+            Event::NewMinute => {
+                self.dirty = true;
+            }
+            _ => (),
+        }
     }
 
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
@@ -57,6 +65,7 @@ impl<'a> Widget for Date {
             ),
         )
         .unwrap();
+        self.dirty = false;
         self.geometry
     }
 

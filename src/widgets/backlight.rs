@@ -20,7 +20,6 @@ pub struct Backlight {
     device_path: PathBuf,
     cur: u64,
     max: u64,
-    dirty: bool,
 }
 
 impl Backlight {
@@ -34,7 +33,6 @@ impl Backlight {
             device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
             cur: 0,
             max: 0,
-            dirty: false,
         };
 
         dev.update();
@@ -43,12 +41,6 @@ impl Backlight {
 }
 
 impl BarWidgetImpl for Backlight {
-    fn get_dirty(&self) -> bool {
-        self.dirty
-    }
-    fn set_dirty(&mut self, dirty: bool) {
-        self.dirty = dirty
-    }
     fn name(&self) -> &'static str {
         "backlight"
     }

@@ -125,6 +125,12 @@ pub struct BufferManager {
 }
 
 impl BufferManager {
+    pub fn new() -> BufferManager {
+        BufferManager {
+            buffers: Vec::new(),
+        }
+    }
+
     pub fn clear_buffers(&mut self) {
         for buf in self.buffers.iter_mut() {
             buf.buffer.destroy()

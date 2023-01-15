@@ -106,12 +106,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "const-cstr"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed3d0b5ff30645a68f35ece8cea4556ca14ef8a1651455f789a099a0513532a6"
-
-[[package]]
 name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -241,15 +235,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a407cfaa3385c4ae6b23e84623d48c2798d06e3e6a1878f7f59f17b3f86499"
 dependencies = [
  "instant",
-]
-
-[[package]]
-name = "fontconfig"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b0653582d9c82645f95bacd0dc87b49a3126f7a9633be8cafa9c6d17d525847"
-dependencies = [
- "yeslogic-fontconfig-sys",
 ]
 
 [[package]]
@@ -1102,7 +1087,6 @@ dependencies = [
  "calloop",
  "chrono",
  "dbus",
- "fontconfig",
  "fuzzy-matcher",
  "itertools",
  "memmap",
@@ -1127,16 +1111,4 @@ checksum = "acbee136714379ab22da0280207fdb7f47e0bb940adea97731b65598b8c7a92e"
 dependencies = [
  "libc",
  "memmap2",
-]
-
-[[package]]
-name = "yeslogic-fontconfig-sys"
-version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec657fd32bbcbeaef5c7bc8e10b3db95b143fab8db0a50079773dbf936fd4f73"
-dependencies = [
- "const-cstr",
- "dlib",
- "once_cell",
- "pkg-config",
 ]

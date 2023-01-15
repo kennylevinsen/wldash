@@ -1,5 +1,5 @@
 use std::{
-    cmp::{min, max, Ordering},
+    cmp::{max, min, Ordering},
     collections::HashMap,
     default::Default,
     process::{exit, Command},
@@ -12,6 +12,7 @@ use crate::{
     color::Color,
     fonts::FontMap,
     keyboard::{keysyms, KeyEvent},
+    state::Event,
     utils::desktop::{load_desktop_files, Desktop},
     widgets::{Geometry, Widget},
 };
@@ -287,18 +288,17 @@ impl InterfaceWidget for Launcher {
         // Draw line
         let mut prompt_offset = intf.geometry.height - line_height;
         let mut prompt_line = view.offset((0, prompt_offset)).unwrap();
-        let mut prompt_border = prompt_line.limit((intf.geometry.width, 1)).unwrap();
-        prompt_border.memset(&fg);
 
         let font = fonts.get_font(intf.font, intf.size);
-        let mut x_max = font.auto_draw_text_with_cursor(
-            &mut prompt_line,
-            &bg,
-            &fg,
-            &format!("   {}", &intf.prompt.input),
-            intf.prompt.cursor + 3,
-        )
-        .unwrap();
+        let mut x_max = font
+            .auto_draw_text_with_cursor(
+                &mut prompt_line,
+                &bg,
+                &fg,
+                &format!("   {}", &intf.prompt.input),
+                intf.prompt.cursor + 3,
+            )
+            .unwrap();
 
         font.auto_draw_text(&mut prompt_line, &bg, &fg, ">")
             .unwrap();
@@ -328,11 +328,17 @@ impl InterfaceWidget for Launcher {
                         colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
                     }
                 }
-                x_max = max(x_max, font.auto_draw_text_individual_colors(&mut line, &bg, &colors, &m.name)
-                    .unwrap());
+                x_max = max(
+                    x_max,
+                    font.auto_draw_text_individual_colors(&mut line, &bg, &colors, &m.name)
+                        .unwrap(),
+                );
             } else {
-                x_max = max(x_max, font.auto_draw_text(&mut line, &bg, &dimfg, &m.name)
-                    .unwrap());
+                x_max = max(
+                    x_max,
+                    font.auto_draw_text(&mut line, &bg, &dimfg, &m.name)
+                        .unwrap(),
+                );
             }
         }
 
@@ -343,7 +349,7 @@ impl InterfaceWidget for Launcher {
         Geometry {
             x: intf.geometry.x,
             y: intf.geometry.y + intf.geometry.height - content_height,
-            width: x_max.0+1,
+            width: x_max.0 + 1,
             height: content_height,
         }
     }
@@ -381,19 +387,18 @@ impl InterfaceWidget for Shell {
         // Draw line
         let prompt_offset = intf.geometry.height - line_height;
         let mut prompt_line = view.offset((0, prompt_offset)).unwrap();
-        let mut prompt_border = prompt_line.limit((intf.geometry.width, 1)).unwrap();
-        prompt_border.memset(&fg);
 
         // Draw prompt
         let font = fonts.get_font(intf.font, intf.size);
-        let x_max = font.auto_draw_text_with_cursor(
-            &mut prompt_line,
-            &bg,
-            &fg,
-            &format!("   {}", &intf.prompt.input),
-            intf.prompt.cursor + 3,
-        )
-        .unwrap();
+        let x_max = font
+            .auto_draw_text_with_cursor(
+                &mut prompt_line,
+                &bg,
+                &fg,
+                &format!("   {}", &intf.prompt.input),
+                intf.prompt.cursor + 3,
+            )
+            .unwrap();
         font.auto_draw_text(&mut prompt_line, &bg, &Color::new(1., 0.75, 0.5, 1.), "!")
             .unwrap();
 
@@ -443,8 +448,6 @@ impl InterfaceWidget for Calc {
         // Draw line
         let mut prompt_offset = intf.geometry.height - (line_height);
         let mut prompt_line = view.offset((0, prompt_offset)).unwrap();
-        let mut prompt_border = prompt_line.limit((intf.geometry.width, 1)).unwrap();
-        prompt_border.memset(&fg);
 
         // Draw prompt
         let font = fonts.get_font(intf.font, intf.size);
@@ -518,39 +521,14 @@ impl Interface {
                 result: None,
             },
             inner: InnerInterface {
-                font, size,
+                font,
+                size,
                 dirty: false,
                 geometry: Default::default(),
                 selection: 0,
                 prompt: Prompt::new(),
             },
         }
-    }
-}
-
-impl Widget for Interface {
-    fn set_dirty(&mut self, dirty: bool) {
-        self.inner.dirty = dirty;
-    }
-    fn get_dirty(&self) -> bool {
-        self.inner.dirty
-    }
-
-    fn geometry(&self) -> Geometry {
-        self.inner.geometry
-    }
-
-    fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
-        match self.inner.prompt.mode {
-            PromptMode::Shell => self.shell.draw(&self.inner, fonts, view),
-            PromptMode::Normal => self.launcher.draw(&self.inner, fonts, view),
-            PromptMode::Calc => self.calc.draw(&self.inner, fonts, view),
-        }
-    }
-
-    fn geometry_update(&mut self, _fonts: &mut FontMap, geometry: &Geometry) -> Geometry {
-        self.inner.geometry = geometry.clone();
-        self.inner.geometry
     }
 
     fn keyboard_input(&mut self, event: &KeyEvent) {
@@ -610,8 +588,36 @@ impl Widget for Interface {
             }
         }
     }
+}
 
-    fn token_update(&mut self, token: &str) {
-        self.launcher.next_token = Some(token.to_string());
+impl Widget for Interface {
+    fn get_dirty(&self) -> bool {
+        self.inner.dirty
+    }
+
+    fn geometry(&self) -> Geometry {
+        self.inner.geometry
+    }
+
+    fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
+        self.inner.dirty = false;
+        match self.inner.prompt.mode {
+            PromptMode::Shell => self.shell.draw(&self.inner, fonts, view),
+            PromptMode::Normal => self.launcher.draw(&self.inner, fonts, view),
+            PromptMode::Calc => self.calc.draw(&self.inner, fonts, view),
+        }
+    }
+
+    fn geometry_update(&mut self, _fonts: &mut FontMap, geometry: &Geometry) -> Geometry {
+        self.inner.geometry = geometry.clone();
+        self.inner.geometry
+    }
+
+    fn event(&mut self, event: &Event) {
+        match event {
+            Event::KeyEvent(e) => self.keyboard_input(e),
+            Event::TokenUpdate(t) => self.launcher.next_token = Some(t.to_string()),
+            _ => (),
+        }
     }
 }

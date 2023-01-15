@@ -3,6 +3,10 @@ name = "wldash2"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+lto = "fat"
+panic = "abort"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
@@ -11,7 +15,7 @@ wayland-protocols = { version = "0.30", features = ["client", "unstable", "stagi
 tempfile = "3.3"
 nix = "0.26"
 memmap = "0.7"
-fontconfig = "0.6.0"
+#fontconfig = "0.6.0"
 rusttype = "^0.9"
 calloop = { version = "0.10" }
 chrono = "0.4"

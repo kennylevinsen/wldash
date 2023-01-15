@@ -9,8 +9,9 @@ use crate::{
 };
 
 pub trait BarWidgetImpl {
-    fn get_dirty(&self) -> bool;
-    fn set_dirty(&mut self, dirty: bool);
+    fn get_dirty(&self) -> bool {
+        false
+    }
     fn name(&self) -> &'static str;
     fn value(&self) -> f32;
     fn color(&self) -> Color;
@@ -27,7 +28,9 @@ impl BarWidget {
     pub fn new(inner_widget: Box<dyn BarWidgetImpl>, font: &'static str, size: f32) -> BarWidget {
         BarWidget {
             geometry: Default::default(),
-            inner_widget, font, size,
+            inner_widget,
+            font,
+            size,
         }
     }
 }
@@ -39,10 +42,6 @@ impl Widget for BarWidget {
 
     fn get_dirty(&self) -> bool {
         self.inner_widget.get_dirty()
-    }
-
-    fn set_dirty(&mut self, dirty: bool) {
-        self.inner_widget.set_dirty(dirty)
     }
 
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {

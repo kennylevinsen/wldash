@@ -1,7 +1,13 @@
-use std::cmp::{max, min};
-use std::fmt;
+use std::{
+    cmp::{max, min},
+    fmt,
+};
 
-use crate::{buffer::BufferView, fonts::FontMap, keyboard::KeyEvent};
+use crate::{
+    buffer::BufferView,
+    fonts::FontMap,
+    state::{Event, State},
+};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Geometry {
@@ -47,38 +53,42 @@ pub trait Widget {
     fn get_dirty(&self) -> bool {
         false
     }
-    fn set_dirty(&mut self, _dirty: bool) {}
     fn geometry(&self) -> Geometry;
     fn geometry_update(&mut self, fonts: &mut FontMap, geometry: &Geometry) -> Geometry;
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry;
-    fn keyboard_input(&mut self, _event: &KeyEvent) {}
-    fn token_update(&mut self, _token: &str) {}
+    fn event(&mut self, _event: &Event) {}
 }
 
-pub trait Layout<U> {
+pub trait Layout {
     fn geometry_update(
-        &mut self,
+        &self,
         fonts: &mut FontMap,
         geometry: &Geometry,
-        user_data: &mut U,
+        state: &mut State,
     ) -> Geometry;
 }
-pub struct HorizontalLayout<U> {
-    pub widgets: Vec<Box<dyn Layout<U>>>,
+pub struct HorizontalLayout {
+    pub widgets: Vec<Box<dyn Layout>>,
 }
 
-impl<U> Layout<U> for HorizontalLayout<U> {
+impl HorizontalLayout {
+    pub fn new(widgets: Vec<Box<dyn Layout>>) -> Box<dyn Layout> {
+        Box::new(HorizontalLayout { widgets })
+    }
+}
+
+impl Layout for HorizontalLayout {
     fn geometry_update(
-        &mut self,
+        &self,
         fonts: &mut FontMap,
         geometry: &Geometry,
-        user_data: &mut U,
+        state: &mut State,
     ) -> Geometry {
         let mut geo = geometry.clone();
         let mut max_width = 0;
         let mut max_height = 0;
-        for w in self.widgets.iter_mut() {
-            let result = w.geometry_update(fonts, &geo, user_data);
+        for w in self.widgets.iter() {
+            let result = w.geometry_update(fonts, &geo, state);
             geo.x = result.x + result.width;
             geo.width -= result.width;
             max_width += result.width;
@@ -90,22 +100,28 @@ impl<U> Layout<U> for HorizontalLayout<U> {
     }
 }
 
-pub struct VerticalLayout<U> {
-    pub widgets: Vec<Box<dyn Layout<U>>>,
+pub struct VerticalLayout {
+    pub widgets: Vec<Box<dyn Layout>>,
 }
 
-impl<U> Layout<U> for VerticalLayout<U> {
+impl VerticalLayout {
+    pub fn new(widgets: Vec<Box<dyn Layout>>) -> Box<dyn Layout> {
+        Box::new(VerticalLayout { widgets })
+    }
+}
+
+impl Layout for VerticalLayout {
     fn geometry_update(
-        &mut self,
+        &self,
         fonts: &mut FontMap,
         geometry: &Geometry,
-        user_data: &mut U,
+        state: &mut State,
     ) -> Geometry {
         let mut geo = geometry.clone();
         let mut max_width = 0;
         let mut max_height = 0;
-        for w in self.widgets.iter_mut() {
-            let result = w.geometry_update(fonts, &geo, user_data);
+        for w in self.widgets.iter() {
+            let result = w.geometry_update(fonts, &geo, state);
             geo.y = result.y + result.height;
             geo.height -= result.height;
             max_width = max(result.width, max_width);
@@ -126,28 +142,40 @@ pub struct IndexedLayout {
     pub widget_idx: usize,
 }
 
-impl<U: WidgetUpdater> Layout<U> for IndexedLayout {
-    fn geometry_update(
-        &mut self,
-        fonts: &mut FontMap,
-        geometry: &Geometry,
-        user_data: &mut U,
-    ) -> Geometry {
-        user_data.geometry_update(self.widget_idx, fonts, geometry)
+impl IndexedLayout {
+    pub fn new(widget_idx: usize) -> Box<dyn Layout> {
+        Box::new(IndexedLayout { widget_idx })
     }
 }
 
-pub struct Margin<U> {
-    pub widget: Box<dyn Layout<U>>,
+impl Layout for IndexedLayout {
+    fn geometry_update(
+        &self,
+        fonts: &mut FontMap,
+        geometry: &Geometry,
+        state: &mut State,
+    ) -> Geometry {
+        state.geometry_update(self.widget_idx, fonts, geometry)
+    }
+}
+
+pub struct Margin {
+    pub widget: Box<dyn Layout>,
     pub margin: (u32, u32, u32, u32),
 }
 
-impl<U> Layout<U> for Margin<U> {
+impl Margin {
+    pub fn new(widget: Box<dyn Layout>, margin: (u32, u32, u32, u32)) -> Box<dyn Layout> {
+        Box::new(Margin { widget, margin })
+    }
+}
+
+impl Layout for Margin {
     fn geometry_update(
-        &mut self,
+        &self,
         fonts: &mut FontMap,
         geometry: &Geometry,
-        user_data: &mut U,
+        state: &mut State,
     ) -> Geometry {
         let geo = Geometry {
             x: geometry.x + self.margin.0,
@@ -156,12 +184,44 @@ impl<U> Layout<U> for Margin<U> {
             height: geometry.height - self.margin.1 - self.margin.3,
         };
 
-        let out = self.widget.geometry_update(fonts, &geo, user_data);
+        let out = self.widget.geometry_update(fonts, &geo, state);
         Geometry {
             x: out.x - self.margin.0,
             y: out.y - self.margin.1,
             width: out.width + self.margin.0 + self.margin.2,
             height: out.height + self.margin.1 + self.margin.3,
         }
+    }
+}
+
+pub struct InvertedHorizontalLayout {
+    pub widgets: Vec<Box<dyn Layout>>,
+}
+
+impl InvertedHorizontalLayout {
+    pub fn new(widgets: Vec<Box<dyn Layout>>) -> Box<dyn Layout> {
+        Box::new(InvertedHorizontalLayout { widgets })
+    }
+}
+
+impl Layout for InvertedHorizontalLayout {
+    fn geometry_update(
+        &self,
+        fonts: &mut FontMap,
+        geometry: &Geometry,
+        state: &mut State,
+    ) -> Geometry {
+        let mut geo = geometry.clone();
+        let mut max_height = 0;
+        for w in self.widgets.iter() {
+            let mut temp_geo = geo.clone();
+            let temp_result = w.geometry_update(fonts, &temp_geo, state);
+            temp_geo.x = geo.x + (geo.width - temp_result.width);
+            let result = w.geometry_update(fonts, &temp_geo, state);
+            geo.width -= result.width;
+            max_height = max(result.height, max_height);
+        }
+        geo.height = max_height;
+        geo
     }
 }

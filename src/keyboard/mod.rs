@@ -12,8 +12,10 @@
 //! calloop event loop. Not doing so will prevent key repetition to work
 //! (but the rest of the functionnality will not be affected).
 
-use std::default::Default;
-use std::os::unix::io::{AsRawFd, OwnedFd};
+use std::{
+    default::Default,
+    os::unix::io::{AsRawFd, OwnedFd},
+};
 
 use wayland_client::{protocol::wl_keyboard, WEnum};
 use xkbcommon::xkb;
@@ -24,6 +26,7 @@ mod state;
 use self::state::KbState;
 pub use self::state::ModifiersState;
 
+#[derive(Debug)]
 pub struct KeyEvent {
     pub serial: u32,
     pub time: u32,

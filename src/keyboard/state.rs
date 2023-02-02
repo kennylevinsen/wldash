@@ -50,6 +50,9 @@ impl ModifiersState {
     }
 }
 
+// Safety: No.
+unsafe impl Send for KbState {}
+
 impl KbState {
     pub(crate) fn update_modifiers(
         &mut self,

@@ -47,7 +47,7 @@ impl CachedGlyph {
         }
     }
 
-    fn draw(&self, buf: &mut BufferView, pos: (i32, i32), bg: &Color, c: &Color) {
+    fn draw(&self, buf: &mut BufferView, pos: (i32, i32), bg: Color, c: Color) {
         let mut x = 0;
         let mut y = 0;
         for v in &self.render {
@@ -56,7 +56,7 @@ impl CachedGlyph {
                     (x + pos.0 + self.origin.0) as u32,
                     (y + pos.1 + self.origin.1) as u32,
                 ),
-                &bg.blend(&c, *v),
+                bg.blend(c, *v),
             );
 
             if x == self.dimensions.0 as i32 - 1 {
@@ -84,6 +84,12 @@ impl<'a> Font<'a> {
         }
     }
 
+    pub fn height(&self) -> f32 {
+        let scale = Scale::uniform(self.size);
+        let m = self.font.v_metrics(scale);
+        m.ascent - m.descent
+    }
+
     pub fn add_str_to_cache(&mut self, s: &str) {
         for ch in s.chars() {
             if self.glyphs.get(&ch).is_none() {
@@ -96,8 +102,8 @@ impl<'a> Font<'a> {
     pub fn draw_text(
         &self,
         buf: &mut BufferView,
-        bg: &Color,
-        c: &Color,
+        bg: Color,
+        c: Color,
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
         let mut x_off = 0;
@@ -129,8 +135,8 @@ impl<'a> Font<'a> {
     pub fn draw_text_with_cursor(
         &self,
         buf: &mut BufferView,
-        bg: &Color,
-        c: &Color,
+        bg: Color,
+        c: Color,
         s: &str,
         cursor: usize,
     ) -> Result<(u32, u32), ::std::io::Error> {
@@ -171,13 +177,13 @@ impl<'a> Font<'a> {
     pub fn draw_cursor(
         &self,
         buf: &mut BufferView,
-        c: &Color,
+        c: Color,
         offset: u32,
         height: u32,
     ) -> Result<(), ::std::io::Error> {
         // draw cursor
         for i in 1..height {
-            buf.put((offset, i), c)?
+            buf.put((offset, i), c);
         }
         Ok(())
     }
@@ -206,8 +212,8 @@ impl<'a> Font<'a> {
     pub fn auto_draw_text(
         &mut self,
         buf: &mut BufferView,
-        bg: &Color,
-        c: &Color,
+        bg: Color,
+        c: Color,
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
         self.add_str_to_cache(s);
@@ -217,8 +223,8 @@ impl<'a> Font<'a> {
     pub fn auto_draw_text_with_cursor(
         &mut self,
         buf: &mut BufferView,
-        bg: &Color,
-        c: &Color,
+        bg: Color,
+        c: Color,
         s: &str,
         cursor: usize,
     ) -> Result<(u32, u32), ::std::io::Error> {
@@ -229,8 +235,8 @@ impl<'a> Font<'a> {
     pub fn draw_text_fixed_width(
         &self,
         buf: &mut BufferView,
-        bg: &Color,
-        c: &Color,
+        bg: Color,
+        c: Color,
         distances: &[u32],
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
@@ -263,7 +269,7 @@ impl<'a> Font<'a> {
     pub fn draw_text_individual_colors(
         &self,
         buf: &mut BufferView,
-        bg: &Color,
+        bg: Color,
         color: &[Color],
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
@@ -286,7 +292,7 @@ impl<'a> Font<'a> {
             }
         }
         for (idx, glyph) in glyphs.into_iter().enumerate() {
-            glyph.draw(buf, (x_off, -off), bg, &color[idx]);
+            glyph.draw(buf, (x_off, -off), bg, color[idx]);
             x_off += glyph.advance;
         }
 
@@ -296,7 +302,7 @@ impl<'a> Font<'a> {
     pub fn auto_draw_text_individual_colors(
         &mut self,
         buf: &mut BufferView,
-        bg: &Color,
+        bg: Color,
         color: &[Color],
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
@@ -305,14 +311,14 @@ impl<'a> Font<'a> {
     }
 }
 
-pub fn draw_box(buf: &mut BufferView, c: &Color, dim: (u32, u32)) -> Result<(), ::std::io::Error> {
+pub fn draw_box(buf: &mut BufferView, c: Color, dim: (u32, u32)) -> Result<(), ::std::io::Error> {
     for x in 0..dim.0 {
-        let _ = buf.put((x, 0), c);
-        let _ = buf.put((x, dim.1 - 1), c);
+        buf.put((x, 0), c);
+        buf.put((x, dim.1 - 1), c);
     }
     for y in 0..dim.1 {
-        buf.put((0, y), c)?;
-        buf.put((dim.0 - 1, y), c)?;
+        buf.put((0, y), c);
+        buf.put((dim.0 - 1, y), c);
     }
 
     Ok(())
@@ -320,7 +326,7 @@ pub fn draw_box(buf: &mut BufferView, c: &Color, dim: (u32, u32)) -> Result<(), 
 
 pub fn draw_bar(
     buf: &mut BufferView,
-    color: &Color,
+    color: Color,
     length: u32,
     height: u32,
     fill: f32,

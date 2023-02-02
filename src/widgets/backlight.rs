@@ -6,6 +6,7 @@ use std::{
 
 use crate::{
     color::Color,
+    fonts::FontMap,
     widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
 
@@ -28,7 +29,7 @@ impl Backlight {
         self.max = read_file_as_u64(self.device_path.join("max_brightness").as_path()).unwrap();
     }
 
-    pub fn new(path: &str, font: &'static str, size: f32) -> BarWidget {
+    pub fn new(path: &str, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
         let mut dev = Backlight {
             device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
             cur: 0,
@@ -36,7 +37,7 @@ impl Backlight {
         };
 
         dev.update();
-        BarWidget::new(Box::new(dev), font, size)
+        BarWidget::new(Box::new(dev), fm, font, size)
     }
 }
 
@@ -53,6 +54,6 @@ impl BarWidgetImpl for Backlight {
         self.cur as f32 / self.max as f32
     }
     fn color(&self) -> Color {
-        Color::new(1.0, 1.0, 1.0, 1.0)
+        Color::WHITE
     }
 }

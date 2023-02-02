@@ -1,3 +1,4 @@
+mod audio;
 mod backlight;
 mod bar_widget;
 mod battery;
@@ -7,7 +8,9 @@ mod date;
 mod launcher;
 mod line;
 mod widget;
+mod layout;
 
+pub use audio::Audio;
 pub use backlight::Backlight;
 pub use battery::Battery;
 pub use calendar::Calendar;
@@ -15,7 +18,5 @@ pub use clock::Clock;
 pub use date::Date;
 pub use launcher::Interface;
 pub use line::Line;
-pub use widget::{
-    Geometry, HorizontalLayout, IndexedLayout, InvertedHorizontalLayout, Layout, Margin,
-    VerticalLayout, Widget, WidgetUpdater,
-};
+pub use layout::{VerticalLayout, HorizontalLayout, IndexedLayout, InvertedHorizontalLayout, Layout, Margin, WidgetUpdater};
+pub use widget::{Geometry, Widget};

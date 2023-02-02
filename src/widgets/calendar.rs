@@ -4,7 +4,7 @@ use crate::{
     buffer::BufferView,
     color::Color,
     fonts::FontMap,
-    state::Event,
+    event::Event,
     widgets::{Geometry, Widget},
 };
 
@@ -14,18 +14,32 @@ pub struct Calendar {
     font: &'static str,
     sections_x: i32,
     sections_y: i32,
+    shown_sections_x: u32,
+    shown_sections_y: u32,
     size: f32,
     dirty: bool,
     geometry: Geometry,
 }
 
+const DAY_FACTOR: f32 = 1.;
+const YEAR_FACTOR: f32 = 1.5;
+const MONTH_FACTOR: f32 = 2.;
+const DATE_FACTOR: f32 = 2.;
+const LINE_HEIGHT: f32 = 1.8;
+
 impl Calendar {
-    pub fn new(font: &'static str, size: f32, sections_x: i32, sections_y: i32) -> Calendar {
+    pub fn new(fm: &mut FontMap, font: &'static str, size: f32, sections_x: i32, sections_y: i32) -> Calendar {
+        fm.queue_font(font, size, "ADEFHIMNORSTUW");
+        fm.queue_font(font, size * 1.5, "0123456789");
+        fm.queue_font(font, size * 2.0, "0123456789 ADFJMOSabcehgilmnoprstuvy");
+
         Calendar {
             font,
             size,
             sections_x,
             sections_y,
+            shown_sections_x: 0,
+            shown_sections_y: 0,
             dirty: true,
             geometry: Default::default(),
         }
@@ -38,10 +52,62 @@ impl Calendar {
         orig: NaiveDate,
         mut time: NaiveDate,
     ) {
-        let black = Color::new(0., 0., 0., 1.);
-        let white = Color::new(1., 1., 1., 1.);
-        let dim = Color::new(0.8, 0.8, 0.8, 1.);
-        let dimmer = Color::new(0.75, 0.75, 0.75, 1.);
+        let black = Color::BLACK;
+        let white = Color::WHITE;
+        let dim = Color::GREY80;
+        let dimmer = Color::GREY75;
+
+        let mut y_off = 1;
+        // TODO: Fix offsets:
+        // - Headline font is not correctly accounted for
+
+        //
+        // Draw the week day
+        //
+        for idx in 1..8 {
+            let day_font = fonts.get_font(self.font, self.size * DAY_FACTOR);
+            let wk_chr = match idx {
+                1 => "MON",
+                2 => "TUE",
+                3 => "WED",
+                4 => "THU",
+                5 => "FRI",
+                6 => "SAT",
+                7 => "SUN",
+                _ => panic!("impossible value"),
+            };
+
+            day_font
+                .draw_text(
+                    &mut view
+                        .offset((
+                            idx * (self.size * 2.5).ceil() as u32 + (self.size / 5.).ceil() as u32,
+                            y_off * (self.size * LINE_HEIGHT).ceil() as u32
+                                + (self.size * 1.).ceil() as u32,
+                        )),
+                    black,
+                    white,
+                    &wk_chr,
+                )
+                .unwrap();
+        }
+
+        //
+        // Draw the month
+        //
+        if time.year() != orig.year() {
+            let year_font = fonts.get_font(self.font, self.size * YEAR_FACTOR);
+            year_font
+                .draw_text(
+                    &mut view.offset(((self.size * 17.).ceil() as u32, 0)),
+                    black,
+                    dim,
+                    &format!("{:}", time.year()),
+                )
+                .unwrap();
+        }
+
+        let cal_font = fonts.get_font(self.font, self.size * DATE_FACTOR);
         let month_str = match time.month() {
             1 => "January",
             2 => "February",
@@ -57,62 +123,8 @@ impl Calendar {
             12 => "December",
             _ => panic!("impossible value"),
         };
-
-
-        let mut y_off = 1;
-        // TODO: Fix offsets:
-        // - Headline font is not correctly accounted for
-
-        //
-        // Draw the week day
-        //
-        for idx in 1..8 {
-            let day_font = fonts.get_font(self.font, self.size);
-            let wk_chr = match idx {
-                1 => "MON",
-                2 => "TUE",
-                3 => "WED",
-                4 => "THU",
-                5 => "FRI",
-                6 => "SAT",
-                7 => "SUN",
-                _ => panic!("impossible value"),
-            };
-
-            day_font
-                .auto_draw_text(
-                    &mut view
-                        .offset((
-                            idx * (self.size * 2.5).ceil() as u32 + (self.size / 5.).ceil() as u32,
-                            y_off * (self.size * 1.8).ceil() as u32
-                                + (self.size * 1.).ceil() as u32,
-                        ))
-                        .unwrap(),
-                    &black,
-                    &white,
-                    &wk_chr,
-                )
-                .unwrap();
-        }
-
-        //
-        // Draw the month
-        //
-        if time.year() != orig.year() {
-            let year_font = fonts.get_font(self.font, self.size * 1.5);
-            year_font
-                .auto_draw_text(
-                    &mut view.offset(((self.size * 17.).ceil() as u32, 0)).unwrap(),
-                    &black,
-                    &dim,
-                    &format!("{:}", time.year()),
-                )
-                .unwrap();
-        }
-
-        let cal_font = fonts.get_font(self.font, self.size * 2.);
         cal_font
-            .auto_draw_text(&mut view, &black, &white, month_str)
+            .draw_text(&mut view, black, white, month_str)
             .unwrap();
 
         let mut done = false;
@@ -133,16 +145,15 @@ impl Calendar {
             //
             let wk = time.iso_week();
             cal_font
-                .auto_draw_text(
+                .draw_text(
                     &mut view
                         .offset((
                             0,
-                            y_off * (self.size * 1.8).ceil() as u32
-                                + (self.size * 2.).ceil() as u32,
-                        ))
-                        .unwrap(),
-                    &black,
-                    &dimmer,
+                            y_off * (self.size * LINE_HEIGHT).ceil() as u32
+                                + (self.size * MONTH_FACTOR).ceil() as u32,
+                        )),
+                    black,
+                    dimmer,
                     &format!("{:02}", wk.week()),
                 )
                 .unwrap();
@@ -153,21 +164,21 @@ impl Calendar {
             //
             while x_pos < 8 {
                 let c = if time.day() == orig.day() && time.month() == orig.month() {
-                    Color::new(1.0, 1.0, 1.0, 1.0)
+                    Color::WHITE
                 } else {
-                    Color::new(0.5, 0.5, 0.5, 1.0)
+                    Color::GREY50
                 };
 
                 cal_font
-                    .auto_draw_text(
+                    .draw_text(
                         &mut view
                             .offset((
                                 x_pos * (self.size * 2.5).ceil() as u32,
-                                y_off * (self.size * 1.8).ceil() as u32 + (self.size * 2.) as u32,
-                            ))
-                            .unwrap(),
-                        &black,
-                        &c,
+                                y_off * (self.size * LINE_HEIGHT).ceil() as u32
+                                    + (self.size * MONTH_FACTOR).ceil() as u32,
+                            )),
+                        black,
+                        c,
                         &format!("{:02}", time.day()),
                     )
                     .unwrap();
@@ -205,35 +216,33 @@ impl<'a> Widget for Calendar {
     }
 
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
+        if self.shown_sections_y == 0 || self.shown_sections_x == 0 {
+            return Geometry {
+                x: self.geometry.x,
+                y: self.geometry.y,
+                width: 0,
+                height: 0,
+            };
+        }
+
         let time = Local::now().naive_local().date();
 
         let cal_height = (self.size * 16.25).ceil() as u32;
-        let cal_width = (7. * self.size * 3. + self.size * 2.).ceil() as u32;
+        let cal_width = (7. * self.size * 2.5 + self.size * 2.).ceil() as u32;
         let cal_pad = (3. * self.size).ceil() as u32;
-        let sections_y = if self.sections_y > 0 {
-            self.sections_y as u32
-        } else {
-            self.geometry.height / cal_height
-        };
-        let sections_x = if self.sections_x > 0 {
-            self.sections_x as u32
-        } else {
-            self.geometry.width / (cal_height + cal_pad)
-        };
 
         let mut t = time.with_day(1).unwrap();
-        let cals = sections_y * sections_x - 1;
-        if cals >=3 {
+        let cals = self.shown_sections_y * self.shown_sections_x;
+        if cals >= 3 {
             t = t.pred_opt().unwrap().with_day(1).unwrap();
         }
 
-        for ydx in 0..sections_y {
-            for idx in 0..sections_x {
+        for ydx in 0..self.shown_sections_y {
+            for idx in 0..self.shown_sections_x {
                 self.draw_month(
                     fonts,
                     &mut view
-                        .offset(((cal_width + cal_pad) * idx, (cal_height) * ydx))
-                        .unwrap(),
+                        .offset(((cal_width + cal_pad) * idx, (cal_height) * ydx)),
                     time,
                     t,
                 );
@@ -249,17 +258,26 @@ impl<'a> Widget for Calendar {
     }
 
     fn geometry_update(&mut self, _fonts: &mut FontMap, geometry: &Geometry) -> Geometry {
-        let cal_width = (7. * self.size * 3. + self.size * 2.).ceil() as u32;
-        let cal_height = (self.size * 16.25).ceil() as u32; // TODO: Calculate from font sizes
+        let cal_width = 7 * (self.size * 2.5).ceil() as u32 + (self.size * 2.).ceil() as u32;
+        let cal_height = (self.size * MONTH_FACTOR).ceil() as u32
+            + (self.size * LINE_HEIGHT * 8.).ceil() as u32;
         let cal_pad = (self.size * 3.).ceil() as u32;
-        let width = if self.sections_x > 0 {
+
+        let possible_sections_x = geometry.width / (cal_width + cal_pad);
+        let possible_sections_y = geometry.height / cal_height;
+
+        let width = if self.sections_x > 0 && self.sections_x < possible_sections_x as i32 {
+            self.shown_sections_x = self.sections_x as u32;
             cal_width * self.sections_x as u32 + cal_pad * (self.sections_x as u32 - 1)
         } else {
-            (geometry.width / (cal_width + cal_pad)) *  (cal_width + cal_pad)
+            self.shown_sections_x = possible_sections_x;
+            (geometry.width / (cal_width + cal_pad)) * (cal_width + cal_pad)
         };
-        let height = if self.sections_y > 0 {
+        let height = if self.sections_y > 0 && self.sections_y < possible_sections_y as i32 {
+            self.shown_sections_y = self.sections_y as u32;
             cal_height * self.sections_y as u32
         } else {
+            self.shown_sections_y = possible_sections_y;
             (geometry.height / cal_height) * cal_height
         };
         self.geometry = Geometry {

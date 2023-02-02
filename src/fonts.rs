@@ -1,7 +1,6 @@
 //! Utility module for fonts
 
 use crate::draw;
-//use fontconfig::Fontconfig as FontConfig;
 use rusttype::Font;
 use std::{
     cell::RefCell,
@@ -10,7 +9,7 @@ use std::{
     hash,
     io::Read,
     mem,
-    path::{Path, PathBuf},
+    path::Path,
     rc::Rc,
     thread,
 };
@@ -18,19 +17,24 @@ use std::{
 /// FontRef is used to store Fonts on widgets.
 pub type FontRef<'a> = &'a rusttype::Font<'a>;
 
-/*
-/// FontSeeker is a marker struct that is used to look up fonts
-pub(crate) struct FontSeeker;
-
-impl FontSeeker {
+#[cfg(feature = "fontloading")]
+mod fc {
+    use fontconfig::Fontconfig as FontConfig;
     /// Acts like fc-match.
     /// Given a string, it matches it to a font file and returns its path.
-    pub(crate) fn from_string(name: &str) -> PathBuf {
+    pub(crate) fn from_string(name: &str) -> String {
         let fc = FontConfig::new().unwrap();
-        fc.find(name, None).unwrap().path
+        fc.find(name, None).unwrap().path.to_str().unwrap().to_string()
     }
 }
-*/
+
+#[cfg(not(feature = "fontloading"))]
+mod fc {
+    pub(crate) fn from_string(_name: &str) -> String {
+        panic!("fontloading feature not enabled");
+    }
+}
+
 /// FontLoader is a marker struct that is used to load files
 pub(crate) struct FontLoader;
 
@@ -77,51 +81,53 @@ impl Eq for ComparableF32 {}
 
 pub struct FontMap {
     fonts: HashMap<(&'static str, ComparableF32), draw::Font<'static>>,
-    required_fonts: HashMap<&'static str, (&'static str, Vec<f32>)>,
+    font_paths: HashMap<&'static str, String>,
+    required_fonts: HashMap<&'static str, (&'static str, Vec<(f32, &'static str)>)>,
 }
 
 impl FontMap {
     pub fn new() -> FontMap {
         FontMap {
             fonts: HashMap::new(),
+            font_paths: HashMap::new(),
             required_fonts: HashMap::new(),
         }
     }
 
-    pub fn queue_font_name(&mut self, font_name: &'static str, size: f32) {
+    pub fn queue_font(&mut self, font_name: &'static str, size: f32, preload: &'static str) {
         match self.required_fonts.get_mut(font_name) {
-            Some(v) => v.1.push(size),
+            Some(v) => v.1.push((size, preload)),
             None => {
-                self.required_fonts
-                    .insert(font_name, (font_name, vec![size]));
+                self.required_fonts.insert(font_name, (font_name, vec![(size, preload)]));
             }
         }
     }
 
-    pub fn queue_font_path(&mut self, font_name: &'static str, font_path: &'static str, size: f32) {
-        match self.required_fonts.get_mut(font_name) {
-            Some(v) => v.1.push(size),
-            None => {
-                self.required_fonts
-                    .insert(font_name, (font_path, vec![size]));
-            }
-        }
+    pub fn add_font_path(&mut self, font_name: &'static str, font_path: String) {
+        self.font_paths.insert(font_name, font_path);
     }
 
     pub fn load_fonts(&mut self) {
         for (font_name, v) in self.required_fonts.iter() {
-            let path = if v.0.starts_with("/") {
-                std::path::PathBuf::from(v.0)
-            } else {
-                //FontSeeker::from_string(v.0)
-                panic!("required FontSeeker");
+            let path = match self.font_paths.get(font_name) {
+                Some(res) => res,
+                _ => {
+                    let s = fc::from_string(font_name);
+                    self.font_paths.insert(font_name, s);
+                    self.font_paths.get(font_name).unwrap()
+                }
             };
             let fontref = Box::leak(Box::new(
                 FontLoader::from_path(path).expect("unable to load font"),
             ));
-            for size in &v.1 {
-                let font = draw::Font::new(fontref, *size);
-                self.fonts.insert((font_name, ComparableF32(*size)), font);
+            for (size, preload) in &v.1 {
+                if let Some(font) = self.fonts.get_mut(&(font_name, ComparableF32(*size))) {
+                    font.add_str_to_cache(preload);
+                } else {
+                    let mut font = draw::Font::new(fontref, *size);
+                    font.add_str_to_cache(preload);
+                    self.fonts.insert((font_name, ComparableF32(*size)), font);
+                }
             }
         }
     }

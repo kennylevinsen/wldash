@@ -4,7 +4,7 @@ use crate::{
     buffer::BufferView,
     color::Color,
     fonts::FontMap,
-    state::Event,
+    event::Event,
     widgets::{Geometry, Widget},
 };
 
@@ -20,7 +20,8 @@ pub struct Clock {
 }
 
 impl<'a> Clock {
-    pub fn new(font: &'static str, size: f32) -> Clock {
+    pub fn new(fm: &mut FontMap, font: &'static str, size: f32) -> Clock {
+        fm.queue_font(font, size, "0123456789: ");
         Clock {
             font,
             size,
@@ -52,16 +53,16 @@ impl<'a> Widget for Clock {
 
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
         let time = Local::now().naive_local();
-        let fg = Color::new(1., 1., 1., 1.);
-        let bg = Color::new(0., 0., 0., 1.);
+        let fg = Color::WHITE;
+        let bg = Color::BLACK;
 
         let digit = self.digit_width;
         let colon = self.colon_width;
         let font = fonts.get_font(self.font, self.size);
         font.draw_text_fixed_width(
             view,
-            &bg,
-            &fg,
+            bg,
+            fg,
             &[digit, digit, colon, digit, digit],
             &format!("{:02}:{:02}", time.hour(), time.minute()),
         )

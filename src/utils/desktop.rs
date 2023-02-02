@@ -1,11 +1,15 @@
-use ini::{Ini, ParseOption};
-use itertools::Itertools;
-use std::cmp::Ordering;
-use std::env;
-use std::error::Error;
-use std::io::Error as io_error;
-use std::io::ErrorKind;
+use std::{
+    cmp::Ordering,
+    collections::HashSet,
+    env,
+    error::Error,
+    fs::read_to_string,
+    io::{Error as io_error, ErrorKind},
+};
+
 use walkdir::WalkDir;
+
+use crate::utils::inish;
 
 #[derive(Clone, Debug, Eq, Hash)]
 pub struct Desktop {
@@ -21,23 +25,18 @@ pub struct Desktop {
 
 impl Desktop {
     fn parse(f: &str) -> Result<Desktop, Box<dyn Error>> {
-        let file = Ini::load_from_file_opt(
-            f,
-            ParseOption {
-                enabled_quote: false,
-                enabled_escape: false,
-            },
-        )?;
-        match file.section(Some("Desktop Entry")) {
-            Some(desktop) => Ok(Desktop {
-                entry_type: desktop.get("Type").unwrap_or(&"".to_string()).to_string(),
-                name: desktop.get("Name").unwrap_or(&"".to_string()).to_string(),
-                term: desktop.get("Terminal").unwrap_or(&"".to_string()) == "true",
-                no_display: desktop.get("NoDisplay").unwrap_or(&"".to_string()) == "true",
-                hidden: desktop.get("Hidden").unwrap_or(&"".to_string()) == "true",
-                exec: desktop.get("Exec").map(|x| x.to_string()),
-                url: desktop.get("URL").map(|x| x.to_string()),
-                keywords: desktop
+        let s = read_to_string(f)?;
+        let config = inish::parse(&s)?;
+        match config.get("Desktop Entry") {
+            Some(section) => Ok(Desktop {
+                entry_type: section.get("Type").unwrap_or(&"").to_string(),
+                name: section.get("Name").unwrap_or(&"").to_string(),
+                term: section.get("Terminal").unwrap_or(&"") == &"true",
+                no_display: section.get("NoDisplay").unwrap_or(&"") == &"true",
+                hidden: section.get("Hidden").unwrap_or(&"") == &"true",
+                exec: section.get("Exec").map(|x| x.to_string()),
+                url: section.get("URL").map(|x| x.to_string()),
+                keywords: section
                     .get("Keywords")
                     .map(|x| {
                         x.split(';')
@@ -52,20 +51,6 @@ impl Desktop {
                 "no desktop entry in file",
             ))),
         }
-    }
-
-    fn parse_dir(d: &str) -> Result<Vec<Desktop>, Box<dyn Error>> {
-        let mut files: Vec<Desktop> = Vec::with_capacity(16);
-        for entry in WalkDir::new(d) {
-            let entry = entry?;
-            let path = entry.path();
-
-            if let Ok(d) = Desktop::parse(path.to_str().unwrap()) {
-                files.push(d)
-            }
-        }
-
-        Ok(files)
     }
 }
 
@@ -99,14 +84,29 @@ pub fn load_desktop_files() -> Vec<Desktop> {
         None => "/usr/local/share:/usr/share".to_string(),
     };
 
-    std::iter::once(xdg_data_home.as_str())
-        .chain(xdg_data_dirs.split(':'))
-        .map(|p| Desktop::parse_dir(&format!("{}/applications", p)))
-        .filter_map(Result::ok)
-        .flatten()
-        .filter(|d| {
-            !d.hidden && !d.no_display && (d.entry_type == "Application" || d.entry_type == "Link")
-        })
-        .unique_by(|x| x.name.clone())
-        .collect()
+    let dirs = std::iter::once(xdg_data_home.as_str()).chain(xdg_data_dirs.split(':'));
+
+    let mut desktop: Vec<Desktop> = Vec::new();
+    let mut seen: HashSet<String> = HashSet::new();
+
+    for dir in dirs {
+        for entry in WalkDir::new(format!("{}/applications", dir)) {
+            if let Ok(entry) = entry {
+                if let Ok(d) = Desktop::parse(entry.path().to_str().unwrap()) {
+                    if d.hidden
+                        || d.no_display
+                        || (d.entry_type != "Application" && d.entry_type != "Link")
+                    {
+                        continue;
+                    }
+                    if !seen.contains(&d.name) {
+                        seen.insert(d.name.to_string());
+                        desktop.push(d);
+                    }
+                }
+            }
+        }
+    }
+
+    desktop
 }

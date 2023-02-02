@@ -5,12 +5,10 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use calloop::ping::Ping;
-
 use wayland_client::{
     protocol::{
         wl_buffer, wl_compositor, wl_keyboard, wl_registry, wl_seat, wl_shm, wl_shm_pool,
-        wl_surface,
+        wl_surface, wl_pointer,
     },
     Connection, Dispatch, QueueHandle, WEnum,
 };
@@ -23,45 +21,10 @@ use wayland_protocols::xdg::{
 use crate::{
     buffer::BufferManager,
     fonts::{FontMap, MaybeFontMap},
-    keyboard::{KeyEvent, Keyboard},
+    keyboard::Keyboard,
     widgets::{Geometry, Layout, Widget, WidgetUpdater},
+    event::{Event, Events, PointerEvent, PointerButton},
 };
-
-pub enum Event {
-    NewMinute,
-    PowerUpdate,
-    KeyEvent(KeyEvent),
-    TokenUpdate(String),
-}
-
-pub struct Events {
-    dirty: bool,
-    events: Vec<Event>,
-    ping: Ping,
-}
-
-impl Events {
-    pub fn new(ping: Ping) -> Arc<Mutex<Events>> {
-        Arc::new(Mutex::new(Events {
-            dirty: false,
-            events: Vec::new(),
-            ping,
-        }))
-    }
-
-    pub fn add_event(&mut self, ev: Event) {
-        self.events.push(ev);
-        if !self.dirty {
-            self.dirty = true;
-            self.ping.ping();
-        }
-    }
-
-    pub fn flush(&mut self) -> Vec<Event> {
-        self.dirty = false;
-        self.events.drain(..).collect()
-    }
-}
 
 pub struct State {
     pub running: bool,
@@ -77,6 +40,7 @@ pub struct State {
     pub bufmgr: BufferManager,
     pub widgets: Vec<Box<dyn Widget>>,
     keyboard: Keyboard,
+    pointer: Option<(f64, f64)>,
     pub fonts: MaybeFontMap,
     pub events: Arc<Mutex<Events>>,
     layout: Rc<Box<dyn Layout>>,
@@ -102,6 +66,7 @@ impl State {
             dimensions: (320, 240),
             bufmgr: BufferManager::new(),
             keyboard: Keyboard::new(),
+            pointer: None,
             widgets,
             fonts,
             events,
@@ -380,6 +345,9 @@ impl Dispatch<wl_seat::WlSeat, ()> for State {
             if capabilities.contains(wl_seat::Capability::Keyboard) {
                 seat.get_keyboard(qh, ());
             }
+            if capabilities.contains(wl_seat::Capability::Pointer) {
+                seat.get_pointer(qh, ());
+            }
         }
     }
 }
@@ -426,6 +394,84 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
                 // TODO: Keymap loading blocks xdg configure, consider delaying
                 state.keyboard.keymap(format, fd, size);
             }
+            _ => (),
+        }
+    }
+}
+
+const BTN_LEFT: u32 = 0x110;
+const BTN_RIGHT: u32 = 0x111;
+const BTN_MIDDLE: u32 = 0x112;
+
+impl Dispatch<wl_pointer::WlPointer, ()> for State {
+    fn event(
+        state: &mut Self,
+        _: &wl_pointer::WlPointer,
+        event: wl_pointer::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        match event {
+            wl_pointer::Event::Enter { surface_x, surface_y, .. } => {
+                state.pointer = Some((surface_x, surface_y));
+            },
+            wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
+                state.pointer = Some((surface_x, surface_y));
+            },
+            wl_pointer::Event::Leave { .. } => {
+                state.pointer = None
+            },
+            wl_pointer::Event::Axis { axis, value, .. } =>  match state.pointer {
+                Some((x, y)) => {
+                    let axis = match axis {
+                        WEnum::Value(wl_pointer::Axis::VerticalScroll) => PointerButton::ScrollVertical(value),
+                        WEnum::Value(wl_pointer::Axis::HorizontalScroll) => PointerButton::ScrollHorizontal(value),
+                        _ => return,
+                    };
+                    let pos = (x as u32, y as u32);
+                    for widget in state.widgets.iter_mut() {
+                        let geo = widget.geometry();
+                        if geo.contains(pos) {
+                            let pos = (pos.0 - geo.x, pos.1 - geo.y);
+                            let ev = Event::PointerEvent(PointerEvent{
+                                button: axis,
+                                pos: pos,
+                            });
+                            widget.event(&ev);
+                            state.dirty = true;
+                            break;
+                        }
+                    }
+                },
+                _ => (),
+            },
+            wl_pointer::Event::Button { button, state: button_state, .. } => match (button, button_state, state.pointer) {
+                (button, WEnum::Value(wl_pointer::ButtonState::Pressed), Some((x, y))) => {
+                    let button = match button {
+                        BTN_LEFT => PointerButton::Left,
+                        BTN_RIGHT => PointerButton::Right,
+                        BTN_MIDDLE => PointerButton::Middle,
+                        _ => return,
+                    };
+                    let pos = (x as u32, y as u32);
+                    for widget in state.widgets.iter_mut() {
+                        let geo = widget.geometry();
+                        if geo.contains(pos) {
+
+                            let pos = (pos.0 - geo.x, pos.1 - geo.y);
+                            let ev = Event::PointerEvent(PointerEvent{
+                                button: button,
+                                pos: pos,
+                            });
+                            widget.event(&ev);
+                            state.dirty = true;
+                            break;
+                        }
+                    }
+                },
+                _ => (),
+            },
             _ => (),
         }
     }

@@ -1,110 +1,81 @@
 use std::{
     sync::{Arc, Mutex},
     thread,
-    time::Duration,
-};
-
-use dbus::blocking::{
-    stdintf::org_freedesktop_dbus::{Properties, PropertiesPropertiesChanged},
-    LocalConnection,
+    error::Error,
 };
 
 use crate::{
     color::Color,
-    state::{Event, Events},
+    event::{Event, Events},
+    fonts::FontMap,
     widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
 
-enum UpowerBatteryState {
-    Charging,
-    Discharging,
-    Empty,
-    Full,
-    NotCharging,
-    Unknown,
-}
+use upower_dbus::BatteryState;
 
 struct InnerBattery {
     value: f32,
-    state: UpowerBatteryState,
+    state: BatteryState,
     dirty: bool,
 }
 
+async fn monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) -> Result<(), Box<dyn Error>> {
+    use zbus::Connection;
+    use upower_dbus::UPowerProxy;
+    use tokio_stream::StreamExt;
+
+    let conn = Connection::system().await?;
+    let proxy = UPowerProxy::new(&conn).await?;
+
+    let device = proxy.get_display_device().await?;
+
+    let local_inner = inner.clone();
+    let local_events = events.clone();
+    let mut percent_stream = device.receive_percentage_changed().await;
+    let a = tokio::spawn(async move {
+        while let Some(percent) = percent_stream.next().await {
+            let percent = percent.get().await.unwrap() as f32 / 100.;
+            let mut inner = local_inner.lock().unwrap();
+            inner.value = percent;
+            inner.dirty = true;
+            drop(inner);
+
+            let mut events = local_events.lock().unwrap();
+            events.add_event(Event::PowerUpdate);
+        }
+    });
+
+    let local_inner = inner.clone();
+    let local_events = events.clone();
+    let mut state_stream = device.receive_state_changed().await;
+    let b = tokio::spawn(async move {
+        while let Some(state) = state_stream.next().await {
+            let state = state.get().await.unwrap();
+            let mut inner = local_inner.lock().unwrap();
+            inner.state = state;
+            inner.dirty = true;
+            drop(inner);
+
+            let mut events = local_events.lock().unwrap();
+            events.add_event(Event::PowerUpdate);
+        }
+    });
+    a.await?;
+    b.await?;
+
+    Ok(())
+}
+
 fn start_monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) {
+    use tokio::runtime;
     thread::Builder::new()
         .name("battmon".to_string())
         .spawn(move || {
-            let conn = LocalConnection::new_system().unwrap();
-            let device_path = "/org/freedesktop/UPower/devices/DisplayDevice";
-            let proxy = conn.with_proxy(
-                "org.freedesktop.UPower",
-                device_path,
-                Duration::from_millis(500),
-            );
-
-            let capacity: f64 = proxy
-                .get("org.freedesktop.UPower.Device", "Percentage")
-                .expect("unable to get property");
-            let state: u32 = proxy
-                .get("org.freedesktop.UPower.Device", "State")
-                .expect("unable to get state");
-
-            {
-                let mut inner = inner.lock().unwrap();
-                inner.value = capacity as f32 / 100.;
-                inner.state = match state {
-                    1 => UpowerBatteryState::Charging,
-                    2 => UpowerBatteryState::Discharging,
-                    3 => UpowerBatteryState::Empty,
-                    4 => UpowerBatteryState::Full,
-                    5 => UpowerBatteryState::NotCharging,
-                    6 => UpowerBatteryState::Discharging,
-                    _ => UpowerBatteryState::Unknown,
-                }
-            }
-
-            proxy
-                .match_signal(
-                    move |c: PropertiesPropertiesChanged,
-                          _: &LocalConnection,
-                          _: &dbus::Message| {
-                        if c.interface_name != "org.freedesktop.UPower.Device" {
-                            return true;
-                        }
-                        let mut inner = inner.lock().unwrap();
-                        for (key, value) in c.changed_properties {
-                            match key.as_str() {
-                                "State" => {
-                                    inner.state = match value.0.as_u64().unwrap() {
-                                        1 => UpowerBatteryState::Charging,
-                                        2 => UpowerBatteryState::Discharging,
-                                        3 => UpowerBatteryState::Empty,
-                                        4 => UpowerBatteryState::Full,
-                                        5 => UpowerBatteryState::NotCharging,
-                                        6 => UpowerBatteryState::Discharging,
-                                        _ => UpowerBatteryState::Unknown,
-                                    };
-                                    inner.dirty = true;
-                                    let mut events = events.lock().unwrap();
-                                    events.add_event(Event::PowerUpdate);
-                                }
-                                "Percentage" => {
-                                    inner.value = value.0.as_f64().unwrap() as f32 / 100.;
-                                    inner.dirty = true;
-                                    let mut events = events.lock().unwrap();
-                                    events.add_event(Event::PowerUpdate);
-                                }
-                                _ => (),
-                            }
-                        }
-                        true
-                    },
-                )
+            let rt = runtime::Builder::new_current_thread()
+                .enable_io()
+                .build()
                 .unwrap();
-
-            loop {
-                conn.process(Duration::from_millis(60000)).unwrap();
-            }
+            rt.block_on(async move { monitor(inner, events).await }).unwrap();
         })
         .unwrap();
 }
@@ -114,16 +85,16 @@ pub struct Battery {
 }
 
 impl Battery {
-    pub fn new(events: Arc<Mutex<Events>>, font: &'static str, size: f32) -> BarWidget {
+    pub fn new(events: Arc<Mutex<Events>>, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
         let battery = Battery {
             inner: Arc::new(Mutex::new(InnerBattery {
                 value: 0.,
-                state: UpowerBatteryState::Unknown,
+                state: BatteryState::Unknown,
                 dirty: false,
             })),
         };
         start_monitor(battery.inner.clone(), events);
-        BarWidget::new(Box::new(battery), font, size)
+        BarWidget::new(Box::new(battery), fm, font, size)
     }
 }
 
@@ -142,20 +113,14 @@ impl BarWidgetImpl for Battery {
     fn color(&self) -> Color {
         let inner = self.inner.lock().unwrap();
         match inner.state {
-            UpowerBatteryState::Discharging | UpowerBatteryState::Unknown => {
-                if inner.value > 0.25 {
-                    Color::new(1.0, 1.0, 1.0, 1.0)
-                } else if inner.value > 0.1 {
-                    Color::new(1.0, 0.5, 0.0, 1.0)
-                } else {
-                    Color::new(1.0, 0.0, 0.0, 1.0)
-                }
-            }
-            UpowerBatteryState::Charging | UpowerBatteryState::Full => {
-                Color::new(0.5, 1.0, 0.5, 1.0)
-            }
-            UpowerBatteryState::NotCharging | UpowerBatteryState::Empty => {
-                Color::new(1.0, 0.5, 0.5, 1.0)
+            BatteryState::Charging | BatteryState::FullyCharged => Color::LIGHTGREEN,
+            BatteryState::PendingCharge => Color::LIGHTRED,
+            _ => if inner.value > 0.25 {
+                Color::WHITE
+            } else if inner.value > 0.1 {
+                Color::DARKORANGE
+            } else {
+                Color::RED
             }
         }
     }

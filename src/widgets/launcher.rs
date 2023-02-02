@@ -12,7 +12,7 @@ use crate::{
     color::Color,
     fonts::FontMap,
     keyboard::{keysyms, KeyEvent},
-    state::Event,
+    event::{Event, Events, PointerEvent, PointerButton},
     utils::desktop::{load_desktop_files, Desktop},
     widgets::{Geometry, Widget},
 };
@@ -205,14 +205,20 @@ struct Launcher {
 }
 
 impl Launcher {
-    fn new() -> Launcher {
+    fn new(events: Arc<Mutex<Events>>) -> Launcher {
         let options = Arc::new(Mutex::new(Vec::new()));
         {
             let options = Arc::clone(&options);
-            thread::spawn(move || {
-                let mut options = options.lock().unwrap();
-                *options = load_desktop_files();
-            });
+            thread::Builder::new()
+                .name("desktopini".to_string())
+                .spawn(move || {
+                    let mut options = options.lock().unwrap();
+                    *options = load_desktop_files();
+                    drop(options);
+                    let mut events = events.lock().unwrap();
+                    events.add_event(Event::LauncherUpdate);
+                })
+                .unwrap();
         }
 
         Launcher {
@@ -280,31 +286,31 @@ impl InterfaceWidget for Launcher {
         fonts: &mut FontMap,
         view: &mut BufferView,
     ) -> Geometry {
-        let fg = Color::new(1., 1., 1., 1.);
-        let bg = Color::new(0., 0., 0., 1.);
+        let fg = Color::WHITE;
+        let bg = Color::BLACK;
 
         let line_height = intf.size.ceil() as u32;
 
         // Draw line
         let mut prompt_offset = intf.geometry.height - line_height;
-        let mut prompt_line = view.offset((0, prompt_offset)).unwrap();
+        let mut prompt_line = view.offset((0, prompt_offset));
 
         let font = fonts.get_font(intf.font, intf.size);
         let mut x_max = font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
-                &bg,
-                &fg,
+                bg,
+                fg,
                 &format!("   {}", &intf.prompt.input),
                 intf.prompt.cursor + 3,
             )
             .unwrap();
 
-        font.auto_draw_text(&mut prompt_line, &bg, &fg, ">")
+        font.auto_draw_text(&mut prompt_line, bg, fg, ">")
             .unwrap();
 
         // Draw entries
-        let dimfg = Color::new(0.5, 0.5, 0.5, 1.0);
+        let dimfg = Color::GREY50;
         prompt_offset -= 16;
 
         for (idx, m) in self.matches.iter().enumerate() {
@@ -312,7 +318,7 @@ impl InterfaceWidget for Launcher {
                 break;
             }
             prompt_offset -= line_height;
-            let mut line = view.offset((0, prompt_offset)).unwrap();
+            let mut line = view.offset((0, prompt_offset));
 
             if idx == intf.selection {
                 let fuzzy_matcher = SkimMatcherV2::default();
@@ -323,20 +329,20 @@ impl InterfaceWidget for Launcher {
                 let mut colors = Vec::with_capacity(m.name.len());
                 for pos in 0..m.name.len() {
                     if indices.contains(&pos) {
-                        colors.push(Color::new(1.0, 0.65, 0., 1.0));
+                        colors.push(Color::LIGHTORANGE);
                     } else {
-                        colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
+                        colors.push(Color::GREY75);
                     }
                 }
                 x_max = max(
                     x_max,
-                    font.auto_draw_text_individual_colors(&mut line, &bg, &colors, &m.name)
+                    font.auto_draw_text_individual_colors(&mut line, bg, &colors, &m.name)
                         .unwrap(),
                 );
             } else {
                 x_max = max(
                     x_max,
-                    font.auto_draw_text(&mut line, &bg, &dimfg, &m.name)
+                    font.auto_draw_text(&mut line, bg, dimfg, &m.name)
                         .unwrap(),
                 );
             }
@@ -379,27 +385,27 @@ impl InterfaceWidget for Shell {
         fonts: &mut FontMap,
         view: &mut BufferView,
     ) -> Geometry {
-        let fg = Color::new(1., 1., 1., 1.);
-        let bg = Color::new(0., 0., 0., 1.);
+        let fg = Color::WHITE;
+        let bg = Color::BLACK;
 
         let line_height = intf.size.ceil() as u32;
 
         // Draw line
         let prompt_offset = intf.geometry.height - line_height;
-        let mut prompt_line = view.offset((0, prompt_offset)).unwrap();
+        let mut prompt_line = view.offset((0, prompt_offset));
 
         // Draw prompt
         let font = fonts.get_font(intf.font, intf.size);
         let x_max = font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
-                &bg,
-                &fg,
+                bg,
+                fg,
                 &format!("   {}", &intf.prompt.input),
                 intf.prompt.cursor + 3,
             )
             .unwrap();
-        font.auto_draw_text(&mut prompt_line, &bg, &Color::new(1., 0.75, 0.5, 1.), "!")
+        font.auto_draw_text(&mut prompt_line, bg, Color::BUFF, "!")
             .unwrap();
 
         Geometry {
@@ -440,45 +446,45 @@ impl InterfaceWidget for Calc {
         fonts: &mut FontMap,
         view: &mut BufferView,
     ) -> Geometry {
-        let fg = Color::new(1., 1., 1., 1.);
-        let bg = Color::new(0., 0., 0., 1.);
+        let fg = Color::WHITE;
+        let bg = Color::BLACK;
 
         let line_height = intf.size.ceil() as u32;
 
         // Draw line
         let mut prompt_offset = intf.geometry.height - (line_height);
-        let mut prompt_line = view.offset((0, prompt_offset)).unwrap();
+        let mut prompt_line = view.offset((0, prompt_offset));
 
         // Draw prompt
         let font = fonts.get_font(intf.font, intf.size);
         let res_off = font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
-                &bg,
-                &fg,
+                bg,
+                fg,
                 &format!("   {} ", &intf.prompt.input),
                 intf.prompt.cursor + 3,
             )
             .unwrap();
 
-        font.auto_draw_text(&mut prompt_line, &bg, &Color::new(1., 0.75, 0.5, 1.), "=")
+        font.auto_draw_text(&mut prompt_line, bg, Color::BUFF, "=")
             .unwrap();
 
         if let Some(res) = &self.result {
-            let resfg = Color::new(1.0, 0.65, 0., 1.0);
-            let mut result_line = view.offset((res_off.0, prompt_offset)).unwrap();
-            font.auto_draw_text(&mut result_line, &bg, &resfg, &format!(" = {}", &res))
+            let resfg = Color::LIGHTORANGE;
+            let mut result_line = view.offset((res_off.0, prompt_offset));
+            font.auto_draw_text(&mut result_line, bg, resfg, &format!(" = {}", &res))
                 .unwrap();
         }
 
         for m in self.old.iter().rev() {
-            let dimfg = Color::new(0.5, 0.5, 0.5, 1.0);
+            let dimfg = Color::GREY50;
             if prompt_offset < line_height {
                 break;
             }
             prompt_offset -= line_height;
-            let mut result_line = view.offset((0, prompt_offset)).unwrap();
-            font.auto_draw_text(&mut result_line, &bg, &dimfg, &m)
+            let mut result_line = view.offset((0, prompt_offset));
+            font.auto_draw_text(&mut result_line, bg, dimfg, &m)
                 .unwrap();
         }
 
@@ -512,9 +518,14 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub fn new(font: &'static str, size: f32) -> Interface {
+    pub fn new(events: Arc<Mutex<Events>>, fm: &mut FontMap, font: &'static str, size: f32) -> Interface {
+        fm.queue_font(
+            font, size, 
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 >=!,.-/()",
+        );
+
         Interface {
-            launcher: Launcher::new(),
+            launcher: Launcher::new(events),
             shell: Shell {},
             calc: Calc {
                 old: Vec::new(),
@@ -528,6 +539,23 @@ impl Interface {
                 selection: 0,
                 prompt: Prompt::new(),
             },
+        }
+    }
+
+    fn pointer_input(&mut self, event: &PointerEvent) {
+        if let PointerButton::Left = event.button {
+            let line_height = self.inner.size.ceil() as u32;
+            let height = self.inner.geometry.height - line_height - 16;
+            let lines = height / line_height;
+
+            let offset = height % line_height;
+            let pos = if event.pos.1 >= offset {
+                event.pos.1 - offset
+            } else {
+                return;
+            };
+            self.inner.selection = (lines - pos / line_height - 1) as usize;
+            self.inner.dirty = true;
         }
     }
 
@@ -616,6 +644,11 @@ impl Widget for Interface {
     fn event(&mut self, event: &Event) {
         match event {
             Event::KeyEvent(e) => self.keyboard_input(e),
+            Event::PointerEvent(e) => self.pointer_input(e),
+            Event::LauncherUpdate => {
+                self.inner.dirty = true;
+                self.launcher.update(&self.inner);
+            },
             Event::TokenUpdate(t) => self.launcher.next_token = Some(t.to_string()),
             _ => (),
         }

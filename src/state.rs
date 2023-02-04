@@ -214,7 +214,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                     // is not a particularly good background, but memsetting is slow. On clay,
                     // toplevels that adhere to their requested dimensions only have black behind
                     // them, so we can save the memset in this case, speeding things up.
-                    state.needs_memset = false;
+                    if let OperationMode::XdgToplevel = state.mode {
+                        state.needs_memset = false;
+                    }
                 }
                 _ => {}
             }

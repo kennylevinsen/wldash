@@ -33,7 +33,7 @@ wayland-protocols = { version = "0.29", features = ["client", "unstable_protocol
 dbus = "0.6"
 fuzzy-matcher = "0.3"
 lazy_static = "1.4"
-rcalc_lib = "1.0"
+rcalc_lib = { git = "https://github.com/VladimirMarkelov/rclc_lib", rev = "de5f0944" }
 rust-ini = "0.18"
 shlex = "1.1"
 timerfd = "1.4.0"

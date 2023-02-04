@@ -18,6 +18,10 @@ use wayland_protocols::xdg::{
     shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base},
 };
 
+use wayland_protocols_wlr::layer_shell::v1::client::{
+    zwlr_layer_shell_v1, zwlr_layer_surface_v1,
+};
+
 use crate::{
     buffer::BufferManager,
     fonts::{FontMap, MaybeFontMap},
@@ -26,11 +30,20 @@ use crate::{
     event::{Event, Events, PointerEvent, PointerButton},
 };
 
+pub enum OperationMode {
+    LayerSurface((u32, u32)),
+    XdgToplevel,
+}
+
 pub struct State {
+    mode: OperationMode,
     pub running: bool,
     pub dirty: bool,
     activated: bool,
+    pub needs_memset: bool,
     pub base_surface: Option<wl_surface::WlSurface>,
+    layer_shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
+    layer_surface: Option<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1>,
     wm_base: Option<xdg_wm_base::XdgWmBase>,
     xdg_surface: Option<(xdg_surface::XdgSurface, xdg_toplevel::XdgToplevel)>,
     wl_shm: Option<wl_shm::WlShm>,
@@ -48,6 +61,7 @@ pub struct State {
 
 impl State {
     pub fn new(
+        mode: OperationMode,
         widgets: Vec<Box<dyn Widget>>,
         layout: Rc<Box<dyn Layout>>,
         fonts: MaybeFontMap,
@@ -57,7 +71,10 @@ impl State {
             running: true,
             dirty: true,
             activated: false,
+            needs_memset: true,
             base_surface: None,
+            layer_shell: None,
+            layer_surface: None,
             wm_base: None,
             xdg_surface: None,
             wl_shm: None,
@@ -67,6 +84,7 @@ impl State {
             bufmgr: BufferManager::new(),
             keyboard: Keyboard::new(),
             pointer: None,
+            mode,
             widgets,
             fonts,
             events,
@@ -97,6 +115,31 @@ impl State {
             _ => (),
         }
     }
+
+    fn init_xdg_surface(&mut self, qh: &QueueHandle<State>) {
+        let wm_base = self.wm_base.as_ref().unwrap();
+        let base_surface = self.base_surface.as_ref().unwrap();
+
+        let xdg_surface = wm_base.get_xdg_surface(base_surface, qh, ());
+        let toplevel = xdg_surface.get_toplevel(qh, ());
+        toplevel.set_title("wldash".into());
+
+        base_surface.commit();
+
+        self.xdg_surface = Some((xdg_surface, toplevel));
+    }
+
+    fn init_layer_surface(&mut self, qh: &QueueHandle<State>, size: (u32, u32)) {
+        let layer_shell = self.layer_shell.as_ref().unwrap();
+        let base_surface = self.base_surface.as_ref().unwrap();
+
+        let layer_surface = layer_shell.get_layer_surface(base_surface, None, zwlr_layer_shell_v1::Layer::Top, "launcher".to_string(), qh, ());
+        layer_surface.set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::Exclusive);
+        layer_surface.set_size(size.0, size.1);
+
+        base_surface.commit();
+        self.layer_surface = Some(layer_surface);
+    }
 }
 
 impl WidgetUpdater for State {
@@ -126,23 +169,26 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
             match &interface[..] {
                 "wl_compositor" => {
                     let compositor =
-                        registry.bind::<wl_compositor::WlCompositor, _, _>(name, 4, qh, ());
+                        registry.bind::<wl_compositor::WlCompositor, _, _>(name, 5, qh, ());
                     let surface = compositor.create_surface(qh, ());
                     state.base_surface = Some(surface);
                     state.activate(qh);
 
-                    if state.wm_base.is_some() && state.xdg_surface.is_none() {
-                        state.init_xdg_surface(qh);
+                    if state.wm_base.is_some() && state.xdg_surface.is_none() && state.layer_surface.is_none() {
+                        match state.mode {
+                            OperationMode::XdgToplevel => state.init_xdg_surface(qh),
+                            OperationMode::LayerSurface(size) => state.init_layer_surface(qh, size),
+                        }
                     }
                 }
                 "wl_shm" => {
                     state.wl_shm = Some(registry.bind::<wl_shm::WlShm, _, _>(name, 1, qh, ()));
                 }
                 "wl_seat" => {
-                    registry.bind::<wl_seat::WlSeat, _, _>(name, 1, qh, ());
+                    registry.bind::<wl_seat::WlSeat, _, _>(name, 8, qh, ());
                 }
-                "xdg_wm_base" => {
-                    let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 1, qh, ());
+                "xdg_wm_base" => if let OperationMode::XdgToplevel = state.mode {
+                    let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 2, qh, ());
                     state.wm_base = Some(wm_base);
 
                     if state.base_surface.is_some() && state.xdg_surface.is_none() {
@@ -154,6 +200,21 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                         registry.bind::<xdg_activation_v1::XdgActivationV1, _, _>(name, 1, qh, ()),
                     );
                     state.activate(qh);
+                }
+                "zwlr_layer_shell_v1" => if let OperationMode::LayerSurface(size) = state.mode {
+                    state.layer_shell = Some(
+                        registry.bind::<zwlr_layer_shell_v1::ZwlrLayerShellV1, _, _>(name, 4, qh, ()),
+                    );
+                    if state.base_surface.is_some() && state.layer_surface.is_none() {
+                        state.init_layer_surface(qh, size);
+                    }
+                },
+                "clay_control_v1" => {
+                    // Buffers are zeroed by default, which is equivalent to zero alpha black. This
+                    // is not a particularly good background, but memsetting is slow. On clay,
+                    // toplevels that adhere to their requested dimensions only have black behind
+                    // them, so we can save the memset in this case, speeding things up.
+                    state.needs_memset = false;
                 }
                 _ => {}
             }
@@ -226,18 +287,52 @@ impl Dispatch<wl_buffer::WlBuffer, ()> for State {
     }
 }
 
-impl State {
-    fn init_xdg_surface(&mut self, qh: &QueueHandle<State>) {
-        let wm_base = self.wm_base.as_ref().unwrap();
-        let base_surface = self.base_surface.as_ref().unwrap();
+impl Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for State {
+    fn event(
+        _: &mut Self,
+        _: &zwlr_layer_shell_v1::ZwlrLayerShellV1,
+        _: zwlr_layer_shell_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {}
+}
 
-        let xdg_surface = wm_base.get_xdg_surface(base_surface, qh, ());
-        let toplevel = xdg_surface.get_toplevel(qh, ());
-        toplevel.set_title("wldash".into());
+impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
+    fn event(
+        state: &mut Self,
+        layer_surface: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
+        event: zwlr_layer_surface_v1::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        if let zwlr_layer_surface_v1::Event::Configure { serial, width, height } = event {
+            if (width, height) == (0, 0) {
+                return;
+            }
+            layer_surface.ack_configure(serial);
+            state.configured = true;
+            state.dirty = true;
 
-        base_surface.commit();
-
-        self.xdg_surface = Some((xdg_surface, toplevel));
+            if state.dimensions != (width as i32, height as i32) {
+                state.bufmgr.clear_buffers();
+                state.dimensions = (width as i32, height as i32);
+                state.fonts.resolve();
+                let fonts = state.fonts.unwrap();
+                let layout = state.layout.clone();
+                layout.geometry_update(
+                    &mut fonts.borrow_mut(),
+                    &Geometry {
+                        x: 0,
+                        y: 0,
+                        width: width as u32,
+                        height: height as u32,
+                    },
+                    state,
+                );
+            }
+        }
     }
 }
 

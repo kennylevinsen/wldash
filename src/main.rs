@@ -19,7 +19,7 @@ use chrono::{Duration, Local, Timelike};
 use buffer::BufferView;
 use color::Color;
 use fonts::{FontMap, MaybeFontMap};
-use state::State;
+use state::{State, OperationMode};
 use event::{Event, Events};
 use widgets::{
     Audio, Backlight, Battery, Calendar, Clock, Date, Geometry, HorizontalLayout, IndexedLayout,
@@ -157,7 +157,7 @@ fn main() {
         fm
     }).unwrap();
 
-    let mut state = State::new(widgets, layout, MaybeFontMap::Waiting(font_thread), events);
+    let mut state = State::new(OperationMode::XdgToplevel, widgets, layout, MaybeFontMap::Waiting(font_thread), events);
 
     let mut damage = Vec::new();
     for _ in 0..state.widgets.len() {
@@ -199,8 +199,9 @@ fn main() {
 
         let surface = state.base_surface.as_ref().unwrap().clone();
         if force {
-            // Other compositors probably need this.
-            //bufview.memset(Color::BLACK);
+            if state.needs_memset {
+                bufview.memset(Color::BLACK);
+            }
             for (idx, widget) in state.widgets.iter_mut().enumerate() {
                 if force || widget.get_dirty() {
                     let geo = widget.geometry();

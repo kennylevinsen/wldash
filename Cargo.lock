@@ -696,8 +696,7 @@ dependencies = [
 [[package]]
 name = "rcalc_lib"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b83922b4c02be427b60b94ca2b4118a6a4fb2b9df4ad88c50c56d9ebd93455c9"
+source = "git+https://github.com/VladimirMarkelov/rclc_lib?rev=de5f0944#de5f094403008cf4f55d4c46a7a01d3232f5459e"
 dependencies = [
  "dtoa",
  "lazy_static",

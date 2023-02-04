@@ -23,13 +23,47 @@ use state::{State, OperationMode};
 use event::{Event, Events};
 use widgets::{
     Audio, Backlight, Battery, Calendar, Clock, Date, Geometry, HorizontalLayout, IndexedLayout,
-    Interface, InvertedHorizontalLayout, Line, Margin, VerticalLayout, Widget,
+    Interface, InvertedHorizontalLayout, Line, Margin, VerticalLayout, Widget, Layout,
 };
 
-use std::{rc::Rc, thread};
+use std::{
+    env,
+    rc::Rc,
+    thread
+};
+
+enum UIVersion {
+    V1,
+    V2,
+}
 
 fn main() {
 //    let now = Local::now();
+
+    let mut args = env::args();
+    // Skip program name
+    _ = args.next();
+
+    let mut version = UIVersion::V2;
+    let mut mode = OperationMode::XdgToplevel;
+    loop {
+        match args.next() {
+            Some(ref s) if s == "layer_shell" => {
+                let width = args.next().map(|x| x.parse::<u32>().ok()).flatten();
+                let height = args.next().map(|x| x.parse::<u32>().ok()).flatten();
+                match (width, height) {
+                    (Some(w), Some(h)) => mode = OperationMode::LayerSurface((w, h)),
+                    _ => panic!("invalid arguments"),
+                }
+            },
+            Some(ref s) if s == "xdg_shell" => mode = OperationMode::XdgToplevel,
+            Some(ref s) if s == "v1" => version = UIVersion::V1,
+            Some(ref s) if s == "v2" => version = UIVersion::V2,
+            Some(_) => panic!("unknown argument"),
+            None => break,
+        }
+    }
+
     let conn = Connection::connect_to_env().unwrap();
 
     let event_queue = conn.new_event_queue();
@@ -92,63 +126,66 @@ fn main() {
     fm.add_font_path("sans", "/usr/share/fonts/noto/NotoSans-Regular.ttf".to_string());
     fm.add_font_path("monospace", "/usr/share/fonts/noto/NotoSansMono-Regular.ttf".to_string());
 
-    let clock = Box::new(Clock::new(&mut fm, "sans", 128.));
-    let calendar = Box::new(Calendar::new(&mut fm, "monospace", 12.0, 1, -1));
-    let date = Box::new(Date::new(&mut fm, "sans", 48.));
-    let line = Box::new(Line::new(1));
-    let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
-    let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
-    let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
-    let audio = Box::new(Audio::new(events.clone(), &mut fm, "sans", 24.));
 
-     let widgets: Vec<Box<dyn Widget>> =
-        vec![clock, date, battery, backlight, audio, line, calendar, launcher];
+    let (widgets, layout): (Vec<Box<dyn Widget>>, Rc<Box<dyn Layout>>) = match version {
+        UIVersion::V1 => {
+            let clock = Box::new(Clock::new(&mut fm, "sans", 256.));
+            let calendar = Box::new(Calendar::new(&mut fm, "monospace", 18.0, -1, 1));
+            let date = Box::new(Date::new(&mut fm, "sans", 48.));
+            let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
+            let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
+            let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
+            let audio = Box::new(Audio::new(events.clone(), &mut fm, "sans", 24.));
 
-    let layout = Rc::new(VerticalLayout::new(vec![
-        HorizontalLayout::new(vec![
-            IndexedLayout::new(0),
-            Margin::new(IndexedLayout::new(1), (16, 16, 0, 0)),
-            VerticalLayout::new(vec![
-                Margin::new(IndexedLayout::new(2), (16, 8, 8, 0)),
-                Margin::new(IndexedLayout::new(3), (16, 8, 8, 0)),
-                Margin::new(IndexedLayout::new(4), (16, 8, 8, 0)),
-            ]),
-        ]),
-        IndexedLayout::new(5),
-        InvertedHorizontalLayout::new(vec![IndexedLayout::new(6), IndexedLayout::new(7)]),
-    ]));
-
-    /* alt look
-    let clock = Box::new(Clock::new(&mut fm, "sans", 256.));
-    let date = Box::new(Date::new(&mut fm, "sans", 64.));
-    let calendar = Box::new(Calendar::new(&mut fm, "monospace", 16.0, 3, 1));
-    let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
-    let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
-    let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
-
-    let widgets: Vec<Box<dyn Widget>> =
-        vec![clock, date, battery, backlight, calendar];
-
-    let layout = Rc::new(Margin::new(
-            VerticalLayout::new(vec![
-                HorizontalLayout::new(vec![
-                    VerticalLayout::new(vec![
-                        IndexedLayout::new(1),
-                        IndexedLayout::new(0),
-                    ]),
-                    Margin::new(
+            let v: Vec<Box<dyn Widget>> = vec![clock, date, battery, backlight, audio, calendar, launcher];
+            let l = Rc::new(Margin::new(
+                VerticalLayout::new(vec![
+                    HorizontalLayout::new(vec![
                         VerticalLayout::new(vec![
-                            Margin::new(IndexedLayout::new(2), (0, 0, 0, 8)),
-                            Margin::new(IndexedLayout::new(3), (0, 0, 0, 8)),
+                            IndexedLayout::new(1),
+                            IndexedLayout::new(0),
                         ]),
-                        (88, 0, 0, 0),
-                    ),
+                        Margin::new(
+                            VerticalLayout::new(vec![
+                                Margin::new(IndexedLayout::new(2), (0, 0, 0, 8)),
+                                Margin::new(IndexedLayout::new(3), (0, 0, 0, 8)),
+                                Margin::new(IndexedLayout::new(4), (0, 0, 0, 8)),
+                            ]),
+                            (88, 0, 0, 0),
+                        ),
+                    ]),
+                    IndexedLayout::new(5),
+                    IndexedLayout::new(6),
+                ]), (20, 20, 20, 20))
+            );
+            (v, l)
+        }
+        UIVersion::V2 => {
+            let clock = Box::new(Clock::new(&mut fm, "sans", 128.));
+            let calendar = Box::new(Calendar::new(&mut fm, "monospace", 12.0, 1, -1));
+            let date = Box::new(Date::new(&mut fm, "sans", 48.));
+            let line = Box::new(Line::new(1));
+            let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
+            let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
+            let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
+            let audio = Box::new(Audio::new(events.clone(), &mut fm, "sans", 24.));
+            let v: Vec<Box<dyn Widget>> = vec![clock, date, battery, backlight, audio, line, calendar, launcher];
+            let l = Rc::new(VerticalLayout::new(vec![
+                HorizontalLayout::new(vec![
+                    IndexedLayout::new(0),
+                    Margin::new(IndexedLayout::new(1), (16, 16, 0, 0)),
+                    VerticalLayout::new(vec![
+                        Margin::new(IndexedLayout::new(2), (16, 8, 8, 0)),
+                        Margin::new(IndexedLayout::new(3), (16, 8, 8, 0)),
+                        Margin::new(IndexedLayout::new(4), (16, 8, 8, 0)),
+                    ]),
                 ]),
-                IndexedLayout::new(4),
-                //IndexedLayout::new(5),
-            ]), (20, 20, 20, 20))
-    );
-    */
+                IndexedLayout::new(5),
+                InvertedHorizontalLayout::new(vec![IndexedLayout::new(6), IndexedLayout::new(7)]),
+            ]));
+            (v, l)
+        }
+    };
 
     let font_thread = thread::Builder::new()
         .name("fontloader".to_string())
@@ -157,7 +194,7 @@ fn main() {
         fm
     }).unwrap();
 
-    let mut state = State::new(OperationMode::XdgToplevel, widgets, layout, MaybeFontMap::Waiting(font_thread), events);
+    let mut state = State::new(mode, widgets, layout, MaybeFontMap::Waiting(font_thread), events);
 
     let mut damage = Vec::new();
     for _ in 0..state.widgets.len() {

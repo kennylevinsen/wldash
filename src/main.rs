@@ -119,10 +119,9 @@ fn main() {
 
     let mut fm = FontMap::new();
 
-    // Todo: Cache in a file
+    // TODO: Cache in a file
     fm.add_font_path("sans", "/usr/share/fonts/noto/NotoSans-Regular.ttf".to_string());
     fm.add_font_path("monospace", "/usr/share/fonts/noto/NotoSansMono-Regular.ttf".to_string());
-
 
     let (widgets, layout): (Vec<Box<dyn Widget>>, Rc<Box<dyn Layout>>) = match version {
         UIVersion::V1 => {

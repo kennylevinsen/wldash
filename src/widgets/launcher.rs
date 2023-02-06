@@ -103,6 +103,11 @@ impl Prompt {
         }
     }
 
+    fn set(&mut self, v: &str) {
+        self.input = v.to_string();
+        self.cursor = self.input.len();
+    }
+
     fn append(&mut self, v: &str) {
         if self.input.len() == 0 {
             match v {
@@ -188,7 +193,7 @@ impl Prompt {
 }
 
 trait InterfaceWidget {
-    fn trigger(&mut self, intf: &InnerInterface);
+    fn trigger(&mut self, intf: &mut InnerInterface);
     fn draw(
         &mut self,
         intf: &InnerInterface,
@@ -239,7 +244,7 @@ impl Launcher {
 }
 
 impl InterfaceWidget for Launcher {
-    fn trigger(&mut self, intf: &InnerInterface) {
+    fn trigger(&mut self, intf: &mut InnerInterface) {
         if self.matches.len() > intf.selection {
             let d = &self.matches[intf.selection];
             if let Some(exec) = &d.exec {
@@ -362,7 +367,7 @@ impl InterfaceWidget for Launcher {
 struct Shell();
 
 impl InterfaceWidget for Shell {
-    fn trigger(&mut self, intf: &InnerInterface) {
+    fn trigger(&mut self, intf: &mut InnerInterface) {
         let args = vec![
             "/bin/sh".to_string(),
             "-c".to_string(),
@@ -414,14 +419,21 @@ impl InterfaceWidget for Shell {
 }
 
 struct Calc {
-    old: Vec<String>,
+    old: Vec<(String, String)>,
     result: Option<String>,
 }
 
 impl InterfaceWidget for Calc {
-    fn trigger(&mut self, intf: &InnerInterface) {
-        if let Some(res) = &self.result {
-            self.old.push(format!("{} = {}", &intf.prompt.input, res));
+    fn trigger(&mut self, intf: &mut InnerInterface) {
+        if intf.selection == 0 {
+            if let Some(res) = &self.result {
+                self.old.push((intf.prompt.input.to_string(), res.to_string()));
+            }
+        } else if self.old.len() >= intf.selection {
+            let (input, res) = &self.old[self.old.len() - intf.selection];
+            self.result = Some(res.to_string());
+            intf.prompt.set(input);
+            intf.selection = 0;
         }
     }
 
@@ -452,7 +464,7 @@ impl InterfaceWidget for Calc {
 
         // Draw prompt
         let font = fonts.get_font(intf.font, intf.size);
-        let res_off = font
+        font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
                 fg,
@@ -464,27 +476,34 @@ impl InterfaceWidget for Calc {
         font.auto_draw_text(&mut prompt_line, Color::BUFF, "=")
             .unwrap();
 
+        prompt_offset -= line_height;
         if let Some(res) = &self.result {
-            let resfg = Color::LIGHTORANGE;
-            let mut result_line = view.offset((res_off.0, prompt_offset));
-            font.auto_draw_text(&mut result_line, resfg, &format!(" = {}", &res))
-                .unwrap();
+            let c = if intf.selection == 0 {
+                Color::LIGHTORANGE
+            } else {
+                Color::GREY50
+            };
+            let mut result_line = view.offset((0, prompt_offset));
+            font.auto_draw_text(&mut result_line, c, res).unwrap();
         }
 
-        for m in self.old.iter().rev() {
-            let dimfg = Color::GREY50;
+        for (idx, (input, res)) in self.old.iter().rev().enumerate() {
             if prompt_offset < line_height {
                 break;
             }
+            let c = if idx + 1 == intf.selection {
+                Color::GREY75
+            } else {
+                Color::GREY50
+            };
             prompt_offset -= line_height;
             let mut result_line = view.offset((0, prompt_offset));
-            font.auto_draw_text(&mut result_line, dimfg, &m)
-                .unwrap();
+            font.auto_draw_text(&mut result_line, c, &format!("{} = {}", input, res)).unwrap();
         }
 
         let content_height = min(
             intf.geometry.height,
-            (self.old.len() + 1) as u32 * line_height + 16,
+            (self.old.len() + 2) as u32 * line_height + 16,
         );
         Geometry {
             x: intf.geometry.x,
@@ -588,7 +607,7 @@ impl Interface {
                 self.inner.selection = 0;
                 widget.update(&self.inner);
             }
-            keysyms::XKB_KEY_Return => widget.trigger(&self.inner),
+            keysyms::XKB_KEY_Return => widget.trigger(&mut self.inner),
             keysyms::XKB_KEY_Left => self.inner.prompt.move_cursor(-1),
             keysyms::XKB_KEY_Right => self.inner.prompt.move_cursor(1),
             keysyms::XKB_KEY_Up => {

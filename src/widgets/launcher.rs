@@ -1,6 +1,9 @@
 use std::{
     cmp::{max, min, Ordering},
     collections::HashMap,
+    env,
+    io::Write,
+    fs::{read_to_string, File},
     default::Default,
     process::{exit, Command},
     sync::{Arc, Mutex},
@@ -419,18 +422,71 @@ impl InterfaceWidget for Shell {
 }
 
 struct Calc {
-    old: Vec<(String, String)>,
+    old: Arc<Mutex<Vec<(String, String)>>>,
     result: Option<String>,
+}
+
+impl Calc {
+    fn new() -> Calc {
+        let old: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
+        let old_local = old.clone();
+        thread::Builder::new()
+            .name("calc".to_string())
+            .spawn(move || {
+                let home = env::var_os("HOME").unwrap().into_string().unwrap();
+                let s = match read_to_string(format!("{}/.cache/wldash/calc", home)) {
+                    Ok(s) => s,
+                    _ => return,
+                };
+
+                let mut old = old_local.lock().unwrap();
+                for line in s.lines() {
+                    let pos = match line.find("=") {
+                        Some(v) => v,
+                        _ => continue,
+                    };
+                    let (input, res) = line.split_at(pos);
+                    let (input, res) = (input.trim(), res[1..].trim());
+                    old.push((input.to_string(), res.to_string()));
+                }
+            })
+            .unwrap();
+
+        Calc{
+            old,
+            result: None,
+        }
+    }
+
+    fn sync(&self) {
+        let home = env::var_os("HOME").unwrap().into_string().unwrap();
+        let mut f = match File::create(format!("{}/.cache/wldash/calc", home)) {
+            Ok(f) => f,
+            _ => return,
+        };
+
+        let old = self.old.lock().unwrap();
+        for (input, res) in old.iter() {
+            write!(f, "{}={}\n", input, res).unwrap();
+        }
+        f.sync_data().unwrap();
+    }
 }
 
 impl InterfaceWidget for Calc {
     fn trigger(&mut self, intf: &mut InnerInterface) {
+        let mut old = self.old.lock().unwrap();
         if intf.selection == 0 {
             if let Some(res) = &self.result {
-                self.old.push((intf.prompt.input.to_string(), res.to_string()));
+                old.push((intf.prompt.input.to_string(), res.to_string()));
+                while old.len() > 32 {
+                    old.remove(0);
+                }
+                drop(old);
+                self.sync();
             }
-        } else if self.old.len() >= intf.selection {
-            let (input, res) = &self.old[self.old.len() - intf.selection];
+        } else if old.len() >= intf.selection {
+            let (input, res) = &old[old.len() - intf.selection];
             self.result = Some(res.to_string());
             intf.prompt.set(input);
             intf.selection = 0;
@@ -454,6 +510,7 @@ impl InterfaceWidget for Calc {
         fonts: &mut FontMap,
         view: &mut BufferView,
     ) -> Geometry {
+        let old = self.old.lock().unwrap();
         let fg = Color::WHITE;
 
         let line_height = intf.size.ceil() as u32;
@@ -487,7 +544,7 @@ impl InterfaceWidget for Calc {
             font.auto_draw_text(&mut result_line, c, res).unwrap();
         }
 
-        for (idx, (input, res)) in self.old.iter().rev().enumerate() {
+        for (idx, (input, res)) in old.iter().rev().enumerate() {
             if prompt_offset < line_height {
                 break;
             }
@@ -503,7 +560,7 @@ impl InterfaceWidget for Calc {
 
         let content_height = min(
             intf.geometry.height,
-            (self.old.len() + 2) as u32 * line_height + 16,
+            (old.len() + 2) as u32 * line_height + 16,
         );
         Geometry {
             x: intf.geometry.x,
@@ -540,10 +597,7 @@ impl Interface {
         Interface {
             launcher: Launcher::new(events),
             shell: Shell {},
-            calc: Calc {
-                old: Vec::new(),
-                result: None,
-            },
+            calc: Calc::new(),
             inner: InnerInterface {
                 font,
                 size,

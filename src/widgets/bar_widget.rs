@@ -14,7 +14,7 @@ pub trait BarWidgetImpl {
         false
     }
     fn name(&self) -> &'static str;
-    fn value(&self) -> f32;
+    fn value(&mut self) -> f32;
     fn color(&self) -> Color;
     fn click(&mut self, _pos: f32, _btn: PointerButton) {}
 }
@@ -50,9 +50,8 @@ impl Widget for BarWidget {
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
         let font = fonts.get_font(self.font, self.size);
         let fg = Color::WHITE;
-        let bg = Color::BLACK;
 
-        font.draw_text(view, bg, fg, self.inner_widget.name())
+        font.draw_text(view, fg, self.inner_widget.name())
             .unwrap();
         let size = self.size.ceil() as u32;
         let bar_offset = 4 * size;

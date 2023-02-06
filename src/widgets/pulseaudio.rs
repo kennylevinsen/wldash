@@ -177,7 +177,7 @@ enum Change {
     ToggleMute,
 }
 
-pub struct InnerAudio {
+struct InnerAudio {
     volume: f32,
     channel_volume: Option<ChannelVolumes>,
     mute: bool,
@@ -186,14 +186,14 @@ pub struct InnerAudio {
     pipe: RawFd,
 }
 
-pub struct Audio {
+pub struct PulseAudio {
     inner: Arc<Mutex<InnerAudio>>,
 }
 
-impl Audio {
+impl PulseAudio {
     pub fn new(events: Arc<Mutex<Events>>, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
         let (a, b) = pipe().unwrap();
-        let audio = Audio {
+        let audio = PulseAudio {
             inner: Arc::new(Mutex::new(InnerAudio{
                 volume: 0.0,
                 channel_volume: None,
@@ -208,15 +208,17 @@ impl Audio {
     }
 }
 
-impl BarWidgetImpl for Audio {
+impl BarWidgetImpl for PulseAudio {
     fn get_dirty(&self) -> bool {
         self.inner.lock().unwrap().dirty
     }
     fn name(&self) -> &'static str {
         "volume"
     }
-    fn value(&self) -> f32 {
-        self.inner.lock().unwrap().volume
+    fn value(&mut self) -> f32 {
+        let mut inner = self.inner.lock().unwrap();
+        inner.dirty = false;
+        inner.volume
     }
     fn color(&self) -> Color {
         match self.inner.lock().unwrap().mute {

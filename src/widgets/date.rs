@@ -50,11 +50,9 @@ impl<'a> Widget for Date {
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
         let time = Local::now().naive_local();
         let fg = Color::WHITE;
-        let bg = Color::BLACK;
         let font = fonts.get_font(self.font, self.size);
         font.draw_text(
             view,
-            bg,
             fg,
             &format!(
                 "{}, {:02}/{:02}/{:4}",

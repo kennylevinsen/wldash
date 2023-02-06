@@ -287,7 +287,6 @@ impl InterfaceWidget for Launcher {
         view: &mut BufferView,
     ) -> Geometry {
         let fg = Color::WHITE;
-        let bg = Color::BLACK;
 
         let line_height = intf.size.ceil() as u32;
 
@@ -299,14 +298,13 @@ impl InterfaceWidget for Launcher {
         let mut x_max = font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
-                bg,
                 fg,
                 &format!("   {}", &intf.prompt.input),
                 intf.prompt.cursor + 3,
             )
             .unwrap();
 
-        font.auto_draw_text(&mut prompt_line, bg, fg, ">")
+        font.auto_draw_text(&mut prompt_line, fg, ">")
             .unwrap();
 
         // Draw entries
@@ -336,13 +334,13 @@ impl InterfaceWidget for Launcher {
                 }
                 x_max = max(
                     x_max,
-                    font.auto_draw_text_individual_colors(&mut line, bg, &colors, &m.name)
+                    font.auto_draw_text_individual_colors(&mut line, &colors, &m.name)
                         .unwrap(),
                 );
             } else {
                 x_max = max(
                     x_max,
-                    font.auto_draw_text(&mut line, bg, dimfg, &m.name)
+                    font.auto_draw_text(&mut line, dimfg, &m.name)
                         .unwrap(),
                 );
             }
@@ -386,7 +384,6 @@ impl InterfaceWidget for Shell {
         view: &mut BufferView,
     ) -> Geometry {
         let fg = Color::WHITE;
-        let bg = Color::BLACK;
 
         let line_height = intf.size.ceil() as u32;
 
@@ -399,13 +396,12 @@ impl InterfaceWidget for Shell {
         let x_max = font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
-                bg,
                 fg,
                 &format!("   {}", &intf.prompt.input),
                 intf.prompt.cursor + 3,
             )
             .unwrap();
-        font.auto_draw_text(&mut prompt_line, bg, Color::BUFF, "!")
+        font.auto_draw_text(&mut prompt_line, Color::BUFF, "!")
             .unwrap();
 
         Geometry {
@@ -447,7 +443,6 @@ impl InterfaceWidget for Calc {
         view: &mut BufferView,
     ) -> Geometry {
         let fg = Color::WHITE;
-        let bg = Color::BLACK;
 
         let line_height = intf.size.ceil() as u32;
 
@@ -460,20 +455,19 @@ impl InterfaceWidget for Calc {
         let res_off = font
             .auto_draw_text_with_cursor(
                 &mut prompt_line,
-                bg,
                 fg,
                 &format!("   {} ", &intf.prompt.input),
                 intf.prompt.cursor + 3,
             )
             .unwrap();
 
-        font.auto_draw_text(&mut prompt_line, bg, Color::BUFF, "=")
+        font.auto_draw_text(&mut prompt_line, Color::BUFF, "=")
             .unwrap();
 
         if let Some(res) = &self.result {
             let resfg = Color::LIGHTORANGE;
             let mut result_line = view.offset((res_off.0, prompt_offset));
-            font.auto_draw_text(&mut result_line, bg, resfg, &format!(" = {}", &res))
+            font.auto_draw_text(&mut result_line, resfg, &format!(" = {}", &res))
                 .unwrap();
         }
 
@@ -484,7 +478,7 @@ impl InterfaceWidget for Calc {
             }
             prompt_offset -= line_height;
             let mut result_line = view.offset((0, prompt_offset));
-            font.auto_draw_text(&mut result_line, bg, dimfg, &m)
+            font.auto_draw_text(&mut result_line, dimfg, &m)
                 .unwrap();
         }
 

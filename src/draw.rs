@@ -47,7 +47,7 @@ impl CachedGlyph {
         }
     }
 
-    fn draw(&self, buf: &mut BufferView, pos: (i32, i32), bg: Color, c: Color) {
+    fn draw(&self, buf: &mut BufferView, pos: (i32, i32), c: Color) {
         let mut x = 0;
         let mut y = 0;
         for v in &self.render {
@@ -56,7 +56,7 @@ impl CachedGlyph {
                     (x + pos.0 + self.origin.0) as u32,
                     (y + pos.1 + self.origin.1) as u32,
                 ),
-                bg.blend(c, *v),
+                c.alpha(*v)
             );
 
             if x == self.dimensions.0 as i32 - 1 {
@@ -102,7 +102,6 @@ impl<'a> Font<'a> {
     pub fn draw_text(
         &self,
         buf: &mut BufferView,
-        bg: Color,
         c: Color,
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
@@ -125,7 +124,7 @@ impl<'a> Font<'a> {
             }
         }
         for glyph in glyphs {
-            glyph.draw(buf, (x_off, -off), bg, c);
+            glyph.draw(buf, (x_off, -off), c);
             x_off += glyph.advance;
         }
 
@@ -135,7 +134,6 @@ impl<'a> Font<'a> {
     pub fn draw_text_with_cursor(
         &self,
         buf: &mut BufferView,
-        bg: Color,
         c: Color,
         s: &str,
         cursor: usize,
@@ -164,7 +162,7 @@ impl<'a> Font<'a> {
             if i == cursor {
                 self.draw_cursor(buf, c, x_off as u32, height)?;
             }
-            glyph.draw(buf, (x_off, -off), bg, c);
+            glyph.draw(buf, (x_off, -off), c);
             x_off += glyph.advance;
         }
         if cursor == glyphs.len() {
@@ -212,30 +210,27 @@ impl<'a> Font<'a> {
     pub fn auto_draw_text(
         &mut self,
         buf: &mut BufferView,
-        bg: Color,
         c: Color,
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
         self.add_str_to_cache(s);
-        self.draw_text(buf, bg, c, s)
+        self.draw_text(buf, c, s)
     }
 
     pub fn auto_draw_text_with_cursor(
         &mut self,
         buf: &mut BufferView,
-        bg: Color,
         c: Color,
         s: &str,
         cursor: usize,
     ) -> Result<(u32, u32), ::std::io::Error> {
         self.add_str_to_cache(s);
-        self.draw_text_with_cursor(buf, bg, c, s, cursor)
+        self.draw_text_with_cursor(buf, c, s, cursor)
     }
 
     pub fn draw_text_fixed_width(
         &self,
         buf: &mut BufferView,
-        bg: Color,
         c: Color,
         distances: &[u32],
         s: &str,
@@ -259,7 +254,7 @@ impl<'a> Font<'a> {
             }
         }
         for (idx, glyph) in glyphs.into_iter().enumerate() {
-            glyph.draw(buf, (x_off, -off), bg, c);
+            glyph.draw(buf, (x_off, -off), c);
             x_off += distances[idx] as i32;
         }
 
@@ -269,7 +264,6 @@ impl<'a> Font<'a> {
     pub fn draw_text_individual_colors(
         &self,
         buf: &mut BufferView,
-        bg: Color,
         color: &[Color],
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
@@ -292,7 +286,7 @@ impl<'a> Font<'a> {
             }
         }
         for (idx, glyph) in glyphs.into_iter().enumerate() {
-            glyph.draw(buf, (x_off, -off), bg, color[idx]);
+            glyph.draw(buf, (x_off, -off), color[idx]);
             x_off += glyph.advance;
         }
 
@@ -302,12 +296,11 @@ impl<'a> Font<'a> {
     pub fn auto_draw_text_individual_colors(
         &mut self,
         buf: &mut BufferView,
-        bg: Color,
         color: &[Color],
         s: &str,
     ) -> Result<(u32, u32), ::std::io::Error> {
         self.add_str_to_cache(s);
-        self.draw_text_individual_colors(buf, bg, color, s)
+        self.draw_text_individual_colors(buf, color, s)
     }
 }
 

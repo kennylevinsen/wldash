@@ -244,28 +244,27 @@ impl<'a> BufferView<'a> {
         }
     }
 
-    pub fn limit(&mut self, dimensions: (u32, u32)) -> BufferView {
-        let bounds = self.get_bounds();
-        if cfg!(debug_assertions) && (dimensions.0 > bounds.2 || dimensions.1 > bounds.3) {
-            panic!("cannot create offset outside buffer: {:?} > {:?}", dimensions, bounds);
-        }
-
-        BufferView {
-            view: self.view,
-            dimensions: self.dimensions,
-            subdimensions: Some((bounds.0, bounds.1, dimensions.0, dimensions.1)),
-        }
-    }
-
     pub fn memset(&mut self, c: Color) {
         if let Some(subdim) = self.subdimensions {
             for y in subdim.1..(subdim.1 + subdim.3) {
-                for x in subdim.0..(subdim.0 + subdim.2) {
-                    self.view[(x + y * self.dimensions.0) as usize] = c.0;
-                }
+                let start = (subdim.0 + y * self.dimensions.0) as usize;
+                let end = start + subdim.2 as usize;
+                self.view[start..end].fill(c.0);
             }
         } else {
             self.view.fill(c.0);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        if let Some(subdim) = self.subdimensions {
+            for y in subdim.1..(subdim.1 + subdim.3) {
+                let start = (subdim.0 + y * self.dimensions.0) as usize;
+                let end = start + subdim.2 as usize;
+                self.view[start..end].fill(0x0);
+            }
+        } else {
+            self.view.fill(0x0);
         }
     }
 

@@ -17,12 +17,11 @@ use calloop::{
 use chrono::{Duration, Local, Timelike};
 
 use buffer::BufferView;
-use color::Color;
 use fonts::{FontMap, MaybeFontMap};
 use state::{State, OperationMode};
 use event::{Event, Events};
 use widgets::{
-    Audio, Backlight, Battery, Calendar, Clock, Date, Geometry, HorizontalLayout, IndexedLayout,
+    PulseAudio, Backlight, Battery, Calendar, Clock, Date, Geometry, HorizontalLayout, IndexedLayout,
     Interface, InvertedHorizontalLayout, Line, Margin, VerticalLayout, Widget, Layout,
 };
 
@@ -38,8 +37,6 @@ enum UIVersion {
 }
 
 fn main() {
-//    let now = Local::now();
-
     let mut args = env::args();
     // Skip program name
     _ = args.next();
@@ -135,7 +132,7 @@ fn main() {
             let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
             let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
             let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
-            let audio = Box::new(Audio::new(events.clone(), &mut fm, "sans", 24.));
+            let audio = Box::new(PulseAudio::new(events.clone(), &mut fm, "sans", 24.));
 
             let v: Vec<Box<dyn Widget>> = vec![clock, date, battery, backlight, audio, calendar, launcher];
             let l = Rc::new(Margin::new(
@@ -168,7 +165,7 @@ fn main() {
             let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
             let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
             let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
-            let audio = Box::new(Audio::new(events.clone(), &mut fm, "sans", 24.));
+            let audio = Box::new(PulseAudio::new(events.clone(), &mut fm, "sans", 24.));
             let v: Vec<Box<dyn Widget>> = vec![clock, date, battery, backlight, audio, line, calendar, launcher];
             let l = Rc::new(VerticalLayout::new(vec![
                 HorizontalLayout::new(vec![
@@ -232,30 +229,24 @@ fn main() {
             (state.dimensions.0 as u32, state.dimensions.1 as u32),
         );
 
-//        eprintln!("time: {}", (Local::now() - now).num_milliseconds());
-
-        let surface = state.base_surface.as_ref().unwrap().clone();
+        let surface = state.main_surface.wl_surface.as_ref().unwrap().clone();
         if force {
-            if state.needs_memset {
-                bufview.memset(Color::BLACK);
-            }
             for (idx, widget) in state.widgets.iter_mut().enumerate() {
                 if force || widget.get_dirty() {
                     let geo = widget.geometry();
                     let mut subview = bufview.subgeometry(geo);
                     damage[idx] = widget.draw(&mut state.fonts.unwrap().borrow_mut(), &mut subview);
-                    //draw_box(&mut subview, &Color::new(1.0, 0.5, 0.0, 1.0), (geo.width, geo.height));
                 }
             }
             surface.damage_buffer(0, 0, 0x7FFFFFFF, 0x7FFFFFFF)
         } else {
             let mut drew = false;
             for (idx, widget) in state.widgets.iter_mut().enumerate() {
-                if force || widget.get_dirty() {
+                if widget.get_dirty() {
                     drew = true;
 
                     let old_damage = damage[idx];
-                    bufview.subgeometry(old_damage).memset(Color::BLACK);
+                    bufview.subgeometry(old_damage).clear();
 
                     let geo = widget.geometry();
                     let mut subview = bufview.subgeometry(geo);
@@ -271,7 +262,6 @@ fn main() {
                         combined_damage.width as i32,
                         combined_damage.height as i32,
                     );
-                    //draw_box(&mut subview, &Color::new(1.0, 0.5, 0.0, 1.0), (geo.width, geo.height));
                 }
             }
             if !drew {
@@ -282,7 +272,7 @@ fn main() {
 
         surface.attach(Some(&buf.buffer), 0, 0);
         surface.commit();
-//        eprintln!("draw time: {}", (Local::now() - now).num_milliseconds());
-//        std::process::exit(0);
+        conn.flush().unwrap();
+        state.keyboard.realize();
     }
 }

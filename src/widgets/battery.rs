@@ -1,81 +1,111 @@
 use std::{
     sync::{Arc, Mutex},
     thread,
-    error::Error,
+    time::Duration,
+};
+
+use dbus::blocking::{
+    stdintf::org_freedesktop_dbus::{Properties, PropertiesPropertiesChanged},
+    LocalConnection,
 };
 
 use crate::{
     color::Color,
-    event::{Event, Events},
     fonts::FontMap,
+    event::{Event, Events},
     widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
 
-use upower_dbus::BatteryState;
+enum UpowerBatteryState {
+    Charging,
+    Discharging,
+    Empty,
+    Full,
+    NotCharging,
+    Unknown,
+}
 
 struct InnerBattery {
     value: f32,
-    state: BatteryState,
+    state: UpowerBatteryState,
     dirty: bool,
 }
 
-async fn monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) -> Result<(), Box<dyn Error>> {
-    use zbus::Connection;
-    use upower_dbus::UPowerProxy;
-    use tokio_stream::StreamExt;
-
-    let conn = Connection::system().await?;
-    let proxy = UPowerProxy::new(&conn).await?;
-
-    let device = proxy.get_display_device().await?;
-
-    let local_inner = inner.clone();
-    let local_events = events.clone();
-    let mut percent_stream = device.receive_percentage_changed().await;
-    let a = tokio::spawn(async move {
-        while let Some(percent) = percent_stream.next().await {
-            let percent = percent.get().await.unwrap() as f32 / 100.;
-            let mut inner = local_inner.lock().unwrap();
-            inner.value = percent;
-            inner.dirty = true;
-            drop(inner);
-
-            let mut events = local_events.lock().unwrap();
-            events.add_event(Event::PowerUpdate);
-        }
-    });
-
-    let local_inner = inner.clone();
-    let local_events = events.clone();
-    let mut state_stream = device.receive_state_changed().await;
-    let b = tokio::spawn(async move {
-        while let Some(state) = state_stream.next().await {
-            let state = state.get().await.unwrap();
-            let mut inner = local_inner.lock().unwrap();
-            inner.state = state;
-            inner.dirty = true;
-            drop(inner);
-
-            let mut events = local_events.lock().unwrap();
-            events.add_event(Event::PowerUpdate);
-        }
-    });
-    a.await?;
-    b.await?;
-
-    Ok(())
-}
-
 fn start_monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) {
-    use tokio::runtime;
     thread::Builder::new()
         .name("battmon".to_string())
         .spawn(move || {
-            let rt = runtime::Builder::new_current_thread()
-                .enable_io()
-                .build()
+            let conn = LocalConnection::new_system().unwrap();
+            let device_path = "/org/freedesktop/UPower/devices/DisplayDevice";
+            let proxy = conn.with_proxy(
+                "org.freedesktop.UPower",
+                device_path,
+                Duration::from_millis(500),
+            );
+
+            let capacity: f64 = proxy
+                .get("org.freedesktop.UPower.Device", "Percentage")
+                .expect("unable to get property");
+            let state: u32 = proxy
+                .get("org.freedesktop.UPower.Device", "State")
+                .expect("unable to get state");
+
+            {
+                let mut inner = inner.lock().unwrap();
+                inner.value = capacity as f32 / 100.;
+                inner.state = match state {
+                    1 => UpowerBatteryState::Charging,
+                    2 => UpowerBatteryState::Discharging,
+                    3 => UpowerBatteryState::Empty,
+                    4 => UpowerBatteryState::Full,
+                    5 => UpowerBatteryState::NotCharging,
+                    6 => UpowerBatteryState::Discharging,
+                    _ => UpowerBatteryState::Unknown,
+                }
+            }
+
+            proxy
+                .match_signal(
+                    move |c: PropertiesPropertiesChanged,
+                          _: &LocalConnection,
+                          _: &dbus::Message| {
+                        if c.interface_name != "org.freedesktop.UPower.Device" {
+                            return true;
+                        }
+                        let mut inner = inner.lock().unwrap();
+                        for (key, value) in c.changed_properties {
+                            match key.as_str() {
+                                "State" => {
+                                    inner.state = match value.0.as_u64().unwrap() {
+                                        1 => UpowerBatteryState::Charging,
+                                        2 => UpowerBatteryState::Discharging,
+                                        3 => UpowerBatteryState::Empty,
+                                        4 => UpowerBatteryState::Full,
+                                        5 => UpowerBatteryState::NotCharging,
+                                        6 => UpowerBatteryState::Discharging,
+                                        _ => UpowerBatteryState::Unknown,
+                                    };
+                                    inner.dirty = true;
+                                    let mut events = events.lock().unwrap();
+                                    events.add_event(Event::PowerUpdate);
+                                }
+                                "Percentage" => {
+                                    inner.value = value.0.as_f64().unwrap() as f32 / 100.;
+                                    inner.dirty = true;
+                                    let mut events = events.lock().unwrap();
+                                    events.add_event(Event::PowerUpdate);
+                                }
+                                _ => (),
+                            }
+                        }
+                        true
+                    },
+                )
                 .unwrap();
-            rt.block_on(async move { monitor(inner, events).await }).unwrap();
+
+            loop {
+                conn.process(Duration::from_millis(60000)).unwrap();
+            }
         })
         .unwrap();
 }
@@ -89,7 +119,7 @@ impl Battery {
         let battery = Battery {
             inner: Arc::new(Mutex::new(InnerBattery {
                 value: 0.,
-                state: BatteryState::Unknown,
+                state: UpowerBatteryState::Unknown,
                 dirty: false,
             })),
         };
@@ -105,7 +135,7 @@ impl BarWidgetImpl for Battery {
     fn name(&self) -> &'static str {
         "battery"
     }
-    fn value(&self) -> f32 {
+    fn value(&mut self) -> f32 {
         let mut inner = self.inner.lock().unwrap();
         inner.dirty = false;
         inner.value
@@ -113,15 +143,11 @@ impl BarWidgetImpl for Battery {
     fn color(&self) -> Color {
         let inner = self.inner.lock().unwrap();
         match inner.state {
-            BatteryState::Charging | BatteryState::FullyCharged => Color::LIGHTGREEN,
-            BatteryState::PendingCharge => Color::LIGHTRED,
-            _ => if inner.value > 0.25 {
-                Color::WHITE
-            } else if inner.value > 0.1 {
-                Color::DARKORANGE
-            } else {
-                Color::RED
-            }
+            UpowerBatteryState::Charging | UpowerBatteryState::Full => Color::LIGHTGREEN,
+            UpowerBatteryState::NotCharging => Color::LIGHTRED,
+            _ if inner.value > 0.25 => Color::WHITE,
+            _ if inner.value > 0.1 => Color::DARKORANGE,
+            _ => Color::RED,
         }
     }
 }

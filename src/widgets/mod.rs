@@ -1,4 +1,5 @@
-mod audio;
+//mod alsaaudio;
+mod pulseaudio;
 mod backlight;
 mod bar_widget;
 mod battery;
@@ -10,7 +11,8 @@ mod line;
 mod widget;
 mod layout;
 
-pub use audio::Audio;
+//pub use alsaaudio::AlsaAudio;
+pub use pulseaudio::PulseAudio;
 pub use backlight::Backlight;
 pub use battery::Battery;
 pub use calendar::Calendar;

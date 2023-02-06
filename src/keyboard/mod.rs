@@ -40,25 +40,36 @@ pub struct KeyEvent {
 
 pub struct Keyboard {
     state: Option<KbState>,
+    fd: Option<(OwnedFd, u32)>,
 }
 
 impl Keyboard {
     pub fn new() -> Keyboard {
-        Keyboard { state: None }
+        Keyboard { state: None, fd: None, }
     }
 
     pub fn keymap(&mut self, format: WEnum<wl_keyboard::KeymapFormat>, fd: OwnedFd, size: u32) {
         match format {
             WEnum::Value(wl_keyboard::KeymapFormat::XkbV1) => {
-                self.state = Some(
-                    KbState::new_from_fd(fd.as_raw_fd(), size as usize)
-                        .expect("unable to load keymap"),
-                );
+                self.fd = Some((fd, size));
             }
             WEnum::Value(wl_keyboard::KeymapFormat::NoKeymap) => {
                 // TODO: how to handle this (hopefully never occuring) case?
             }
             _ => unreachable!(),
+        }
+    }
+
+    pub fn realize(&mut self) {
+        if self.state.is_some() {
+            return;
+        }
+
+        if let Some((fd, size)) = &self.fd {
+            self.state = Some(
+                KbState::new_from_fd(fd.as_raw_fd(), *size as usize)
+                    .expect("unable to load keymap"),
+            );
         }
     }
 

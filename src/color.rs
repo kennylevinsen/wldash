@@ -75,18 +75,11 @@ fn blend_f32(a: f32, b: f32, r: f32) -> f32 {
     a + ((b - a) * r)
 }
 */
-#[inline]
-fn blend_u8(a: u8, b: u8, r: f32) -> u32 {
-    let af = a as f32;
-    let bf = b as f32;
-    (af + ((bf - af) * r)) as u32
-}
 
 #[derive(Copy, Clone)]
 pub struct Color(pub u32);
 
 impl Color {
-    pub const BLACK:       Color = Color(0xFF000000);
     pub const WHITE:       Color = Color(0xFFFFFFFF);
     pub const GREY50:      Color = Color(0xFF7F7F7F);
     pub const GREY75:      Color = Color(0xFFBFBFBF);
@@ -104,17 +97,17 @@ impl Color {
         Color((opacity as u32) << 24 | (red as u32) << 16 | (green as u32) << 8 | (blue as u32))
     }
 
-    fn opacity(self) -> u8 {((self.0 >> 24) & 0xFF) as u8 }
     fn red(self) -> u8 {((self.0 >> 16) & 0xFF) as u8 }
     fn green(self) -> u8 {((self.0 >> 8) & 0xFF) as u8 }
     fn blue(self) -> u8 {(self.0 & 0xFF) as u8 }
 
-    pub fn blend(self, other: Color, ratio: f32) -> Color {
-        Color(
-            blend_u8(self.opacity(), other.opacity(), ratio) << 24 |
-            blend_u8(self.red(), other.red(), ratio) << 16 |
-            blend_u8(self.green(), other.green(), ratio) << 8 |
-            blend_u8(self.blue(), other.blue(), ratio)
-        )
+    pub fn alpha(self, alpha: f32) -> Color {
+        unsafe {
+            Color(
+                (255. * alpha).to_int_unchecked::<u32>() << 24 |
+                (self.red() as f32 * alpha).to_int_unchecked::<u32>() << 16 |
+                (self.green() as f32 * alpha).to_int_unchecked::<u32>() << 8 |
+                (self.blue() as f32 * alpha).to_int_unchecked::<u32>())
+        }
     }
 }

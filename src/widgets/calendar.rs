@@ -52,7 +52,6 @@ impl Calendar {
         orig: NaiveDate,
         mut time: NaiveDate,
     ) {
-        let black = Color::BLACK;
         let white = Color::WHITE;
         let dim = Color::GREY80;
         let dimmer = Color::GREY75;
@@ -85,7 +84,6 @@ impl Calendar {
                             y_off * (self.size * LINE_HEIGHT).ceil() as u32
                                 + (self.size * 1.).ceil() as u32,
                         )),
-                    black,
                     white,
                     &wk_chr,
                 )
@@ -100,7 +98,6 @@ impl Calendar {
             year_font
                 .draw_text(
                     &mut view.offset(((self.size * 17.).ceil() as u32, 0)),
-                    black,
                     dim,
                     &format!("{:}", time.year()),
                 )
@@ -124,7 +121,7 @@ impl Calendar {
             _ => panic!("impossible value"),
         };
         cal_font
-            .draw_text(&mut view, black, white, month_str)
+            .draw_text(&mut view, white, month_str)
             .unwrap();
 
         let mut done = false;
@@ -152,7 +149,6 @@ impl Calendar {
                             y_off * (self.size * LINE_HEIGHT).ceil() as u32
                                 + (self.size * MONTH_FACTOR).ceil() as u32,
                         )),
-                    black,
                     dimmer,
                     &format!("{:02}", wk.week()),
                 )
@@ -177,7 +173,6 @@ impl Calendar {
                                 y_off * (self.size * LINE_HEIGHT).ceil() as u32
                                     + (self.size * MONTH_FACTOR).ceil() as u32,
                             )),
-                        black,
                         c,
                         &format!("{:02}", time.day()),
                     )

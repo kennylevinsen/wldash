@@ -54,14 +54,12 @@ impl<'a> Widget for Clock {
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
         let time = Local::now().naive_local();
         let fg = Color::WHITE;
-        let bg = Color::BLACK;
 
         let digit = self.digit_width;
         let colon = self.colon_width;
         let font = fonts.get_font(self.font, self.size);
         font.draw_text_fixed_width(
             view,
-            bg,
             fg,
             &[digit, digit, colon, digit, digit],
             &format!("{:02}:{:02}", time.hour(), time.minute()),

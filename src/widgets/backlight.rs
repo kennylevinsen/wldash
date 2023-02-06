@@ -45,7 +45,7 @@ impl BarWidgetImpl for Backlight {
     fn name(&self) -> &'static str {
         "backlight"
     }
-    fn value(&self) -> f32 {
+    fn value(&mut self) -> f32 {
         if self.cur > self.max {
             // what.
             return 1.0;

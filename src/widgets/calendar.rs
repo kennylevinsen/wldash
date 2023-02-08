@@ -266,6 +266,8 @@ impl<'a> Widget for Calendar {
         let cal_pad = self.date_width * 2;
 
         if geometry.width < cal_width || geometry.height < cal_height {
+            self.shown_sections_x = 0;
+            self.shown_sections_y = 0;
             self.geometry = Default::default();
             return self.geometry;
         }

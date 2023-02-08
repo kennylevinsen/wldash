@@ -316,7 +316,7 @@ impl InterfaceWidget for Launcher {
 
         // Draw entries
         let dimfg = Color::GREY50;
-        prompt_offset -= 16;
+        prompt_offset -= 8;
 
         for (idx, m) in self.matches.iter().enumerate() {
             if prompt_offset < line_height {
@@ -354,7 +354,7 @@ impl InterfaceWidget for Launcher {
 
         let content_height = min(
             intf.geometry.height,
-            (self.matches.len() + 1) as u32 * line_height + 16,
+            (self.matches.len() + 1) as u32 * line_height + 8,
         );
         Geometry {
             x: intf.geometry.x,
@@ -527,7 +527,7 @@ impl InterfaceWidget for Calc {
         font.auto_draw_text(&mut prompt_line, Color::BUFF, "=")
             .unwrap();
 
-        prompt_offset -= 16;
+        prompt_offset -= 8;
         prompt_offset -= line_height;
         if let Some(res) = &self.result {
             let c = if intf.selection == 0 {
@@ -556,7 +556,7 @@ impl InterfaceWidget for Calc {
 
         let content_height = min(
             intf.geometry.height,
-            (old.len() + 2) as u32 * line_height + 16,
+            (old.len() + 2) as u32 * line_height + 8,
         );
         Geometry {
             x: intf.geometry.x,
@@ -614,7 +614,7 @@ impl Interface {
     fn pointer_input(&mut self, event: &PointerEvent) {
         if let PointerButton::Left = event.button {
             let line_height = self.inner.size.ceil() as u32;
-            let height = self.inner.geometry.height - line_height - 16;
+            let height = self.inner.geometry.height - line_height - 8;
             let lines = height / line_height;
 
             let offset = height % line_height;
@@ -715,7 +715,7 @@ impl Widget for Interface {
             x: 0,
             y: 0,
             width: 256,
-            height: (self.inner.size.ceil() as u32) * 4 + 16,
+            height: (self.inner.size.ceil() as u32) * 4 + 8,
         }
     }
 

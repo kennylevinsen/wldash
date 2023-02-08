@@ -45,7 +45,10 @@ pub struct Keyboard {
 
 impl Keyboard {
     pub fn new() -> Keyboard {
-        Keyboard { state: None, fd: None, }
+        Keyboard {
+            state: None,
+            fd: None,
+        }
     }
 
     pub fn keymap(&mut self, format: WEnum<wl_keyboard::KeymapFormat>, fd: OwnedFd, size: u32) {

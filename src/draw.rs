@@ -21,7 +21,6 @@ impl CachedGlyph {
 
         if let Some(bounding_box) = glyph.pixel_bounding_box() {
             let origin = (bounding_box.min.x, bounding_box.min.y);
-
             let dimensions = (
                 (bounding_box.max.x - bounding_box.min.x) as u32,
                 (bounding_box.max.y - bounding_box.min.y) as u32,
@@ -50,13 +49,15 @@ impl CachedGlyph {
     fn draw(&self, buf: &mut BufferView, pos: (i32, i32), c: Color) {
         let mut x = 0;
         let mut y = 0;
+        let bounds = buf.get_bounds();
+        let offset = (bounds.0 as i32, bounds.1 as i32);
         for v in &self.render {
-            let _ = buf.put(
+            buf.put_raw(
                 (
-                    (x + pos.0 + self.origin.0) as u32,
-                    (y + pos.1 + self.origin.1) as u32,
+                    (x + pos.0 + self.origin.0 + offset.0) as u32,
+                    (y + pos.1 + self.origin.1 + offset.1) as u32,
                 ),
-                c.alpha(*v)
+                c.alpha(*v),
             );
 
             if x == self.dimensions.0 as i32 - 1 {
@@ -180,8 +181,9 @@ impl<'a> Font<'a> {
         height: u32,
     ) -> Result<(), ::std::io::Error> {
         // draw cursor
-        for i in 1..height {
-            buf.put((offset, i), c);
+        let bounds = buf.get_bounds();
+        for i in bounds.1 + 1..height + bounds.1 {
+            buf.put_raw((bounds.0 + offset, i), c);
         }
         Ok(())
     }
@@ -305,13 +307,12 @@ impl<'a> Font<'a> {
 }
 
 pub fn draw_box(buf: &mut BufferView, c: Color, dim: (u32, u32)) -> Result<(), ::std::io::Error> {
-    for x in 0..dim.0 {
-        buf.put((x, 0), c);
-        buf.put((x, dim.1 - 1), c);
-    }
-    for y in 0..dim.1 {
-        buf.put((0, y), c);
-        buf.put((dim.0 - 1, y), c);
+    let bounds = buf.get_bounds();
+    buf.put_line_raw((bounds.0, bounds.1), dim.0, c);
+    buf.put_line_raw((bounds.0, bounds.1 + dim.1 - 1), dim.0, c);
+    for y in bounds.1..dim.1 + bounds.1 {
+        buf.put_raw((bounds.0, y), c);
+        buf.put_raw((bounds.0 + dim.0 - 1, y), c);
     }
 
     Ok(())
@@ -328,10 +329,9 @@ pub fn draw_bar(
     if fill_pos > length {
         fill_pos = length;
     }
-    for y in 0..height {
-        for x in 0..fill_pos {
-            let _ = buf.put((x, y), color);
-        }
+    let bounds = buf.get_bounds();
+    for y in bounds.1..height + bounds.1 {
+        buf.put_line_raw((bounds.0, y), fill_pos, color);
     }
 
     Ok(())

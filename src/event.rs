@@ -58,4 +58,3 @@ impl Events {
         self.events.drain(..).collect()
     }
 }
-

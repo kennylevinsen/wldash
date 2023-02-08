@@ -1,10 +1,6 @@
 use std::cmp::max;
 
-use crate::{
-    fonts::FontMap,
-    state::State,
-    widgets::{Geometry},
-};
+use crate::{fonts::FontMap, state::State, widgets::Geometry};
 
 pub trait Layout {
     fn geometry_update(
@@ -13,6 +9,8 @@ pub trait Layout {
         geometry: &Geometry,
         state: &mut State,
     ) -> Geometry;
+
+    fn minimum_size(&self, fonts: &mut FontMap, state: &mut State) -> Geometry;
 }
 
 pub struct HorizontalLayout {
@@ -45,6 +43,22 @@ impl Layout for HorizontalLayout {
         geo.width = max_width;
         geo.height = max_height;
         geo
+    }
+
+    fn minimum_size(&self, fonts: &mut FontMap, state: &mut State) -> Geometry {
+        let mut max_width = 0;
+        let mut max_height = 0;
+        for w in self.widgets.iter() {
+            let result = w.minimum_size(fonts, state);
+            max_width += result.x + result.width;
+            max_height = max(result.y + result.height, max_height);
+        }
+        Geometry {
+            width: max_width,
+            height: max_height,
+            x: 0,
+            y: 0,
+        }
     }
 }
 
@@ -79,11 +93,28 @@ impl Layout for VerticalLayout {
         geo.height = max_height;
         geo
     }
+
+    fn minimum_size(&self, fonts: &mut FontMap, state: &mut State) -> Geometry {
+        let mut max_width = 0;
+        let mut max_height = 0;
+        for w in self.widgets.iter() {
+            let result = w.minimum_size(fonts, state);
+            max_width = max(result.x + result.width, max_width);
+            max_height += result.y + result.height;
+        }
+        Geometry {
+            width: max_width,
+            height: max_height,
+            x: 0,
+            y: 0,
+        }
+    }
 }
 
 pub trait WidgetUpdater {
     fn geometry_update(&mut self, idx: usize, fonts: &mut FontMap, geometry: &Geometry)
         -> Geometry;
+    fn minimum_size(&mut self, idx: usize, fonts: &mut FontMap) -> Geometry;
 }
 
 pub struct IndexedLayout {
@@ -104,6 +135,10 @@ impl Layout for IndexedLayout {
         state: &mut State,
     ) -> Geometry {
         state.geometry_update(self.widget_idx, fonts, geometry)
+    }
+
+    fn minimum_size(&self, fonts: &mut FontMap, state: &mut State) -> Geometry {
+        state.minimum_size(self.widget_idx, fonts)
     }
 }
 
@@ -139,6 +174,16 @@ impl Layout for Margin {
             height: out.height + self.margin.1 + self.margin.3,
         }
     }
+
+    fn minimum_size(&self, fonts: &mut FontMap, state: &mut State) -> Geometry {
+        let size = self.widget.minimum_size(fonts, state);
+        Geometry {
+            width: size.x + size.width + self.margin.0 + self.margin.2,
+            height: size.y + size.height + self.margin.1 + self.margin.3,
+            x: 0,
+            y: 0,
+        }
+    }
 }
 
 pub struct InvertedHorizontalLayout {
@@ -170,5 +215,21 @@ impl Layout for InvertedHorizontalLayout {
         }
         geo.height = max_height;
         geo
+    }
+
+    fn minimum_size(&self, fonts: &mut FontMap, state: &mut State) -> Geometry {
+        let mut max_width = 0;
+        let mut max_height = 0;
+        for w in self.widgets.iter() {
+            let result = w.minimum_size(fonts, state);
+            max_width += result.x + result.width;
+            max_height = max(result.y + result.height, max_height);
+        }
+        Geometry {
+            width: max_width,
+            height: max_height,
+            x: 0,
+            y: 0,
+        }
     }
 }

@@ -1,10 +1,10 @@
 use std::{
     cmp::{max, min, Ordering},
     collections::HashMap,
-    env,
-    io::Write,
-    fs::{read_to_string, File},
     default::Default,
+    env,
+    fs::{read_to_string, File},
+    io::Write,
     process::{exit, Command},
     sync::{Arc, Mutex},
     thread,
@@ -13,9 +13,9 @@ use std::{
 use crate::{
     buffer::BufferView,
     color::Color,
+    event::{Event, Events, PointerButton, PointerEvent},
     fonts::FontMap,
     keyboard::{keysyms, KeyEvent},
-    event::{Event, Events, PointerEvent, PointerButton},
     utils::desktop::{load_desktop_files, Desktop},
     widgets::{Geometry, Widget},
 };
@@ -312,8 +312,7 @@ impl InterfaceWidget for Launcher {
             )
             .unwrap();
 
-        font.auto_draw_text(&mut prompt_line, fg, ">")
-            .unwrap();
+        font.auto_draw_text(&mut prompt_line, fg, ">").unwrap();
 
         // Draw entries
         let dimfg = Color::GREY50;
@@ -348,8 +347,7 @@ impl InterfaceWidget for Launcher {
             } else {
                 x_max = max(
                     x_max,
-                    font.auto_draw_text(&mut line, dimfg, &m.name)
-                        .unwrap(),
+                    font.auto_draw_text(&mut line, dimfg, &m.name).unwrap(),
                 );
             }
         }
@@ -452,10 +450,7 @@ impl Calc {
             })
             .unwrap();
 
-        Calc{
-            old,
-            result: None,
-        }
+        Calc { old, result: None }
     }
 
     fn sync(&self) {
@@ -521,18 +516,18 @@ impl InterfaceWidget for Calc {
 
         // Draw prompt
         let font = fonts.get_font(intf.font, intf.size);
-        font
-            .auto_draw_text_with_cursor(
-                &mut prompt_line,
-                fg,
-                &format!("   {} ", &intf.prompt.input),
-                intf.prompt.cursor + 3,
-            )
-            .unwrap();
+        font.auto_draw_text_with_cursor(
+            &mut prompt_line,
+            fg,
+            &format!("   {} ", &intf.prompt.input),
+            intf.prompt.cursor + 3,
+        )
+        .unwrap();
 
         font.auto_draw_text(&mut prompt_line, Color::BUFF, "=")
             .unwrap();
 
+        prompt_offset -= 16;
         prompt_offset -= line_height;
         if let Some(res) = &self.result {
             let c = if intf.selection == 0 {
@@ -555,7 +550,8 @@ impl InterfaceWidget for Calc {
             };
             prompt_offset -= line_height;
             let mut result_line = view.offset((0, prompt_offset));
-            font.auto_draw_text(&mut result_line, c, &format!("{} = {}", input, res)).unwrap();
+            font.auto_draw_text(&mut result_line, c, &format!("{} = {}", input, res))
+                .unwrap();
         }
 
         let content_height = min(
@@ -588,9 +584,15 @@ pub struct Interface {
 }
 
 impl Interface {
-    pub fn new(events: Arc<Mutex<Events>>, fm: &mut FontMap, font: &'static str, size: f32) -> Interface {
+    pub fn new(
+        events: Arc<Mutex<Events>>,
+        fm: &mut FontMap,
+        font: &'static str,
+        size: f32,
+    ) -> Interface {
         fm.queue_font(
-            font, size, 
+            font,
+            size,
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 >=!,.-/()",
         );
 
@@ -708,6 +710,15 @@ impl Widget for Interface {
         self.inner.geometry
     }
 
+    fn minimum_size(&mut self, _fonts: &mut FontMap) -> Geometry {
+        Geometry {
+            x: 0,
+            y: 0,
+            width: 256,
+            height: (self.inner.size.ceil() as u32) * 4 + 16,
+        }
+    }
+
     fn event(&mut self, event: &Event) {
         match event {
             Event::KeyEvent(e) => self.keyboard_input(e),
@@ -715,7 +726,7 @@ impl Widget for Interface {
             Event::LauncherUpdate => {
                 self.inner.dirty = true;
                 self.launcher.update(&self.inner);
-            },
+            }
             Event::TokenUpdate(t) => self.launcher.next_token = Some(t.to_string()),
             _ => (),
         }

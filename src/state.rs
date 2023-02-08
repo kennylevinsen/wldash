@@ -1,43 +1,39 @@
 use std::{
+    cmp::max,
+    default::Default,
     env,
     process::exit,
     rc::Rc,
     sync::{Arc, Mutex},
-    default::Default,
 };
 
 use wayland_client::{
     protocol::{
-        wl_buffer, wl_compositor, wl_subcompositor, wl_keyboard, wl_registry, wl_seat, wl_shm, wl_shm_pool,
-        wl_surface, wl_subsurface, wl_pointer,
+        wl_buffer, wl_compositor, wl_keyboard, wl_pointer, wl_registry, wl_seat, wl_shm,
+        wl_shm_pool, wl_subcompositor, wl_subsurface, wl_surface,
     },
     Connection, Dispatch, QueueHandle, WEnum,
 };
 
 use wayland_protocols::{
+    wp::{
+        single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1,
+        viewporter::client::{wp_viewport, wp_viewporter},
+    },
     xdg::{
         activation::v1::client::{xdg_activation_token_v1, xdg_activation_v1},
         shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base},
     },
-    wp::{
-        single_pixel_buffer::v1::client::wp_single_pixel_buffer_manager_v1,
-        viewporter::client::{
-            wp_viewport,
-            wp_viewporter,
-        },
-    },
 };
 
-use wayland_protocols_wlr::layer_shell::v1::client::{
-    zwlr_layer_shell_v1, zwlr_layer_surface_v1,
-};
+use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
 use crate::{
     buffer::BufferManager,
+    event::{Event, Events, PointerButton, PointerEvent},
     fonts::{FontMap, MaybeFontMap},
     keyboard::Keyboard,
     widgets::{Geometry, Layout, Widget, WidgetUpdater},
-    event::{Event, Events, PointerEvent, PointerButton},
 };
 
 #[derive(Debug)]
@@ -127,7 +123,10 @@ impl State {
             Ok(token) => token,
             Err(_) => return,
         };
-        match (&self.main_surface.wl_surface, &self.protocols.xdg_activation) {
+        match (
+            &self.main_surface.wl_surface,
+            &self.protocols.xdg_activation,
+        ) {
             (Some(surface), Some(activation)) => {
                 activation.activate(key, surface);
                 let activation_token = activation.get_activation_token(qh, ());
@@ -147,6 +146,10 @@ impl WidgetUpdater for State {
         geometry: &Geometry,
     ) -> Geometry {
         self.widgets[idx].geometry_update(fonts, geometry)
+    }
+
+    fn minimum_size(&mut self, idx: usize, fonts: &mut FontMap) -> Geometry {
+        self.widgets[idx].minimum_size(fonts)
     }
 }
 
@@ -182,30 +185,34 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                             let subsurface = subcompositor.get_subsurface(child, parent, qh, ());
                             subsurface.place_below(parent);
                             state.bg_surface.subsurface = Some(subsurface);
-                        },
+                        }
                         _ => todo!("handle early subcompositor creation"),
                     }
                 }
                 "wl_shm" => {
-                    state.protocols.wl_shm = Some(registry.bind::<wl_shm::WlShm, _, _>(name, 1, qh, ()));
+                    state.protocols.wl_shm =
+                        Some(registry.bind::<wl_shm::WlShm, _, _>(name, 1, qh, ()));
                 }
                 "wl_seat" => {
                     registry.bind::<wl_seat::WlSeat, _, _>(name, 8, qh, ());
                 }
-                "xdg_wm_base" => if let OperationMode::XdgToplevel = state.mode {
-                    let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 2, qh, ());
+                "xdg_wm_base" => {
+                    if let OperationMode::XdgToplevel = state.mode {
+                        let wm_base =
+                            registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 2, qh, ());
 
-                    match &state.main_surface.wl_surface {
-                        Some(surface) => {
-                            let xdg_surface = wm_base.get_xdg_surface(surface, qh, ());
-                            let toplevel = xdg_surface.get_toplevel(qh, ());
-                            toplevel.set_title("wldash".into());
+                        match &state.main_surface.wl_surface {
+                            Some(surface) => {
+                                let xdg_surface = wm_base.get_xdg_surface(surface, qh, ());
+                                let toplevel = xdg_surface.get_toplevel(qh, ());
+                                toplevel.set_title("wldash".into());
 
-                            surface.commit();
+                                surface.commit();
 
-                            state.main_surface.xdg_surface = Some((xdg_surface, toplevel));
+                                state.main_surface.xdg_surface = Some((xdg_surface, toplevel));
+                            }
+                            _ => todo!("handle early xdg_shell creation"),
                         }
-                        _ => todo!("handle early xdg_shell creation"),
                     }
                 }
                 "xdg_activation_v1" => {
@@ -214,41 +221,63 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                     );
                     state.activate(qh);
                 }
-                "zwlr_layer_shell_v1" => if let OperationMode::LayerSurface(size) = state.mode {
-                    let layer_shell = registry.bind::<zwlr_layer_shell_v1::ZwlrLayerShellV1, _, _>(name, 4, qh, ());
-                    match &state.main_surface.wl_surface {
-                        Some(surface) => {
-                            let layer_surface = layer_shell.get_layer_surface(surface, None, zwlr_layer_shell_v1::Layer::Top, "launcher".to_string(), qh, ());
-                            layer_surface.set_keyboard_interactivity(zwlr_layer_surface_v1::KeyboardInteractivity::Exclusive);
-                            layer_surface.set_size(size.0, size.1);
+                "zwlr_layer_shell_v1" => {
+                    if let OperationMode::LayerSurface(size) = state.mode {
+                        let layer_shell = registry
+                            .bind::<zwlr_layer_shell_v1::ZwlrLayerShellV1, _, _>(name, 4, qh, ());
+                        state.fonts.resolve();
+                        let fonts = state.fonts.unwrap();
+                        let layout = state.layout.clone();
+                        let min_size = layout.minimum_size(&mut fonts.borrow_mut(), state);
+                        match &state.main_surface.wl_surface {
+                            Some(surface) => {
+                                let layer_surface = layer_shell.get_layer_surface(
+                                    surface,
+                                    None,
+                                    zwlr_layer_shell_v1::Layer::Top,
+                                    "launcher".to_string(),
+                                    qh,
+                                    (),
+                                );
+                                layer_surface.set_keyboard_interactivity(
+                                    zwlr_layer_surface_v1::KeyboardInteractivity::Exclusive,
+                                );
+                                layer_surface.set_size(
+                                    max(size.0, min_size.width),
+                                    max(size.1, min_size.height),
+                                );
 
-                            surface.commit();
-                            state.main_surface.layer_surface = Some(layer_surface);
+                                surface.commit();
+                                state.main_surface.layer_surface = Some(layer_surface);
+                            }
+                            _ => todo!("handle early layer_shell creation"),
                         }
-                        _ => todo!("handle early layer_shell creation"),
                     }
-                },
+                }
                 "wp_viewporter" => {
-                    let viewporter = registry.bind::<wp_viewporter::WpViewporter, _, _>(name, 1, qh, ());
+                    let viewporter =
+                        registry.bind::<wp_viewporter::WpViewporter, _, _>(name, 1, qh, ());
                     match &state.bg_surface.wl_surface {
                         Some(surface) => {
-                            state.bg_surface.viewport = Some(viewporter.get_viewport(surface, qh, ()));
-                        },
+                            state.bg_surface.viewport =
+                                Some(viewporter.get_viewport(surface, qh, ()));
+                        }
                         _ => todo!("handle early viewporter creation"),
                     }
                     state.protocols.viewporter = Some(viewporter);
-                },
+                }
                 "wp_single_pixel_buffer_manager_v1" => {
                     let singlepixel = registry.bind::<wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1, _, _>(name, 1, qh, ());
                     match &state.bg_surface.wl_surface {
                         Some(surface) => {
-                            let buffer = singlepixel.create_u32_rgba_buffer(0, 0, 0, 0xFFFFFFFF, qh, ());
+                            let buffer =
+                                singlepixel.create_u32_rgba_buffer(0, 0, 0, 0xFFFFFFFF, qh, ());
                             surface.attach(Some(&buffer), 0, 0);
                             surface.damage_buffer(0, 0, 1, 1);
-                        },
+                        }
                         _ => todo!("handle early single_pixel_buffer creation"),
                     }
-                },
+                }
                 _ => {}
             }
         }
@@ -352,7 +381,8 @@ impl Dispatch<zwlr_layer_shell_v1::ZwlrLayerShellV1, ()> for State {
         _: &(),
         _: &Connection,
         _: &QueueHandle<Self>,
-    ) {}
+    ) {
+    }
 }
 
 impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
@@ -364,7 +394,12 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let zwlr_layer_surface_v1::Event::Configure { serial, width, height } = event {
+        if let zwlr_layer_surface_v1::Event::Configure {
+            serial,
+            width,
+            height,
+        } = event
+        {
             if (width, height) == (0, 0) {
                 return;
             }
@@ -397,7 +432,7 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
                 (Some(surface), Some(viewport)) => {
                     viewport.set_destination(dim.0, dim.1);
                     surface.commit();
-                },
+                }
                 _ => todo!("handle early layer shell creation"),
             }
         }
@@ -577,20 +612,30 @@ impl Dispatch<wl_pointer::WlPointer, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         match event {
-            wl_pointer::Event::Enter { surface_x, surface_y, .. } => {
+            wl_pointer::Event::Enter {
+                surface_x,
+                surface_y,
+                ..
+            } => {
                 state.pointer = Some((surface_x, surface_y));
-            },
-            wl_pointer::Event::Motion { surface_x, surface_y, .. } => {
+            }
+            wl_pointer::Event::Motion {
+                surface_x,
+                surface_y,
+                ..
+            } => {
                 state.pointer = Some((surface_x, surface_y));
-            },
-            wl_pointer::Event::Leave { .. } => {
-                state.pointer = None
-            },
-            wl_pointer::Event::Axis { axis, value, .. } =>  match state.pointer {
+            }
+            wl_pointer::Event::Leave { .. } => state.pointer = None,
+            wl_pointer::Event::Axis { axis, value, .. } => match state.pointer {
                 Some((x, y)) => {
                     let axis = match axis {
-                        WEnum::Value(wl_pointer::Axis::VerticalScroll) => PointerButton::ScrollVertical(value),
-                        WEnum::Value(wl_pointer::Axis::HorizontalScroll) => PointerButton::ScrollHorizontal(value),
+                        WEnum::Value(wl_pointer::Axis::VerticalScroll) => {
+                            PointerButton::ScrollVertical(value)
+                        }
+                        WEnum::Value(wl_pointer::Axis::HorizontalScroll) => {
+                            PointerButton::ScrollHorizontal(value)
+                        }
                         _ => return,
                     };
                     let pos = (x as u32, y as u32);
@@ -598,7 +643,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for State {
                         let geo = widget.geometry();
                         if geo.contains(pos) {
                             let pos = (pos.0 - geo.x, pos.1 - geo.y);
-                            let ev = Event::PointerEvent(PointerEvent{
+                            let ev = Event::PointerEvent(PointerEvent {
                                 button: axis,
                                 pos: pos,
                             });
@@ -607,10 +652,14 @@ impl Dispatch<wl_pointer::WlPointer, ()> for State {
                             break;
                         }
                     }
-                },
+                }
                 _ => (),
             },
-            wl_pointer::Event::Button { button, state: button_state, .. } => match (button, button_state, state.pointer) {
+            wl_pointer::Event::Button {
+                button,
+                state: button_state,
+                ..
+            } => match (button, button_state, state.pointer) {
                 (button, WEnum::Value(wl_pointer::ButtonState::Pressed), Some((x, y))) => {
                     let button = match button {
                         BTN_LEFT => PointerButton::Left,
@@ -622,9 +671,8 @@ impl Dispatch<wl_pointer::WlPointer, ()> for State {
                     for widget in state.widgets.iter_mut() {
                         let geo = widget.geometry();
                         if geo.contains(pos) {
-
                             let pos = (pos.0 - geo.x, pos.1 - geo.y);
-                            let ev = Event::PointerEvent(PointerEvent{
+                            let ev = Event::PointerEvent(PointerEvent {
                                 button: button,
                                 pos: pos,
                             });
@@ -633,7 +681,7 @@ impl Dispatch<wl_pointer::WlPointer, ()> for State {
                             break;
                         }
                     }
-                },
+                }
                 _ => (),
             },
             _ => (),

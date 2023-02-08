@@ -3,11 +3,7 @@ use std::{
     fmt,
 };
 
-use crate::{
-    buffer::BufferView,
-    fonts::FontMap,
-    event::Event,
-};
+use crate::{buffer::BufferView, event::Event, fonts::FontMap};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Geometry {
@@ -49,8 +45,10 @@ impl Geometry {
     }
 
     pub fn contains(&self, position: (u32, u32)) -> bool {
-        position.0 >= self.x && position.0 < self.x + self.width &&
-            position.1 >= self.y && position.1 < self.y + self.height
+        position.0 >= self.x
+            && position.0 < self.x + self.width
+            && position.1 >= self.y
+            && position.1 < self.y + self.height
     }
 }
 
@@ -60,7 +58,9 @@ pub trait Widget {
     }
     fn geometry(&self) -> Geometry;
     fn geometry_update(&mut self, fonts: &mut FontMap, geometry: &Geometry) -> Geometry;
+    fn minimum_size(&mut self, _fonts: &mut FontMap) -> Geometry {
+        Default::default()
+    }
     fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry;
     fn event(&mut self, _event: &Event) {}
 }
-

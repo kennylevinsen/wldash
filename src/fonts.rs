@@ -3,15 +3,7 @@
 use crate::draw;
 use rusttype::Font;
 use std::{
-    cell::RefCell,
-    collections::HashMap,
-    fs::File,
-    hash,
-    io::Read,
-    mem,
-    path::Path,
-    rc::Rc,
-    thread,
+    cell::RefCell, collections::HashMap, fs::File, hash, io::Read, mem, path::Path, rc::Rc, thread,
 };
 
 /// FontRef is used to store Fonts on widgets.
@@ -24,7 +16,12 @@ mod fc {
     /// Given a string, it matches it to a font file and returns its path.
     pub(crate) fn from_string(name: &str) -> String {
         let fc = FontConfig::new().unwrap();
-        fc.find(name, None).unwrap().path.to_str().unwrap().to_string()
+        fc.find(name, None)
+            .unwrap()
+            .path
+            .to_str()
+            .unwrap()
+            .to_string()
     }
 }
 
@@ -98,7 +95,8 @@ impl FontMap {
         match self.required_fonts.get_mut(font_name) {
             Some(v) => v.1.push((size, preload)),
             None => {
-                self.required_fonts.insert(font_name, (font_name, vec![(size, preload)]));
+                self.required_fonts
+                    .insert(font_name, (font_name, vec![(size, preload)]));
             }
         }
     }

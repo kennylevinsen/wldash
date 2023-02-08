@@ -1,16 +1,13 @@
-
 use std::{
+    cell::RefCell,
+    error::Error,
+    os::fd::RawFd,
+    rc::Rc,
     sync::{Arc, Mutex},
     thread,
-    error::Error,
-    rc::Rc,
-    cell::RefCell,
-    os::fd::RawFd,
 };
 
-use nix::unistd::{
-    pipe, write, read,
-};
+use nix::unistd::{pipe, read, write};
 
 use crate::{
     color::Color,
@@ -21,22 +18,19 @@ use crate::{
 
 use libpulse_binding::volume::ChannelVolumes;
 
-fn monitor(events: Arc<Mutex<Events>>, inner: Arc<Mutex<InnerAudio>>, pipe: RawFd) -> Result<(), Box<dyn Error>> {
+fn monitor(
+    events: Arc<Mutex<Events>>,
+    inner: Arc<Mutex<InnerAudio>>,
+    pipe: RawFd,
+) -> Result<(), Box<dyn Error>> {
     use libpulse_binding::{
-        mainloop::{
-            self,
-            standard::{
-                IterateResult,
-            },
-            api::Mainloop,
-            events::io::FlagSet as IoFlagSet,
-        },
         callbacks::ListResult,
         context::{
-            Context,
-            FlagSet,
-            subscribe::{InterestMaskSet, Facility},
-            State,
+            subscribe::{Facility, InterestMaskSet},
+            Context, FlagSet, State,
+        },
+        mainloop::{
+            self, api::Mainloop, events::io::FlagSet as IoFlagSet, standard::IterateResult,
         },
         proplist::{properties, Proplist},
         volume::Volume,
@@ -48,7 +42,9 @@ fn monitor(events: Arc<Mutex<Events>>, inner: Arc<Mutex<InnerAudio>>, pipe: RawF
         .unwrap();
 
     let mut mainloop = mainloop::standard::Mainloop::new().unwrap();
-    let context = Rc::new(RefCell::new(Context::new_with_proplist(&mainloop, "wldash_context", &proplist).unwrap()));
+    let context = Rc::new(RefCell::new(
+        Context::new_with_proplist(&mainloop, "wldash_context", &proplist).unwrap(),
+    ));
     context.borrow_mut().connect(None, FlagSet::NOFLAGS, None)?;
 
     loop {
@@ -63,33 +59,31 @@ fn monitor(events: Arc<Mutex<Events>>, inner: Arc<Mutex<InnerAudio>>, pipe: RawF
     let local_context = context.clone();
     let local_inner = inner.clone();
     let local_events = events.clone();
-    context
-        .borrow_mut()
-        .set_subscribe_callback(Some(Box::new(move |facility, _operation, index| {
-            match facility {
-                Some(Facility::Sink) => {
-                    let introspector = local_context.borrow_mut().introspect();
-                    let inner = local_inner.clone();
-                    let events = local_events.clone();
-                    introspector.get_sink_info_by_index(index, move |res| {
-                        match res {
-                            ListResult::End | ListResult::Error => (),
-                            ListResult::Item(sink_info) => if let Some(_) = &sink_info.name {
-                                let avg = sink_info.volume.avg().0 as f32 / Volume::NORMAL.0 as f32;
-                                let mut inner = inner.lock().unwrap();
-                                inner.volume = avg;
-                                inner.mute = sink_info.mute;
-                                inner.dirty = true;
-                                drop(inner);
-                                let mut events = events.lock().unwrap();
-                                events.add_event(Event::AudioUpdate);
-                            },
+    context.borrow_mut().set_subscribe_callback(Some(Box::new(
+        move |facility, _operation, index| match facility {
+            Some(Facility::Sink) => {
+                let introspector = local_context.borrow_mut().introspect();
+                let inner = local_inner.clone();
+                let events = local_events.clone();
+                introspector.get_sink_info_by_index(index, move |res| match res {
+                    ListResult::End | ListResult::Error => (),
+                    ListResult::Item(sink_info) => {
+                        if let Some(_) = &sink_info.name {
+                            let avg = sink_info.volume.avg().0 as f32 / Volume::NORMAL.0 as f32;
+                            let mut inner = inner.lock().unwrap();
+                            inner.volume = avg;
+                            inner.mute = sink_info.mute;
+                            inner.dirty = true;
+                            drop(inner);
+                            let mut events = events.lock().unwrap();
+                            events.add_event(Event::AudioUpdate);
                         }
-                    });
-                },
-                _ => (),
+                    }
+                });
             }
-        })));
+            _ => (),
+        },
+    )));
 
     context
         .borrow_mut()
@@ -97,10 +91,10 @@ fn monitor(events: Arc<Mutex<Events>>, inner: Arc<Mutex<InnerAudio>>, pipe: RawF
 
     let introspector = context.borrow_mut().introspect();
     let local_inner = inner.clone();
-    introspector.get_sink_info_by_name("@DEFAULT_SINK@", move |res| {
-        match res {
-            ListResult::End | ListResult::Error => (),
-            ListResult::Item(sink_info) => if let Some(_) = &sink_info.name {
+    introspector.get_sink_info_by_name("@DEFAULT_SINK@", move |res| match res {
+        ListResult::End | ListResult::Error => (),
+        ListResult::Item(sink_info) => {
+            if let Some(_) = &sink_info.name {
                 let avg = sink_info.volume.avg().0 as f32 / Volume::NORMAL.0 as f32;
                 let mut inner = local_inner.lock().unwrap();
                 inner.volume = avg;
@@ -110,46 +104,50 @@ fn monitor(events: Arc<Mutex<Events>>, inner: Arc<Mutex<InnerAudio>>, pipe: RawF
                 drop(inner);
                 let mut events = events.lock().unwrap();
                 events.add_event(Event::AudioUpdate);
-            },
+            }
         }
     });
     drop(introspector);
 
     let local_context = context.clone();
     let local_inner = inner.clone();
-    let event_source = mainloop.new_io_event(pipe as i32, IoFlagSet::INPUT, Box::new(move |_, _, _| {
-        let mut buf = [0; 8];
-        _ = read(pipe, &mut buf);
+    let event_source = mainloop.new_io_event(
+        pipe as i32,
+        IoFlagSet::INPUT,
+        Box::new(move |_, _, _| {
+            let mut buf = [0; 8];
+            _ = read(pipe, &mut buf);
 
-        let mut inner = local_inner.lock().unwrap();
-        let mut introspector = local_context.borrow_mut().introspect();
-        match inner.last_click.take() {
-            Some(Change::Volume(volume)) => {
-                // do something
-                let mut vol = inner.channel_volume.unwrap();
-                vol.scale(Volume((volume * Volume::NORMAL.0 as f32).round() as u32));
-                introspector.set_sink_volume_by_name("@DEFAULT_SINK@", &vol, None);
-            },
-            Some(Change::VolumeInc(value)) => {
-                let mut vol = inner.channel_volume.unwrap();
-                // apply step to volumes
-                let step = (value * Volume::NORMAL.0 as f32).round() as i32;
-                if step > 0 {
-                    vol.inc_clamp(Volume(step as u32), Volume::NORMAL);
-                } else {
-                    vol.decrease(Volume(-step as u32));
+            let mut inner = local_inner.lock().unwrap();
+            let mut introspector = local_context.borrow_mut().introspect();
+            match inner.last_click.take() {
+                Some(Change::Volume(volume)) => {
+                    // do something
+                    let mut vol = inner.channel_volume.unwrap();
+                    vol.scale(Volume((volume * Volume::NORMAL.0 as f32).round() as u32));
+                    introspector.set_sink_volume_by_name("@DEFAULT_SINK@", &vol, None);
                 }
-                // HACK: It would be better to only update the volume from feedback, but axis
-                // events fire fast and require the last set volume immediately for reference.
-                inner.channel_volume = Some(vol);
-                introspector.set_sink_volume_by_name("@DEFAULT_SINK@", &vol, None);
-            },
-            Some(Change::ToggleMute) => {
-                introspector.set_sink_mute_by_name("@DEFAULT_SINK@", !inner.mute, None);
-            },
-            None => (),
-        }
-    }));
+                Some(Change::VolumeInc(value)) => {
+                    let mut vol = inner.channel_volume.unwrap();
+                    // apply step to volumes
+                    let step = (value * Volume::NORMAL.0 as f32).round() as i32;
+                    if step > 0 {
+                        vol.inc_clamp(Volume(step as u32), Volume::NORMAL);
+                    } else {
+                        vol.decrease(Volume(-step as u32));
+                    }
+                    // HACK: It would be better to only update the volume from feedback, but axis
+                    // events fire fast and require the last set volume immediately for reference.
+                    inner.channel_volume = Some(vol);
+                    introspector.set_sink_volume_by_name("@DEFAULT_SINK@", &vol, None);
+                }
+                Some(Change::ToggleMute) => {
+                    introspector.set_sink_mute_by_name("@DEFAULT_SINK@", !inner.mute, None);
+                }
+                None => (),
+            }
+        }),
+    );
 
     loop {
         match mainloop.iterate(true) {
@@ -167,7 +165,7 @@ fn monitor(events: Arc<Mutex<Events>>, inner: Arc<Mutex<InnerAudio>>, pipe: RawF
 fn start_monitor(events: Arc<Mutex<Events>>, inner: Arc<Mutex<InnerAudio>>, pipe: RawFd) {
     thread::Builder::new()
         .name("audiomon".to_string())
-        .spawn(move || { monitor(events, inner, pipe).unwrap() })
+        .spawn(move || monitor(events, inner, pipe).unwrap())
         .unwrap();
 }
 
@@ -191,10 +189,15 @@ pub struct PulseAudio {
 }
 
 impl PulseAudio {
-    pub fn new(events: Arc<Mutex<Events>>, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
+    pub fn new(
+        events: Arc<Mutex<Events>>,
+        fm: &mut FontMap,
+        font: &'static str,
+        size: f32,
+    ) -> BarWidget {
         let (a, b) = pipe().unwrap();
         let audio = PulseAudio {
-            inner: Arc::new(Mutex::new(InnerAudio{
+            inner: Arc::new(Mutex::new(InnerAudio {
                 volume: 0.0,
                 channel_volume: None,
                 mute: false,
@@ -229,7 +232,7 @@ impl BarWidgetImpl for PulseAudio {
     fn click(&mut self, pos: f32, btn: PointerButton) {
         let mut inner = self.inner.lock().unwrap();
         inner.last_click = match btn {
-            PointerButton::Left =>  Some(Change::Volume(pos)),
+            PointerButton::Left => Some(Change::Volume(pos)),
             PointerButton::Right => Some(Change::ToggleMute),
             PointerButton::ScrollVertical(val) => Some(Change::VolumeInc((val / 512.) as f32)),
             PointerButton::ScrollHorizontal(val) => Some(Change::VolumeInc((val / 100.) as f32)),

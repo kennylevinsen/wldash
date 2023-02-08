@@ -11,18 +11,33 @@ use dbus::blocking::{
 
 use crate::{
     color::Color,
-    fonts::FontMap,
     event::{Event, Events},
+    fonts::FontMap,
     widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
 
 enum UpowerBatteryState {
+    Unknown,
     Charging,
     Discharging,
     Empty,
-    Full,
-    NotCharging,
-    Unknown,
+    FullyCharged,
+    PendingCharge,
+    PendingDischarge,
+}
+
+impl UpowerBatteryState {
+    fn from_dbus(val: u64) -> UpowerBatteryState {
+        match val {
+            1 => UpowerBatteryState::Charging,
+            2 => UpowerBatteryState::Discharging,
+            3 => UpowerBatteryState::Empty,
+            4 => UpowerBatteryState::FullyCharged,
+            5 => UpowerBatteryState::PendingCharge,
+            6 => UpowerBatteryState::PendingDischarge,
+            _ => UpowerBatteryState::Unknown,
+        }
+    }
 }
 
 struct InnerBattery {
@@ -53,15 +68,7 @@ fn start_monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) {
             {
                 let mut inner = inner.lock().unwrap();
                 inner.value = capacity as f32 / 100.;
-                inner.state = match state {
-                    1 => UpowerBatteryState::Charging,
-                    2 => UpowerBatteryState::Discharging,
-                    3 => UpowerBatteryState::Empty,
-                    4 => UpowerBatteryState::Full,
-                    5 => UpowerBatteryState::NotCharging,
-                    6 => UpowerBatteryState::Discharging,
-                    _ => UpowerBatteryState::Unknown,
-                }
+                inner.state = UpowerBatteryState::from_dbus(state as u64);
             }
 
             proxy
@@ -76,15 +83,8 @@ fn start_monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) {
                         for (key, value) in c.changed_properties {
                             match key.as_str() {
                                 "State" => {
-                                    inner.state = match value.0.as_u64().unwrap() {
-                                        1 => UpowerBatteryState::Charging,
-                                        2 => UpowerBatteryState::Discharging,
-                                        3 => UpowerBatteryState::Empty,
-                                        4 => UpowerBatteryState::Full,
-                                        5 => UpowerBatteryState::NotCharging,
-                                        6 => UpowerBatteryState::Discharging,
-                                        _ => UpowerBatteryState::Unknown,
-                                    };
+                                    inner.state =
+                                        UpowerBatteryState::from_dbus(value.0.as_u64().unwrap());
                                     inner.dirty = true;
                                     let mut events = events.lock().unwrap();
                                     events.add_event(Event::PowerUpdate);
@@ -115,7 +115,12 @@ pub struct Battery {
 }
 
 impl Battery {
-    pub fn new(events: Arc<Mutex<Events>>, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
+    pub fn new(
+        events: Arc<Mutex<Events>>,
+        fm: &mut FontMap,
+        font: &'static str,
+        size: f32,
+    ) -> BarWidget {
         let battery = Battery {
             inner: Arc::new(Mutex::new(InnerBattery {
                 value: 0.,
@@ -143,8 +148,7 @@ impl BarWidgetImpl for Battery {
     fn color(&self) -> Color {
         let inner = self.inner.lock().unwrap();
         match inner.state {
-            UpowerBatteryState::Charging | UpowerBatteryState::Full => Color::LIGHTGREEN,
-            UpowerBatteryState::NotCharging => Color::LIGHTRED,
+            UpowerBatteryState::Charging | UpowerBatteryState::FullyCharged => Color::LIGHTGREEN,
             _ if inner.value > 0.25 => Color::WHITE,
             _ if inner.value > 0.1 => Color::DARKORANGE,
             _ => Color::RED,

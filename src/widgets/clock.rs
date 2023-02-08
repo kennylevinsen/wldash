@@ -3,8 +3,8 @@ use std::default::Default;
 use crate::{
     buffer::BufferView,
     color::Color,
-    fonts::FontMap,
     event::Event,
+    fonts::FontMap,
     widgets::{Geometry, Widget},
 };
 
@@ -80,5 +80,17 @@ impl<'a> Widget for Clock {
             height: self.size.ceil() as u32,
         };
         self.geometry
+    }
+
+    fn minimum_size(&mut self, fonts: &mut FontMap) -> Geometry {
+        let font = fonts.get_font(self.font, self.size);
+        let digit_width = font.auto_widest("0123456789").unwrap();
+        let colon_width = font.auto_widest(":").unwrap();
+        Geometry {
+            x: 0,
+            y: 0,
+            width: digit_width * 4 + colon_width,
+            height: self.size.ceil() as u32,
+        }
     }
 }

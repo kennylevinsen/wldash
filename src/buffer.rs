@@ -199,15 +199,16 @@ impl<'a> BufferView<'a> {
         }
     }
 
-    pub fn subdimensions(
-        &mut self,
-        subdimensions: (u32, u32, u32, u32),
-    ) -> BufferView {
+    pub fn subdimensions(&mut self, subdimensions: (u32, u32, u32, u32)) -> BufferView {
         let bounds = self.get_bounds();
-        if cfg!(debug_assertions) && (subdimensions.0 + subdimensions.2 > bounds.2
-            || subdimensions.1 + subdimensions.3 > bounds.3)
+        if cfg!(debug_assertions)
+            && (subdimensions.0 + subdimensions.2 > bounds.2
+                || subdimensions.1 + subdimensions.3 > bounds.3)
         {
-            panic!("cannot create subdimensions larger than buffer: {:?} > {:?}", subdimensions, bounds);
+            panic!(
+                "cannot create subdimensions larger than buffer: {:?} > {:?}",
+                subdimensions, bounds
+            );
         }
 
         BufferView {
@@ -229,7 +230,10 @@ impl<'a> BufferView<'a> {
     pub fn offset(&mut self, offset: (u32, u32)) -> BufferView {
         let bounds = self.get_bounds();
         if cfg!(debug_assertions) && (offset.0 > bounds.2 || offset.1 > bounds.3) {
-            panic!("cannot create offset outside buffer: {:?} > {:?}", offset, bounds);
+            panic!(
+                "cannot create offset outside buffer: {:?} > {:?}",
+                offset, bounds
+            );
         }
 
         BufferView {
@@ -268,19 +272,15 @@ impl<'a> BufferView<'a> {
         }
     }
 
-    pub fn put(&mut self, pos: (u32, u32), c: Color) {
-        let true_pos = if let Some(subdim) = self.subdimensions {
-            if cfg!(debug_assertions) && (pos.0 >= subdim.2 || pos.1 >= subdim.3) {
-                panic!("put({:?}) is not within subdimensions of buffer ({:?})", pos, subdim);
-            }
-            (pos.0 + subdim.0, pos.1 + subdim.1)
-        } else {
-            if cfg!(debug_assertions) && (pos.0 >= self.dimensions.0 || pos.1 >= self.dimensions.1) {
-                panic!("put({:?}) is not within dimensions of buffer ({:?})", pos, self.dimensions);
-            }
-            pos
-        };
+    #[inline]
+    pub fn put_raw(&mut self, pos: (u32, u32), c: Color) {
+        self.view[(pos.0 + pos.1 * self.dimensions.0) as usize] = c.0
+    }
 
-        self.view[(true_pos.0 + (true_pos.1 * self.dimensions.0)) as usize] = c.0;
+    #[inline]
+    pub fn put_line_raw(&mut self, pos: (u32, u32), len: u32, c: Color) {
+        let start = (pos.0 + (pos.1 * self.dimensions.0)) as usize;
+        let len = len as usize;
+        self.view[start..start + len].fill(c.0);
     }
 }

@@ -4,9 +4,9 @@ use crate::{
     buffer::BufferView,
     color::Color,
     draw::{draw_bar, draw_box},
+    event::{Event, PointerButton},
     fonts::FontMap,
     widgets::{Geometry, Widget},
-    event::{Event, PointerButton},
 };
 
 pub trait BarWidgetImpl {
@@ -27,7 +27,12 @@ pub struct BarWidget {
 }
 
 impl BarWidget {
-    pub fn new(inner_widget: Box<dyn BarWidgetImpl>, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
+    pub fn new(
+        inner_widget: Box<dyn BarWidgetImpl>,
+        fm: &mut FontMap,
+        font: &'static str,
+        size: f32,
+    ) -> BarWidget {
         fm.queue_font(font, size, inner_widget.name());
         BarWidget {
             geometry: Default::default(),
@@ -51,8 +56,7 @@ impl Widget for BarWidget {
         let font = fonts.get_font(self.font, self.size);
         let fg = Color::WHITE;
 
-        font.draw_text(view, fg, self.inner_widget.name())
-            .unwrap();
+        font.draw_text(view, fg, self.inner_widget.name()).unwrap();
         let size = self.size.ceil() as u32;
         let bar_offset = 4 * size;
         let val = self.inner_widget.value();
@@ -91,6 +95,15 @@ impl Widget for BarWidget {
         self.geometry
     }
 
+    fn minimum_size(&mut self, _fonts: &mut FontMap) -> Geometry {
+        Geometry {
+            x: 0,
+            y: 0,
+            width: self.size.ceil() as u32 * 6,
+            height: self.size.ceil() as u32,
+        }
+    }
+
     fn event(&mut self, event: &Event) {
         match event {
             Event::PointerEvent(ev) => {
@@ -99,9 +112,8 @@ impl Widget for BarWidget {
                     let val = (ev.pos.0 - offset) as f32 / (self.geometry.width - offset) as f32;
                     self.inner_widget.click(val, ev.button);
                 }
-            },
+            }
             _ => (),
         }
     }
-
 }

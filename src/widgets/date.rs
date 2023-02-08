@@ -3,8 +3,8 @@ use std::default::Default;
 use crate::{
     buffer::BufferView,
     color::Color,
-    fonts::FontMap,
     event::Event,
+    fonts::FontMap,
     widgets::{Geometry, Widget},
 };
 
@@ -77,5 +77,16 @@ impl<'a> Widget for Date {
             height: font.height().ceil() as u32,
         };
         self.geometry
+    }
+
+    fn minimum_size(&mut self, fonts: &mut FontMap) -> Geometry {
+        let width = (3. + 2. + 2. + 2. + 4.) * self.size / 2.;
+        let font = fonts.get_font(self.font, self.size);
+        Geometry {
+            x: 0,
+            y: 0,
+            width: width.ceil() as u32,
+            height: font.height().ceil() as u32,
+        }
     }
 }

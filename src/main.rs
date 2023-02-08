@@ -1,12 +1,12 @@
 mod buffer;
 mod color;
 mod draw;
+mod event;
 mod fonts;
 mod keyboard;
 mod state;
 mod utils;
 mod widgets;
-mod event;
 
 use wayland_client::{Connection, QueueHandle, WaylandSource};
 
@@ -17,19 +17,15 @@ use calloop::{
 use chrono::{Duration, Local, Timelike};
 
 use buffer::BufferView;
-use fonts::{FontMap, MaybeFontMap};
-use state::{State, OperationMode};
 use event::{Event, Events};
+use fonts::{FontMap, MaybeFontMap};
+use state::{OperationMode, State};
 use widgets::{
-    PulseAudio, Backlight, Battery, Calendar, Clock, Date, Geometry, HorizontalLayout, IndexedLayout,
-    Interface, InvertedHorizontalLayout, Line, Margin, VerticalLayout, Widget, Layout,
+    Backlight, Battery, Calendar, Clock, Date, Geometry, HorizontalLayout, IndexedLayout,
+    Interface, InvertedHorizontalLayout, Layout, Line, Margin, PulseAudio, VerticalLayout, Widget,
 };
 
-use std::{
-    env,
-    rc::Rc,
-    thread
-};
+use std::{env, rc::Rc, thread};
 
 enum UIVersion {
     V1,
@@ -52,7 +48,7 @@ fn main() {
                     (Some(w), Some(h)) => mode = OperationMode::LayerSurface((w, h)),
                     _ => panic!("invalid arguments"),
                 }
-            },
+            }
             Some(ref s) if s == "xdg_shell" => mode = OperationMode::XdgToplevel,
             Some(ref s) if s == "v1" => version = UIVersion::V1,
             Some(ref s) if s == "v2" => version = UIVersion::V2,
@@ -120,27 +116,31 @@ fn main() {
     let mut fm = FontMap::new();
 
     // TODO: Cache in a file
-    fm.add_font_path("sans", "/usr/share/fonts/noto/NotoSans-Regular.ttf".to_string());
-    fm.add_font_path("monospace", "/usr/share/fonts/noto/NotoSansMono-Regular.ttf".to_string());
+    fm.add_font_path(
+        "sans",
+        "/usr/share/fonts/noto/NotoSans-Regular.ttf".to_string(),
+    );
+    fm.add_font_path(
+        "monospace",
+        "/usr/share/fonts/noto/NotoSansMono-Regular.ttf".to_string(),
+    );
 
     let (widgets, layout): (Vec<Box<dyn Widget>>, Rc<Box<dyn Layout>>) = match version {
         UIVersion::V1 => {
             let clock = Box::new(Clock::new(&mut fm, "sans", 256.));
-            let calendar = Box::new(Calendar::new(&mut fm, "monospace", 18.0, -1, 1));
+            let calendar = Box::new(Calendar::new(&mut fm, "monospace", "sans", 36.0, 3, 1));
             let date = Box::new(Date::new(&mut fm, "sans", 48.));
             let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
             let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
-            let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
+            let backlight = Box::new(Backlight::new("intel_backlight", &mut fm, "sans", 24.));
             let audio = Box::new(PulseAudio::new(events.clone(), &mut fm, "sans", 24.));
 
-            let v: Vec<Box<dyn Widget>> = vec![clock, date, battery, backlight, audio, calendar, launcher];
+            let v: Vec<Box<dyn Widget>> =
+                vec![clock, date, battery, backlight, audio, calendar, launcher];
             let l = Rc::new(Margin::new(
                 VerticalLayout::new(vec![
                     HorizontalLayout::new(vec![
-                        VerticalLayout::new(vec![
-                            IndexedLayout::new(1),
-                            IndexedLayout::new(0),
-                        ]),
+                        VerticalLayout::new(vec![IndexedLayout::new(1), IndexedLayout::new(0)]),
                         Margin::new(
                             VerticalLayout::new(vec![
                                 Margin::new(IndexedLayout::new(2), (0, 0, 0, 8)),
@@ -152,20 +152,23 @@ fn main() {
                     ]),
                     IndexedLayout::new(5),
                     IndexedLayout::new(6),
-                ]), (20, 20, 20, 20))
-            );
+                ]),
+                (20, 20, 20, 20),
+            ));
             (v, l)
         }
         UIVersion::V2 => {
             let clock = Box::new(Clock::new(&mut fm, "sans", 128.));
-            let calendar = Box::new(Calendar::new(&mut fm, "monospace", 12.0, 1, -1));
+            let calendar = Box::new(Calendar::new(&mut fm, "monospace", "sans", 24.0, 1, -1));
             let date = Box::new(Date::new(&mut fm, "sans", 48.));
             let line = Box::new(Line::new(1));
             let launcher = Box::new(Interface::new(events.clone(), &mut fm, "monospace", 32.));
             let battery = Box::new(Battery::new(events.clone(), &mut fm, "sans", 24.));
-            let backlight = Box::new(Backlight::new("intel_backlight",  &mut fm, "sans", 24.));
+            let backlight = Box::new(Backlight::new("intel_backlight", &mut fm, "sans", 24.));
             let audio = Box::new(PulseAudio::new(events.clone(), &mut fm, "sans", 24.));
-            let v: Vec<Box<dyn Widget>> = vec![clock, date, battery, backlight, audio, line, calendar, launcher];
+            let v: Vec<Box<dyn Widget>> = vec![
+                clock, date, battery, backlight, audio, line, calendar, launcher,
+            ];
             let l = Rc::new(VerticalLayout::new(vec![
                 HorizontalLayout::new(vec![
                     IndexedLayout::new(0),
@@ -186,11 +189,18 @@ fn main() {
     let font_thread = thread::Builder::new()
         .name("fontloader".to_string())
         .spawn(move || {
-        fm.load_fonts();
-        fm
-    }).unwrap();
+            fm.load_fonts();
+            fm
+        })
+        .unwrap();
 
-    let mut state = State::new(mode, widgets, layout, MaybeFontMap::Waiting(font_thread), events);
+    let mut state = State::new(
+        mode,
+        widgets,
+        layout,
+        MaybeFontMap::Waiting(font_thread),
+        events,
+    );
 
     let mut damage = Vec::new();
     for _ in 0..state.widgets.len() {

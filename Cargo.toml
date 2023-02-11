@@ -37,3 +37,6 @@ rcalc_lib = "1.0"
 #alsa = { version = "0.7", optional = true }
 dbus = "0.9"
 libpulse-binding = "2.26"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"

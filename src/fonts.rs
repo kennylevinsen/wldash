@@ -9,27 +9,21 @@ use std::{
 /// FontRef is used to store Fonts on widgets.
 pub type FontRef<'a> = &'a rusttype::Font<'a>;
 
-#[cfg(feature = "fontloading")]
-mod fc {
+#[cfg(feature = "fontconfig")]
+pub(crate) fn find_font(name: &str) -> String {
     use fontconfig::Fontconfig as FontConfig;
-    /// Acts like fc-match.
-    /// Given a string, it matches it to a font file and returns its path.
-    pub(crate) fn from_string(name: &str) -> String {
-        let fc = FontConfig::new().unwrap();
-        fc.find(name, None)
-            .unwrap()
-            .path
-            .to_str()
-            .unwrap()
-            .to_string()
-    }
+    let fc = FontConfig::new().unwrap();
+    fc.find(name, None)
+        .unwrap()
+        .path
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
-#[cfg(not(feature = "fontloading"))]
-mod fc {
-    pub(crate) fn from_string(_name: &str) -> String {
-        panic!("fontloading feature not enabled");
-    }
+#[cfg(not(feature = "fontconfig"))]
+pub(crate) fn find_font(_name: &str) -> String {
+    panic!("fontconfig not enabled so font search not available");
 }
 
 /// FontLoader is a marker struct that is used to load files
@@ -110,7 +104,7 @@ impl FontMap {
             let path = match self.font_paths.get(font_name) {
                 Some(res) => res,
                 _ => {
-                    let s = fc::from_string(font_name);
+                    let s = find_font(font_name);
                     self.font_paths.insert(font_name, s);
                     self.font_paths.get(font_name).unwrap()
                 }

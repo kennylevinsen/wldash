@@ -8,10 +8,6 @@ edition = "2021"
 lto = "fat"
 panic = "abort"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[features]
-fontloading = ["fontconfig"]
-
 [dependencies]
 wayland-client = { version = "0.30", features = ["calloop", "log"] }
 wayland-protocols = { version = "0.30", features = ["client", "unstable", "staging"] }

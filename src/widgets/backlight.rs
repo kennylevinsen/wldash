@@ -39,6 +39,14 @@ impl Backlight {
         dev.update();
         BarWidget::new(Box::new(dev), fm, font, size)
     }
+
+    pub fn detect(path: &str) -> bool {
+        let path = Path::new("/sys/class/backlight").to_path_buf().join(path);
+        match read_file_as_u64(path.join("brightness").as_path()) {
+            Ok(_) => true,
+            Err(_) => false,
+        }
+    }
 }
 
 impl BarWidgetImpl for Backlight {

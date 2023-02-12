@@ -29,18 +29,13 @@ use wayland_protocols::{
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
 use crate::{
+    config::OperationMode,
     buffer::BufferManager,
     event::{Event, Events, PointerButton, PointerEvent},
     fonts::{FontMap, MaybeFontMap},
     keyboard::Keyboard,
     widgets::{Geometry, Layout, Widget, WidgetUpdater},
 };
-
-#[derive(Debug)]
-pub enum OperationMode {
-    LayerSurface((u32, u32)),
-    XdgToplevel,
-}
 
 #[derive(Default)]
 pub struct MainSurface {

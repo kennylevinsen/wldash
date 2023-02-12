@@ -2,6 +2,7 @@ use std::{
     sync::{Arc, Mutex},
     thread,
     time::Duration,
+    error::Error,
 };
 
 use dbus::blocking::{
@@ -44,6 +45,19 @@ struct InnerBattery {
     value: f32,
     state: UpowerBatteryState,
     dirty: bool,
+}
+
+fn get_battery_state() -> Result<UpowerBatteryState, Box<dyn Error>> {
+    let conn = LocalConnection::new_system()?;
+    let device_path = "/org/freedesktop/UPower/devices/DisplayDevice";
+    let proxy = conn.with_proxy(
+        "org.freedesktop.UPower",
+        device_path,
+        Duration::from_millis(500),
+    );
+    let state: u32 = proxy
+        .get("org.freedesktop.UPower.Device", "State")?;
+    Ok(UpowerBatteryState::from_dbus(state as u64))
 }
 
 fn start_monitor(inner: Arc<Mutex<InnerBattery>>, events: Arc<Mutex<Events>>) {
@@ -130,6 +144,13 @@ impl Battery {
         };
         start_monitor(battery.inner.clone(), events);
         BarWidget::new(Box::new(battery), fm, font, size)
+    }
+
+    pub fn detect() -> bool {
+        match get_battery_state() {
+            Ok(_) => true,
+            Err(_) => false,
+        }
     }
 }
 

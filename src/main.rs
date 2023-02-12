@@ -20,39 +20,36 @@ use calloop::{
 use chrono::{Duration, Local, Timelike};
 
 use buffer::BufferView;
-use config::{Config, Widget as ConfigWidget};
+use config::Config;
 use event::{Event, Events};
 use fonts::{FontMap, MaybeFontMap};
-use state::{OperationMode, State};
+use state::State;
 use widgets::{Geometry, Widget};
 
 use std::{env, rc::Rc, thread};
-
-enum UIVersion {
-    V1,
-    V2,
-}
 
 fn main() {
     let mut args = env::args();
     // Skip program name
     _ = args.next();
 
-    let mut version = UIVersion::V2;
-    let mut mode = OperationMode::XdgToplevel;
     loop {
         match args.next() {
-            Some(ref s) if s == "layer_shell" => {
-                let width = args.next().map(|x| x.parse::<u32>().ok()).flatten();
-                let height = args.next().map(|x| x.parse::<u32>().ok()).flatten();
-                match (width, height) {
-                    (Some(w), Some(h)) => mode = OperationMode::LayerSurface((w, h)),
-                    _ => panic!("invalid arguments"),
+            Some(ref s) if s == "generate" => {
+                let config = match args.next() {
+                    Some(ref s) if s == "v1" => Config::generate_v1(),
+                    Some(ref s) if s == "v2" => Config::generate_v2(false),
+                    Some(ref s) if s == "clay" => Config::generate_v2(true),
+                    None => Config::generate_v2(false),
+                    Some(s) => panic!("unknown argument: {}", s),
+                };
+                let home = env::var_os("HOME").unwrap().into_string().unwrap();
+                match File::create(format!("{}/.config/wldash/config.yml", home)) {
+                    Ok(f) => serde_yaml::to_writer(f, &config).unwrap(),
+                    Err(_) => panic!("uh"),
                 }
-            }
-            Some(ref s) if s == "xdg_shell" => mode = OperationMode::XdgToplevel,
-            Some(ref s) if s == "v1" => version = UIVersion::V1,
-            Some(ref s) if s == "v2" => version = UIVersion::V2,
+                std::process::exit(0);
+            },
             Some(_) => panic!("unknown argument"),
             None => break,
         }
@@ -122,24 +119,15 @@ fn main() {
         Err(_) => Default::default(),
     };
 
-    let widget = match config.widget {
-        Some(w) => w,
-        None => match version {
-            UIVersion::V1 => ConfigWidget::v1(),
-            UIVersion::V2 => ConfigWidget::v2(),
-        },
-    };
-
     if let Some(font_paths) = config.font_paths {
         for (key, value) in font_paths.into_iter() {
             fm.add_font_path(Box::leak(key.into_boxed_str()), value);
         }
     }
 
-    let layout = Rc::new(widget.construct_layout(&mut 0));
+    let layout = Rc::new(config.widget.construct_layout(&mut 0));
     let mut widgets: Vec<Box<dyn Widget>> = Vec::new();
-    widget.construct_widgets(&mut widgets, &mut fm, &events);
-
+    config.widget.construct_widgets(&mut widgets, &mut fm, &events);
 
     let font_thread = thread::Builder::new()
         .name("fontloader".to_string())
@@ -150,7 +138,7 @@ fn main() {
         .unwrap();
 
     let mut state = State::new(
-        mode,
+        config.mode,
         widgets,
         layout,
         MaybeFontMap::Waiting(font_thread),

@@ -129,7 +129,7 @@ fn main() {
     let home = env::var_os("HOME").unwrap().into_string().unwrap();
     let config: Config = match File::open(format!("{}/.config/wldash/config.yml", home)) {
         Ok(f) => serde_yaml::from_reader(f).unwrap(),
-        Err(_) => Default::default(),
+        Err(_) => panic!("configuration file missing"),
     };
 
     if let Some(font_paths) = config.font_paths {

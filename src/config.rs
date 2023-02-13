@@ -81,16 +81,6 @@ pub struct Config {
     pub mode: OperationMode,
 }
 
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            font_paths: None,
-            widget: Default::default(),
-            mode: Default::default(),
-        }
-    }
-}
-
 impl Config {
     pub fn generate_v1() -> Config {
         let has_battery = Battery::detect();
@@ -261,68 +251,6 @@ fn leak_or_default(v: Option<String>, d: &'static str) -> &'static str {
     match v {
         Some(v) => Box::leak(v.into_boxed_str()),
         None => d,
-    }
-}
-
-impl Default for Widget {
-    fn default() -> Widget {
-        Widget::VerticalLayout(vec![
-            Widget::HorizontalLayout(vec![
-                Widget::Clock {
-                    font: None,
-                    font_size: 128.,
-                },
-                Widget::Margin {
-                    margins: (16, 16, 0, 0),
-                    widget: Box::new(Widget::Date {
-                        font: None,
-                        font_size: 48.,
-                    }),
-                },
-                Widget::VerticalLayout(vec![
-                    Widget::Margin {
-                        margins: (16, 8, 8, 0),
-                        widget: Box::new(Widget::Battery {
-                            font: None,
-                            font_size: 24.,
-                        }),
-                    },
-                    Widget::Margin {
-                        margins: (16, 8, 8, 0),
-                        widget: Box::new(Widget::Backlight {
-                            device: None,
-                            font: None,
-                            font_size: 24.,
-                        }),
-                    },
-                    Widget::Margin {
-                        margins: (16, 8, 8, 0),
-                        widget: Box::new(Widget::PulseAudio {
-                            font: None,
-                            font_size: 24.,
-                        }),
-                    },
-                ]),
-            ]),
-            Widget::HorizontalLine(1),
-            Widget::InvertedHorizontalLayout(vec![
-                Widget::Margin {
-                    margins: (16, 8, 16, 0),
-                    widget: Box::new(Widget::Calendar {
-                        font_primary: None,
-                        font_secondary: None,
-                        font_size: 24.,
-                        sections_x: 1,
-                        sections_y: -1,
-                    }),
-                },
-                Widget::VerticalLine(1),
-                Widget::Launcher {
-                    font: None,
-                    font_size: 32.,
-                },
-            ]),
-        ])
     }
 }
 

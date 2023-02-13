@@ -241,6 +241,6 @@ fn main() {
         surface.attach(Some(&buf.buffer), 0, 0);
         surface.commit();
         conn.flush().unwrap();
-        state.keyboard.realize();
+        state.keyboard.resolve();
     }
 }

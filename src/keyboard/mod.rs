@@ -63,7 +63,7 @@ impl Keyboard {
         }
     }
 
-    pub fn realize(&mut self) {
+    pub fn resolve(&mut self) {
         if self.state.is_some() {
             return;
         }

@@ -47,10 +47,15 @@ impl CachedGlyph {
     }
 
     fn draw(&self, buf: &mut BufferView, pos: (i32, i32), c: Color) {
+        let bounds = buf.get_bounds();
+        if pos.0 as u32 + self.dimensions.0 > bounds.2 {
+            return;
+        }
+
+        let offset = (bounds.0 as i32, bounds.1 as i32);
+        let width = self.dimensions.0 as i32 - 1;
         let mut x = 0;
         let mut y = 0;
-        let bounds = buf.get_bounds();
-        let offset = (bounds.0 as i32, bounds.1 as i32);
         for v in &self.render {
             buf.put_raw(
                 (
@@ -60,7 +65,7 @@ impl CachedGlyph {
                 c.alpha(*v),
             );
 
-            if x == self.dimensions.0 as i32 - 1 {
+            if x == width {
                 y += 1;
                 x = 0;
             } else {
@@ -173,7 +178,7 @@ impl<'a> Font<'a> {
         Ok((x_off as u32, self.size as u32))
     }
 
-    pub fn draw_cursor(
+    fn draw_cursor(
         &self,
         buf: &mut BufferView,
         c: Color,
@@ -182,6 +187,9 @@ impl<'a> Font<'a> {
     ) -> Result<(), ::std::io::Error> {
         // draw cursor
         let bounds = buf.get_bounds();
+        if offset + 1 > bounds.2 {
+            return Ok(());
+        }
         for i in bounds.1 + 1..height + bounds.1 {
             buf.put_raw((bounds.0 + offset, i), c);
         }

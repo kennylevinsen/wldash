@@ -356,10 +356,11 @@ impl InterfaceWidget for Launcher {
             intf.geometry.height,
             (self.matches.len() + 1) as u32 * line_height + 8,
         );
+        let content_width = min(intf.geometry.width, x_max.0 + 1);
         Geometry {
             x: intf.geometry.x,
             y: intf.geometry.y + intf.geometry.height - content_height,
-            width: x_max.0 + 1,
+            width: content_width,
             height: content_height,
         }
     }

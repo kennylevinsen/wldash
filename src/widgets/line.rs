@@ -10,13 +10,15 @@ use crate::{
 pub struct Line {
     geometry: Geometry,
     thickness: u32,
+    vertical: bool,
 }
 
 impl Line {
-    pub fn new(thickness: u32) -> Line {
+    pub fn new(thickness: u32, vertical: bool) -> Line {
         Line {
             geometry: Default::default(),
             thickness,
+            vertical,
         }
     }
 }
@@ -35,8 +37,16 @@ impl Widget for Line {
         self.geometry = Geometry {
             x: geometry.x,
             y: geometry.y,
-            width: geometry.width,
-            height: self.thickness,
+            width: if self.vertical {
+                self.thickness
+            } else {
+                geometry.width
+            },
+            height: if self.vertical {
+                geometry.height
+            } else {
+                self.thickness
+            },
         };
         self.geometry
     }
@@ -45,8 +55,8 @@ impl Widget for Line {
         Geometry {
             x: 0,
             y: 0,
-            width: 0,
-            height: self.thickness,
+            width: if self.vertical { self.thickness } else { 1 },
+            height: if self.vertical { 1 } else { self.thickness },
         }
     }
 }

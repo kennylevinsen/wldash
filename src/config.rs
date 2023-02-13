@@ -31,7 +31,8 @@ pub enum Widget {
     HorizontalLayout(Vec<Widget>),
     InvertedHorizontalLayout(Vec<Widget>),
     VerticalLayout(Vec<Widget>),
-    Line(u32),
+    HorizontalLine(u32),
+    VerticalLine(u32),
     Clock {
         font: Option<String>,
         font_size: f32,
@@ -219,15 +220,19 @@ impl Config {
                 },
                 Widget::VerticalLayout(bars),
             ]),
-            Widget::Line(1),
+            Widget::HorizontalLine(1),
             Widget::InvertedHorizontalLayout(vec![
-                Widget::Calendar {
-                    font_primary: None,
-                    font_secondary: None,
-                    font_size: 24.,
-                    sections_x: 1,
-                    sections_y: -1,
+                Widget::Margin {
+                    margins: (16, 8, 16, 0),
+                    widget: Box::new(Widget::Calendar {
+                        font_primary: None,
+                        font_secondary: None,
+                        font_size: 24.,
+                        sections_x: 1,
+                        sections_y: if clay { -1 } else { 3 },
+                    }),
                 },
+                Widget::VerticalLine(1),
                 Widget::Launcher {
                     font: None,
                     font_size: 32.,
@@ -246,7 +251,7 @@ impl Config {
             mode: if clay {
                 OperationMode::XdgToplevel
             } else {
-                OperationMode::LayerSurface((1024, 768))
+                OperationMode::LayerSurface((1024, 1))
             },
         }
     }
@@ -299,15 +304,19 @@ impl Default for Widget {
                     },
                 ]),
             ]),
-            Widget::Line(1),
+            Widget::HorizontalLine(1),
             Widget::InvertedHorizontalLayout(vec![
-                Widget::Calendar {
-                    font_primary: None,
-                    font_secondary: None,
-                    font_size: 24.,
-                    sections_x: 1,
-                    sections_y: -1,
+                Widget::Margin {
+                    margins: (16, 8, 16, 0),
+                    widget: Box::new(Widget::Calendar {
+                        font_primary: None,
+                        font_secondary: None,
+                        font_size: 24.,
+                        sections_x: 1,
+                        sections_y: -1,
+                    }),
                 },
+                Widget::VerticalLine(1),
                 Widget::Launcher {
                     font: None,
                     font_size: 32.,
@@ -335,7 +344,8 @@ impl Widget {
             Widget::VerticalLayout(widgets) => widgets
                 .into_iter()
                 .for_each(|w| w.construct_widgets(v, fm, events)),
-            Widget::Line(width) => v.push(Box::new(Line::new(width))),
+            Widget::HorizontalLine(width) => v.push(Box::new(Line::new(width, false))),
+            Widget::VerticalLine(width) => v.push(Box::new(Line::new(width, true))),
             Widget::Clock { font, font_size } => v.push(Box::new(Clock::new(
                 &mut fm,
                 leak_or_default(font, "sans"),

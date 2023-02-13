@@ -22,14 +22,14 @@ use xkbcommon::xkb;
 
 pub mod keysyms;
 mod state;
+mod repeat;
 
 use self::state::KbState;
 pub use self::state::ModifiersState;
+pub use self::repeat::{KeyRepeatSource, RepeatMessage};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct KeyEvent {
-    pub serial: u32,
-    pub time: u32,
     pub rawkey: u32,
     pub keysym: u32,
     pub state: WEnum<wl_keyboard::KeyState>,
@@ -78,8 +78,6 @@ impl Keyboard {
 
     pub fn key(
         &mut self,
-        serial: u32,
-        time: u32,
         key: u32,
         key_state: WEnum<wl_keyboard::KeyState>,
     ) -> KeyEvent {
@@ -120,8 +118,6 @@ impl Keyboard {
                 keysym: sym,
                 state: key_state,
                 modifiers: state.mods_state(),
-                serial,
-                time,
                 utf8,
                 repeats,
             }
@@ -133,8 +129,6 @@ impl Keyboard {
                 modifiers: Default::default(),
                 utf8: None,
                 repeats: false,
-                serial,
-                time,
             }
         }
     }

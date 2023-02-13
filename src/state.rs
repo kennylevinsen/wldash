@@ -33,9 +33,11 @@ use crate::{
     buffer::BufferManager,
     event::{Event, Events, PointerButton, PointerEvent},
     fonts::{FontMap, MaybeFontMap},
-    keyboard::Keyboard,
+    keyboard::{Keyboard, RepeatMessage},
     widgets::{Geometry, Layout, Widget, WidgetUpdater},
 };
+
+use calloop::channel::Sender;
 
 #[derive(Default)]
 pub struct MainSurface {
@@ -71,6 +73,7 @@ pub struct State {
     pub bufmgr: BufferManager,
     pub widgets: Vec<Box<dyn Widget>>,
     pub keyboard: Keyboard,
+    pub keyrepeat_sender: Sender<RepeatMessage>,
     pointer: Option<(f64, f64)>,
     pub fonts: MaybeFontMap,
     pub events: Arc<Mutex<Events>>,
@@ -84,6 +87,7 @@ impl State {
         layout: Rc<Box<dyn Layout>>,
         fonts: MaybeFontMap,
         events: Arc<Mutex<Events>>,
+        keyrepeat_sender: Sender<RepeatMessage>,
     ) -> State {
         State {
             protocols: Default::default(),
@@ -97,6 +101,7 @@ impl State {
             bufmgr: BufferManager::new(),
             keyboard: Keyboard::new(),
             pointer: None,
+            keyrepeat_sender,
             mode,
             widgets,
             fonts,
@@ -555,20 +560,28 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         match event {
+            wl_keyboard::Event::Leave { .. }=> {
+                state.keyrepeat_sender.send(RepeatMessage::StopRepeat).unwrap();
+            }
             wl_keyboard::Event::Key {
-                serial,
-                time,
                 key,
                 state: kbstate,
+                ..
             } => {
                 if key == 1 {
                     state.running = false;
                     return;
                 }
-                let k = state.keyboard.key(serial, time, key, kbstate);
+                let k = state.keyboard.key(key, kbstate);
+                let repeats = k.repeats;
                 let ev = Event::KeyEvent(k);
                 for widget in state.widgets.iter_mut() {
                     widget.event(&ev);
+                }
+                if repeats {
+                    if let Event::KeyEvent(k) = ev {
+                        state.keyrepeat_sender.send(RepeatMessage::KeyEvent(k)).unwrap();
+                    }
                 }
                 state.dirty = true;
             }
@@ -586,6 +599,9 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
             wl_keyboard::Event::Keymap { format, fd, size } => {
                 // TODO: Keymap loading blocks xdg configure, consider delaying
                 state.keyboard.keymap(format, fd, size);
+            }
+            wl_keyboard::Event::RepeatInfo { rate, delay } => {
+                state.keyrepeat_sender.send(RepeatMessage::RepeatInfo((rate as u32, delay as u32))).unwrap();
             }
             _ => (),
         }

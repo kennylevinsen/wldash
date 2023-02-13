@@ -25,6 +25,7 @@ use event::{Event, Events};
 use fonts::{FontMap, MaybeFontMap};
 use state::State;
 use widgets::{Geometry, Widget};
+use keyboard::{KeyRepeatSource, RepeatMessage};
 
 use std::{env, rc::Rc, thread};
 
@@ -64,6 +65,7 @@ fn main() {
     display.get_registry(&qhandle, ());
 
     let (ping_sender, ping_source) = calloop::ping::make_ping().unwrap();
+    let (keyrepeat_sender, keyrepeat_channel) = calloop::channel::channel::<RepeatMessage>();
 
     let mut event_loop: EventLoop<State> =
         EventLoop::try_new().expect("Failed to initialize the event loop!");
@@ -109,6 +111,17 @@ fn main() {
         })
         .expect("Failed to insert event source!");
 
+    let keyrepeat_source = KeyRepeatSource::new(keyrepeat_channel);
+    handle
+        .insert_source(keyrepeat_source, |event, _metadata, state| {
+            let ev = Event::KeyEvent(event);
+            for widget in state.widgets.iter_mut() {
+                widget.event(&ev);
+            }
+            state.dirty = true;
+        })
+        .expect("Failed to insert keyrepeat source!");
+
     let events = Events::new(ping_sender);
 
     let mut fm = FontMap::new();
@@ -143,6 +156,7 @@ fn main() {
         layout,
         MaybeFontMap::Waiting(font_thread),
         events,
+        keyrepeat_sender,
     );
 
     let mut damage = Vec::new();

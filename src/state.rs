@@ -2,7 +2,6 @@ use std::{
     cmp::max,
     default::Default,
     env,
-    process::exit,
     rc::Rc,
     sync::{Arc, Mutex},
 };
@@ -498,7 +497,10 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                 if activated {
                     state.activated = true;
                 } else if state.activated && !activated {
-                    exit(0);
+                    let ev = Event::FocusLost;
+                    for widget in state.widgets.iter_mut() {
+                        widget.event(&ev);
+                    }
                 }
 
                 if state.dimensions != (width, height) {

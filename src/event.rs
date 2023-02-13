@@ -28,6 +28,7 @@ pub enum Event {
     KeyEvent(KeyEvent),
     PointerEvent(PointerEvent),
     TokenUpdate(String),
+    FocusLost,
 }
 
 pub struct Events {

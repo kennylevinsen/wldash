@@ -629,6 +629,19 @@ impl Interface {
         }
     }
 
+    fn exit(&mut self) {
+        if self.inner.prompt.input.len() == 0 {
+            std::process::exit(0);
+        }
+
+        let home = env::var_os("HOME").unwrap().into_string().unwrap();
+        if let Ok(mut f) = File::create(format!("{}/.cache/wldash/prompt", home)) {
+            write!(f, "{}", self.inner.prompt.input).unwrap();
+            f.sync_data().unwrap();
+        }
+        std::process::exit(0);
+    }
+
     fn keyboard_input(&mut self, event: &KeyEvent) {
         if event.state != WEnum::Value(wl_keyboard::KeyState::Pressed) {
             return;
@@ -652,6 +665,12 @@ impl Interface {
                 self.inner.selection = 0;
                 widget.update(&self.inner);
             }
+            keysyms::XKB_KEY_r if event.modifiers.ctrl => {
+                let home = env::var_os("HOME").unwrap().into_string().unwrap();
+                if let Ok(s) = read_to_string(format!("{}/.cache/wldash/prompt", home)) {
+                    self.inner.prompt.set(&s);
+                }
+            }
             keysyms::XKB_KEY_Home => self.inner.prompt.home(),
             keysyms::XKB_KEY_End => self.inner.prompt.end(),
             keysyms::XKB_KEY_BackSpace => {
@@ -664,6 +683,7 @@ impl Interface {
                 self.inner.selection = 0;
                 widget.update(&self.inner);
             }
+            keysyms::XKB_KEY_Escape => self.exit(),
             keysyms::XKB_KEY_Return => widget.trigger(&mut self.inner),
             keysyms::XKB_KEY_Left => self.inner.prompt.move_cursor(-1),
             keysyms::XKB_KEY_Right => self.inner.prompt.move_cursor(1),
@@ -724,6 +744,7 @@ impl Widget for Interface {
         match event {
             Event::KeyEvent(e) => self.keyboard_input(e),
             Event::PointerEvent(e) => self.pointer_input(e),
+            Event::FocusLost => self.exit(),
             Event::LauncherUpdate => {
                 self.inner.dirty = true;
                 self.launcher.update(&self.inner);

@@ -23,9 +23,9 @@ use buffer::BufferView;
 use config::Config;
 use event::{Event, Events};
 use fonts::{FontMap, MaybeFontMap};
+use keyboard::{KeyRepeatSource, RepeatMessage};
 use state::State;
 use widgets::{Geometry, Widget};
-use keyboard::{KeyRepeatSource, RepeatMessage};
 
 use std::{env, rc::Rc, thread};
 
@@ -50,7 +50,7 @@ fn main() {
                     Err(_) => panic!("uh"),
                 }
                 std::process::exit(0);
-            },
+            }
             Some(_) => panic!("unknown argument"),
             None => break,
         }
@@ -140,7 +140,9 @@ fn main() {
 
     let layout = Rc::new(config.widget.construct_layout(&mut 0));
     let mut widgets: Vec<Box<dyn Widget>> = Vec::new();
-    config.widget.construct_widgets(&mut widgets, &mut fm, &events);
+    config
+        .widget
+        .construct_widgets(&mut widgets, &mut fm, &events);
 
     let font_thread = thread::Builder::new()
         .name("fontloader".to_string())

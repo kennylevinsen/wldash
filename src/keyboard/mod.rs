@@ -21,12 +21,12 @@ use wayland_client::{protocol::wl_keyboard, WEnum};
 use xkbcommon::xkb;
 
 pub mod keysyms;
-mod state;
 mod repeat;
+mod state;
 
+pub use self::repeat::{KeyRepeatSource, RepeatMessage};
 use self::state::KbState;
 pub use self::state::ModifiersState;
-pub use self::repeat::{KeyRepeatSource, RepeatMessage};
 
 #[derive(Debug, Clone)]
 pub struct KeyEvent {
@@ -76,11 +76,7 @@ impl Keyboard {
         }
     }
 
-    pub fn key(
-        &mut self,
-        key: u32,
-        key_state: WEnum<wl_keyboard::KeyState>,
-    ) -> KeyEvent {
+    pub fn key(&mut self, key: u32, key_state: WEnum<wl_keyboard::KeyState>) -> KeyEvent {
         if let Some(state) = &mut self.state {
             let (sym, utf8, repeats) = {
                 // Get the values to generate a key event

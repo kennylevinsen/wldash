@@ -1,8 +1,8 @@
 use std::{
+    error::Error,
     sync::{Arc, Mutex},
     thread,
     time::Duration,
-    error::Error,
 };
 
 use dbus::blocking::{
@@ -55,8 +55,7 @@ fn get_battery_state() -> Result<UpowerBatteryState, Box<dyn Error>> {
         device_path,
         Duration::from_millis(500),
     );
-    let state: u32 = proxy
-        .get("org.freedesktop.UPower.Device", "State")?;
+    let state: u32 = proxy.get("org.freedesktop.UPower.Device", "State")?;
     Ok(UpowerBatteryState::from_dbus(state as u64))
 }
 

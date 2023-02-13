@@ -5,9 +5,7 @@ use calloop::{
     timer::{TimeoutAction, Timer},
     EventSource, Poll, PostAction, Readiness, Token, TokenFactory,
 };
-use wayland_client::{
-    protocol::wl_keyboard, WEnum,
-};
+use wayland_client::{protocol::wl_keyboard, WEnum};
 
 use super::KeyEvent;
 
@@ -15,7 +13,7 @@ use super::KeyEvent;
 pub enum RepeatMessage {
     StopRepeat,
     KeyEvent(KeyEvent),
-    RepeatInfo((u32, u32))
+    RepeatInfo((u32, u32)),
 }
 
 #[derive(Debug)]
@@ -30,7 +28,7 @@ pub struct KeyRepeatSource {
 
 impl KeyRepeatSource {
     pub fn new(ch: channel::Channel<RepeatMessage>) -> KeyRepeatSource {
-        KeyRepeatSource{
+        KeyRepeatSource {
             channel: ch,
             timer: Timer::immediate(),
             delay: Duration::ZERO,
@@ -71,44 +69,40 @@ impl EventSource for KeyRepeatSource {
         // Check if the key repeat should stop
         let channel_pa = self
             .channel
-            .process_events(readiness, token, |event, _| {
-                match event {
-                    channel::Event::Msg(message) => {
-                        match message {
-                            RepeatMessage::StopRepeat => {
+            .process_events(readiness, token, |event, _| match event {
+                channel::Event::Msg(message) => match message {
+                    RepeatMessage::StopRepeat => {
+                        key.take();
+                    }
+                    RepeatMessage::KeyEvent(event) => match event.state {
+                        WEnum::Value(wl_keyboard::KeyState::Pressed) => {
+                            key.replace(event);
+                            reregister = true;
+
+                            next_deadline = std::time::Instant::now() + *delay;
+                            timer.set_deadline(next_deadline);
+                        }
+                        WEnum::Value(wl_keyboard::KeyState::Released) => match key {
+                            Some(k) if k.keysym == event.keysym => {
                                 key.take();
                             }
-                            RepeatMessage::KeyEvent(event) => match event.state {
-                                WEnum::Value(wl_keyboard::KeyState::Pressed) => {
-                                    key.replace(event);
-                                    reregister = true;
-
-                                    next_deadline = std::time::Instant::now() + *delay;
-                                    timer.set_deadline(next_deadline);
-                                }
-                                WEnum::Value(wl_keyboard::KeyState::Released) => match key {
-                                    Some(k) if k.keysym == event.keysym => {
-                                        key.take();
-                                    }
-                                    _ => (),
-                                },
-                                _ => (),
-                            }
-                            RepeatMessage::RepeatInfo((new_rate, new_delay)) => {
-                                *rate = Duration::from_micros(1_000_000 / new_rate as u64);
-                                *delay = Duration::from_millis(new_delay as u64);
-                                *disabled = false;
-                                if key.is_some() {
-                                    next_deadline = std::time::Instant::now() + *delay;
-                                    timer.set_deadline(next_deadline);
-                                }
-                            }
+                            _ => (),
+                        },
+                        _ => (),
+                    },
+                    RepeatMessage::RepeatInfo((new_rate, new_delay)) => {
+                        *rate = Duration::from_micros(1_000_000 / new_rate as u64);
+                        *delay = Duration::from_millis(new_delay as u64);
+                        *disabled = false;
+                        if key.is_some() {
+                            next_deadline = std::time::Instant::now() + *delay;
+                            timer.set_deadline(next_deadline);
                         }
                     }
+                },
 
-                    channel::Event::Closed => {
-                        removed = true;
-                    }
+                channel::Event::Closed => {
+                    removed = true;
                 }
             })
             .map_err(|err| calloop::Error::OtherError(Box::new(err)))?;
@@ -166,4 +160,3 @@ impl EventSource for KeyRepeatSource {
         self.timer.unregister(poll)
     }
 }
-

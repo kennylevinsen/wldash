@@ -29,8 +29,8 @@ use wayland_protocols::{
 use wayland_protocols_wlr::layer_shell::v1::client::{zwlr_layer_shell_v1, zwlr_layer_surface_v1};
 
 use crate::{
-    config::OperationMode,
     buffer::BufferManager,
+    config::OperationMode,
     event::{Event, Events, PointerButton, PointerEvent},
     fonts::{FontMap, MaybeFontMap},
     keyboard::{Keyboard, RepeatMessage},
@@ -560,8 +560,11 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         match event {
-            wl_keyboard::Event::Leave { .. }=> {
-                state.keyrepeat_sender.send(RepeatMessage::StopRepeat).unwrap();
+            wl_keyboard::Event::Leave { .. } => {
+                state
+                    .keyrepeat_sender
+                    .send(RepeatMessage::StopRepeat)
+                    .unwrap();
             }
             wl_keyboard::Event::Key {
                 key,
@@ -580,7 +583,10 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
                 }
                 if repeats {
                     if let Event::KeyEvent(k) = ev {
-                        state.keyrepeat_sender.send(RepeatMessage::KeyEvent(k)).unwrap();
+                        state
+                            .keyrepeat_sender
+                            .send(RepeatMessage::KeyEvent(k))
+                            .unwrap();
                     }
                 }
                 state.dirty = true;
@@ -601,7 +607,10 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
                 state.keyboard.keymap(format, fd, size);
             }
             wl_keyboard::Event::RepeatInfo { rate, delay } => {
-                state.keyrepeat_sender.send(RepeatMessage::RepeatInfo((rate as u32, delay as u32))).unwrap();
+                state
+                    .keyrepeat_sender
+                    .send(RepeatMessage::RepeatInfo((rate as u32, delay as u32)))
+                    .unwrap();
             }
             _ => (),
         }

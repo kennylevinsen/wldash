@@ -6,10 +6,11 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     event::Events,
-    fonts::{FontMap, find_font},
+    fonts::{find_font, FontMap},
     widgets::{
         Backlight, Battery, Calendar, Clock, Date, HorizontalLayout, IndexedLayout, Interface,
-        InvertedHorizontalLayout, Layout, Line, Margin, PulseAudio, VerticalLayout, Widget as RealWidget,
+        InvertedHorizontalLayout, Layout, Line, Margin, PulseAudio, VerticalLayout,
+        Widget as RealWidget,
     },
 };
 
@@ -81,7 +82,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Config {
-        Config{
+        Config {
             font_paths: None,
             widget: Default::default(),
             mode: Default::default(),
@@ -98,12 +99,31 @@ impl Config {
 
         let mut bars = Vec::new();
         if has_battery {
-            bars.push(Widget::Margin{ margins: (0, 0, 0, 8), widget: Box::new(Widget::Battery { font: None, font_size: 24. })});
+            bars.push(Widget::Margin {
+                margins: (0, 0, 0, 8),
+                widget: Box::new(Widget::Battery {
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
         }
         if has_backlight {
-            bars.push(Widget::Margin{ margins: (0, 0, 0, 8), widget: Box::new(Widget::Backlight { device: Some("intel_backlight".to_string()), font: None, font_size: 24. })});
+            bars.push(Widget::Margin {
+                margins: (0, 0, 0, 8),
+                widget: Box::new(Widget::Backlight {
+                    device: Some("intel_backlight".to_string()),
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
         }
-        bars.push(Widget::Margin{ margins: (0, 0, 0, 8), widget: Box::new(Widget::PulseAudio { font: None, font_size: 24. })});
+        bars.push(Widget::Margin {
+            margins: (0, 0, 0, 8),
+            widget: Box::new(Widget::PulseAudio {
+                font: None,
+                font_size: 24.,
+            }),
+        });
 
         let widget = Widget::Margin {
             margins: (20, 20, 20, 20),
@@ -143,7 +163,7 @@ impl Config {
             ("monospace".to_string(), monospace),
         ]);
 
-        Config{
+        Config {
             font_paths: Some(map),
             widget: widget,
             mode: OperationMode::LayerSurface((1024, 768)),
@@ -158,12 +178,31 @@ impl Config {
 
         let mut bars = Vec::new();
         if has_battery {
-            bars.push(Widget::Margin{ margins: (16, 8, 8, 0), widget: Box::new(Widget::Battery { font: None, font_size: 24. })});
+            bars.push(Widget::Margin {
+                margins: (16, 8, 8, 0),
+                widget: Box::new(Widget::Battery {
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
         }
         if has_backlight {
-            bars.push(Widget::Margin{ margins: (16, 8, 8, 0), widget: Box::new(Widget::Backlight { device: Some("intel_backlight".to_string()), font: None, font_size: 24. })});
+            bars.push(Widget::Margin {
+                margins: (16, 8, 8, 0),
+                widget: Box::new(Widget::Backlight {
+                    device: Some("intel_backlight".to_string()),
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
         }
-        bars.push(Widget::Margin{ margins: (16, 8, 8, 0), widget: Box::new(Widget::PulseAudio { font: None, font_size: 24. })});
+        bars.push(Widget::Margin {
+            margins: (16, 8, 8, 0),
+            widget: Box::new(Widget::PulseAudio {
+                font: None,
+                font_size: 24.,
+            }),
+        });
 
         let widget = Widget::VerticalLayout(vec![
             Widget::HorizontalLayout(vec![
@@ -201,10 +240,14 @@ impl Config {
             ("monospace".to_string(), monospace),
         ]);
 
-        Config{
+        Config {
             font_paths: Some(map),
             widget: widget,
-            mode: if clay { OperationMode::XdgToplevel } else { OperationMode::LayerSurface((1024, 768)) },
+            mode: if clay {
+                OperationMode::XdgToplevel
+            } else {
+                OperationMode::LayerSurface((1024, 768))
+            },
         }
     }
 }

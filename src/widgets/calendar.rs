@@ -151,7 +151,7 @@ impl Calendar {
                         y_off * (self.size * LINE_HEIGHT).ceil() as u32
                             + (self.size * MONTH_FACTOR).ceil() as u32,
                     )),
-                    Color::GREY75,
+                    if wk == orig.iso_week() { Color::WHITE } else { Color::GREY75 },
                     &format!("{:02}", wk.week()),
                 )
                 .unwrap();

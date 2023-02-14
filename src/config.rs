@@ -9,8 +9,8 @@ use crate::{
     fonts::{find_font, FontMap},
     widgets::{
         Backlight, Battery, Calendar, Clock, Date, HorizontalLayout, IndexedLayout, Interface,
-        InvertedHorizontalLayout, Layout, Line, Margin, PulseAudio, VerticalLayout,
-        Widget as RealWidget,
+        InvertedHorizontalLayout, InvertedVerticalLayout, Layout, Line, Margin, PulseAudio,
+        VerticalLayout, Widget as RealWidget,
     },
 };
 
@@ -31,6 +31,7 @@ pub enum Widget {
     HorizontalLayout(Vec<Widget>),
     InvertedHorizontalLayout(Vec<Widget>),
     VerticalLayout(Vec<Widget>),
+    InvertedVerticalLayout(Vec<Widget>),
     HorizontalLine(u32),
     VerticalLine(u32),
     Clock {
@@ -272,6 +273,9 @@ impl Widget {
             Widget::VerticalLayout(widgets) => widgets
                 .into_iter()
                 .for_each(|w| w.construct_widgets(v, fm, events)),
+            Widget::InvertedVerticalLayout(widgets) => widgets
+                .into_iter()
+                .for_each(|w| w.construct_widgets(v, fm, events)),
             Widget::HorizontalLine(width) => v.push(Box::new(Line::new(width, false))),
             Widget::VerticalLine(width) => v.push(Box::new(Line::new(width, true))),
             Widget::Clock { font, font_size } => v.push(Box::new(Clock::new(
@@ -343,6 +347,9 @@ impl Widget {
             Widget::VerticalLayout(widgets) => {
                 VerticalLayout::new(widgets.iter().map(|w| w.construct_layout(idx)).collect())
             }
+            Widget::InvertedVerticalLayout(widgets) => InvertedVerticalLayout::new(
+                widgets.iter().map(|w| w.construct_layout(idx)).collect(),
+            ),
             _ => IndexedLayout::new({
                 let i = *idx;
                 *idx += 1;

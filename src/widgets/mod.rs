@@ -19,8 +19,8 @@ pub use clock::Clock;
 pub use date::Date;
 pub use launcher::Interface;
 pub use layout::{
-    HorizontalLayout, IndexedLayout, InvertedHorizontalLayout, Layout, Margin, VerticalLayout,
-    WidgetUpdater,
+    HorizontalLayout, IndexedLayout, InvertedHorizontalLayout, InvertedVerticalLayout, Layout,
+    Margin, VerticalLayout, WidgetUpdater,
 };
 pub use line::Line;
 pub use pulseaudio::PulseAudio;

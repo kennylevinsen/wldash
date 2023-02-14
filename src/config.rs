@@ -198,12 +198,15 @@ impl Config {
 
         let widget = Widget::VerticalLayout(vec![
             Widget::HorizontalLayout(vec![
-                Widget::Clock {
-                    font: None,
-                    font_size: 128.,
+                Widget::Margin {
+                    margins: (8, 0, 0, 0),
+                    widget: Box::new(Widget::Clock {
+                        font: None,
+                        font_size: 128.,
+                    }),
                 },
                 Widget::Margin {
-                    margins: (16, 16, 0, 0),
+                    margins: (16, 64, 0, 0),
                     widget: Box::new(Widget::Date {
                         font: None,
                         font_size: 48.,
@@ -224,9 +227,12 @@ impl Config {
                     }),
                 },
                 Widget::VerticalLine(1),
-                Widget::Launcher {
-                    font: None,
-                    font_size: 32.,
+                Widget::Margin {
+                    margins: (8, 0, 0, 0),
+                    widget: Box::new(Widget::Launcher {
+                        font: None,
+                        font_size: 32.,
+                    }),
                 },
             ]),
         ]);

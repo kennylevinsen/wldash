@@ -2,7 +2,6 @@ use std::{
     cmp::{max, min, Ordering},
     collections::HashMap,
     default::Default,
-    env,
     fs::{read_to_string, File},
     io::Write,
     process::{exit, Command},
@@ -16,7 +15,10 @@ use crate::{
     event::{Event, Events, PointerButton, PointerEvent},
     fonts::FontMap,
     keyboard::{keysyms, KeyEvent},
-    utils::desktop::{load_desktop_files, Desktop},
+    utils::{
+        desktop::{load_desktop_files, load_desktop_cache, write_desktop_cache, Desktop},
+        xdg,
+    },
     widgets::{Geometry, Widget},
 };
 
@@ -221,7 +223,14 @@ impl Launcher {
                 .name("desktopini".to_string())
                 .spawn(move || {
                     let mut options = options.lock().unwrap();
-                    *options = load_desktop_files();
+                    *options = match load_desktop_cache() {
+                        Ok(v) => v,
+                        Err(_) => {
+                            let v = load_desktop_files();
+                            write_desktop_cache(&v).unwrap();
+                            v
+                        }
+                    };
                     drop(options);
                     let mut events = events.lock().unwrap();
                     events.add_event(Event::LauncherUpdate);
@@ -432,8 +441,7 @@ impl Calc {
         thread::Builder::new()
             .name("calc".to_string())
             .spawn(move || {
-                let home = env::var_os("HOME").unwrap().into_string().unwrap();
-                let s = match read_to_string(format!("{}/.cache/wldash/calc", home)) {
+                let s = match read_to_string(format!("{}/wldash/calc", xdg::cache_folder())) {
                     Ok(s) => s,
                     _ => return,
                 };
@@ -455,8 +463,7 @@ impl Calc {
     }
 
     fn sync(&self) {
-        let home = env::var_os("HOME").unwrap().into_string().unwrap();
-        let mut f = match File::create(format!("{}/.cache/wldash/calc", home)) {
+        let mut f = match File::create(format!("{}/wldash/calc", xdg::cache_folder())) {
             Ok(f) => f,
             _ => return,
         };
@@ -634,8 +641,7 @@ impl Interface {
             std::process::exit(0);
         }
 
-        let home = env::var_os("HOME").unwrap().into_string().unwrap();
-        if let Ok(mut f) = File::create(format!("{}/.cache/wldash/prompt", home)) {
+        if let Ok(mut f) = File::create(format!("{}/wldash/prompt", xdg::cache_folder())) {
             write!(f, "{}", self.inner.prompt.input).unwrap();
             f.sync_data().unwrap();
         }
@@ -666,8 +672,7 @@ impl Interface {
                 widget.update(&self.inner);
             }
             keysyms::XKB_KEY_r if event.modifiers.ctrl => {
-                let home = env::var_os("HOME").unwrap().into_string().unwrap();
-                if let Ok(s) = read_to_string(format!("{}/.cache/wldash/prompt", home)) {
+                if let Ok(s) = read_to_string(format!("{}/wldash/prompt", xdg::cache_folder())) {
                     self.inner.prompt.set(&s);
                 }
             }

@@ -1,17 +1,19 @@
 use std::{
     cmp::Ordering,
     collections::HashSet,
-    env,
     error::Error,
-    fs::read_to_string,
+    fs::{read_to_string, File},
     io::{Error as io_error, ErrorKind},
 };
 
+use serde::{self, Deserialize, Serialize};
+use simd_json;
 use walkdir::WalkDir;
 
-use crate::utils::inish;
+use crate::utils::{inish, xdg};
 
-#[derive(Clone, Debug, Eq, Hash)]
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
 pub struct Desktop {
     pub entry_type: String,
     pub name: String,
@@ -72,19 +74,22 @@ impl PartialEq for Desktop {
     }
 }
 
+pub fn load_desktop_cache() -> Result<Vec<Desktop>, Box<dyn Error>> {
+    match File::open(format!("{}/wldash/desktop.json", xdg::cache_folder())) {
+        Ok(f) => simd_json::from_reader(f).map_err(|e| e.into()),
+        Err(e) => Err(e.into())
+    }
+}
+
+pub fn write_desktop_cache(v: &Vec<Desktop>) -> Result<(), Box<dyn Error>> {
+    match File::create(format!("{}/wldash/desktop.json", xdg::cache_folder())) {
+        Ok(f) => simd_json::to_writer(f, v).map_err(|e| e.into()),
+        Err(e) => Err(e.into())
+    }
+}
+
 pub fn load_desktop_files() -> Vec<Desktop> {
-    let home = env::var_os("HOME").unwrap().into_string().unwrap();
-
-    let xdg_data_home = match env::var_os("XDG_DATA_HOME") {
-        Some(s) => s.into_string().unwrap(),
-        None => format!("{}/.local/share", home),
-    };
-    let xdg_data_dirs = match env::var_os("XDG_DATA_DIRS") {
-        Some(s) => s.into_string().unwrap(),
-        None => "/usr/local/share:/usr/share".to_string(),
-    };
-
-    let dirs = std::iter::once(xdg_data_home.as_str()).chain(xdg_data_dirs.split(':'));
+    let dirs = xdg::data_folders();
 
     let mut desktop: Vec<Desktop> = Vec::new();
     let mut seen: HashSet<String> = HashSet::new();

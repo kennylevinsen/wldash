@@ -26,6 +26,7 @@ use fonts::{FontMap, MaybeFontMap};
 use keyboard::{KeyRepeatSource, RepeatMessage};
 use state::State;
 use widgets::{Geometry, Widget};
+use utils::{xdg, desktop::{load_desktop_files, write_desktop_cache}};
 
 use std::{env, rc::Rc, thread};
 
@@ -44,11 +45,15 @@ fn main() {
                     None => Config::generate_v2(false),
                     Some(s) => panic!("unknown argument: {}", s),
                 };
-                let home = env::var_os("HOME").unwrap().into_string().unwrap();
-                match File::create(format!("{}/.config/wldash/config.yml", home)) {
+                match File::create(format!("{}/wldash/config.yml", xdg::config_folder())) {
                     Ok(f) => serde_yaml::to_writer(f, &config).unwrap(),
                     Err(_) => panic!("uh"),
                 }
+                std::process::exit(0);
+            }
+            Some(ref s) if s == "desktop-refresh" => {
+                let v = load_desktop_files();
+                write_desktop_cache(&v).unwrap();
                 std::process::exit(0);
             }
             Some(_) => panic!("unknown argument"),
@@ -126,8 +131,7 @@ fn main() {
 
     let mut fm = FontMap::new();
 
-    let home = env::var_os("HOME").unwrap().into_string().unwrap();
-    let config: Config = match File::open(format!("{}/.config/wldash/config.yml", home)) {
+    let config: Config = match File::open(format!("{}/wldash/config.yml", xdg::config_folder())) {
         Ok(f) => serde_yaml::from_reader(f).unwrap(),
         Err(_) => panic!("configuration file missing"),
     };

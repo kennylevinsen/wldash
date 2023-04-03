@@ -375,7 +375,27 @@ impl InterfaceWidget for Launcher {
     }
 }
 
-struct Shell();
+struct Shell {
+    next_token: Option<String>,
+}
+
+
+impl Shell {
+    fn new() -> Shell {
+        Shell {
+            next_token: None,
+        }
+    }
+
+    fn exec(&self, args: Vec<String>) {
+        let mut cmd = Command::new(args[0].clone());
+        if let Some(token) = &self.next_token {
+            cmd.env("XDG_ACTIVATION_TOKEN", token);
+        }
+        cmd.args(&args[1..]).spawn().unwrap();
+        exit(0);
+    }
+}
 
 impl InterfaceWidget for Shell {
     fn trigger(&mut self, intf: &mut InnerInterface) {
@@ -384,11 +404,7 @@ impl InterfaceWidget for Shell {
             "-c".to_string(),
             intf.prompt.input.clone(),
         ];
-        Command::new(args[0].clone())
-            .args(&args[1..])
-            .spawn()
-            .unwrap();
-        exit(0);
+        self.exec(args);
     }
 
     fn update(&mut self, _intf: &InnerInterface) {}
@@ -606,7 +622,7 @@ impl Interface {
 
         Interface {
             launcher: Launcher::new(events),
-            shell: Shell {},
+            shell: Shell::new(),
             calc: Calc::new(),
             inner: InnerInterface {
                 font,
@@ -754,7 +770,10 @@ impl Widget for Interface {
                 self.inner.dirty = true;
                 self.launcher.update(&self.inner);
             }
-            Event::TokenUpdate(t) => self.launcher.next_token = Some(t.to_string()),
+            Event::TokenUpdate(t) => {
+                self.launcher.next_token = Some(t.to_string());
+                self.shell.next_token = Some(t.to_string());
+            }
             _ => (),
         }
     }

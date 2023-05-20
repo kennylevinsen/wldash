@@ -270,7 +270,7 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                     match &state.bg_surface.wl_surface {
                         Some(surface) => {
                             let buffer =
-                                singlepixel.create_u32_rgba_buffer(0, 0, 0, 0xFFFFFFFF, qh, ());
+                                singlepixel.create_u32_rgba_buffer(0, 0, 0, 0xFAFAFAFA, qh, ());
                             surface.attach(Some(&buffer), 0, 0);
                             surface.damage_buffer(0, 0, 1, 1);
                         }
@@ -504,6 +504,14 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                 }
 
                 if state.dimensions != (width, height) {
+                    match (&state.bg_surface.wl_surface, &state.bg_surface.viewport) {
+                        (Some(surface), Some(viewport)) => {
+                            viewport.set_destination(width, height);
+                            surface.commit();
+                        }
+                        _ => todo!("handle early xdg creation"),
+                    }
+
                     state.bufmgr.clear_buffers();
                     state.dimensions = (width, height);
                     state.fonts.resolve();

@@ -199,7 +199,6 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                     if let OperationMode::XdgToplevel = state.mode {
                         let wm_base =
                             registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 2, qh, ());
-
                         match &state.main_surface.wl_surface {
                             Some(surface) => {
                                 let xdg_surface = wm_base.get_xdg_surface(surface, qh, ());
@@ -395,12 +394,15 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
     ) {
         if let zwlr_layer_surface_v1::Event::Configure {
             serial,
-            width,
-            height,
+            mut width,
+            mut height,
         } = event
         {
             if (width, height) == (0, 0) {
-                return;
+                if state.configured {
+                    return;
+                }
+                (width, height) = (640, 480);
             }
             layer_surface.ack_configure(serial);
             state.configured = true;
@@ -408,12 +410,11 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
 
             let dim = (width as i32, height as i32);
 
-            if state.dimensions == dim {
+            if state.configured && state.dimensions == dim {
                 return;
             }
             state.bufmgr.clear_buffers();
             state.dimensions = dim;
-            state.fonts.resolve();
             let fonts = state.fonts.unwrap();
             let layout = state.layout.clone();
             layout.geometry_update(
@@ -481,13 +482,16 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
     ) {
         match event {
             xdg_toplevel::Event::Configure {
-                width,
-                height,
+                mut width,
+                mut height,
                 states,
                 ..
             } => {
                 if (width, height) == (0, 0) {
-                    return;
+                    if state.configured {
+                        return;
+                    }
+                    (width, height) = (640, 480);
                 }
                 let activated = states
                     .iter()
@@ -503,7 +507,7 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                     }
                 }
 
-                if state.dimensions != (width, height) {
+                if !state.configured || state.dimensions != (width, height) {
                     match (&state.bg_surface.wl_surface, &state.bg_surface.viewport) {
                         (Some(surface), Some(viewport)) => {
                             viewport.set_destination(width, height);
@@ -585,6 +589,7 @@ impl Dispatch<wl_keyboard::WlKeyboard, ()> for State {
                     state.running = false;
                     return;
                 }
+                state.keyboard.resolve();
                 let k = state.keyboard.key(key, kbstate);
                 let repeats = k.repeats;
                 let ev = Event::KeyEvent(k);

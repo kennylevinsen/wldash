@@ -210,7 +210,7 @@ fn main() {
                     damage[idx] = widget.draw(&mut state.fonts.unwrap().borrow_mut(), &mut subview);
                 }
             }
-            surface.damage_buffer(0, 0, 0x7FFFFFFF, 0x7FFFFFFF)
+            surface.damage_buffer(0, 0, 0x7FFFFFFF, 0x7FFFFFFF);
         } else {
             let mut drew = false;
             for (idx, widget) in state.widgets.iter_mut().enumerate() {
@@ -238,6 +238,7 @@ fn main() {
             }
             if !drew {
                 buf.release();
+                conn.flush().unwrap();
                 continue;
             }
         }
@@ -245,6 +246,5 @@ fn main() {
         surface.attach(Some(&buf.buffer), 0, 0);
         surface.commit();
         conn.flush().unwrap();
-        state.keyboard.resolve();
     }
 }

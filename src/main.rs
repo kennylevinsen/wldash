@@ -35,8 +35,16 @@ fn main() {
     // Skip program name
     _ = args.next();
 
+    let mut config_file = format!("{}/wldash/config.yml", xdg::config_folder());
+
     loop {
         match args.next() {
+            Some(ref s) if s == "--config" => {
+                match args.next() {
+                    Some(ref s) => config_file = s.clone(),
+                    None => panic!("missing argument to --config"),
+                }
+            }
             Some(ref s) if s == "generate" => {
                 let config = match args.next() {
                     Some(ref s) if s == "v1" => Config::generate_v1(),
@@ -45,7 +53,7 @@ fn main() {
                     None => Config::generate_v2(false),
                     Some(s) => panic!("unknown argument: {}", s),
                 };
-                match File::create(format!("{}/wldash/config.yml", xdg::config_folder())) {
+                match File::create(config_file) {
                     Ok(f) => serde_yaml::to_writer(f, &config).unwrap(),
                     Err(_) => panic!("uh"),
                 }
@@ -131,7 +139,7 @@ fn main() {
 
     let mut fm = FontMap::new();
 
-    let config: Config = match File::open(format!("{}/wldash/config.yml", xdg::config_folder())) {
+    let config: Config = match File::open(config_file) {
         Ok(f) => serde_yaml::from_reader(f).unwrap(),
         Err(_) => panic!("configuration file missing"),
     };

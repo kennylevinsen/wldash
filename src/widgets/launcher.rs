@@ -675,43 +675,43 @@ impl Interface {
             PromptMode::Calc => &mut self.calc as &mut dyn InterfaceWidget,
         };
         match event.keysym {
-            keysyms::XKB_KEY_a if event.modifiers.ctrl => self.inner.prompt.home(),
-            keysyms::XKB_KEY_e if event.modifiers.ctrl => self.inner.prompt.end(),
-            keysyms::XKB_KEY_u if event.modifiers.ctrl => {
+            keysyms::KEY_a if event.modifiers.ctrl => self.inner.prompt.home(),
+            keysyms::KEY_e if event.modifiers.ctrl => self.inner.prompt.end(),
+            keysyms::KEY_u if event.modifiers.ctrl => {
                 self.inner.prompt.clear_left();
                 self.inner.selection = 0;
                 widget.update(&self.inner);
             }
-            keysyms::XKB_KEY_k if event.modifiers.ctrl => {
+            keysyms::KEY_k if event.modifiers.ctrl => {
                 self.inner.prompt.clear_right();
                 self.inner.selection = 0;
                 widget.update(&self.inner);
             }
-            keysyms::XKB_KEY_r if event.modifiers.ctrl => {
+            keysyms::KEY_r if event.modifiers.ctrl => {
                 if let Ok(s) = read_to_string(format!("{}/wldash/prompt", xdg::cache_folder())) {
                     self.inner.prompt.set(&s);
                 }
             }
-            keysyms::XKB_KEY_Home => self.inner.prompt.home(),
-            keysyms::XKB_KEY_End => self.inner.prompt.end(),
-            keysyms::XKB_KEY_BackSpace => {
+            keysyms::KEY_Home => self.inner.prompt.home(),
+            keysyms::KEY_End => self.inner.prompt.end(),
+            keysyms::KEY_BackSpace => {
                 self.inner.prompt.backspace();
                 self.inner.selection = 0;
                 widget.update(&self.inner);
             }
-            keysyms::XKB_KEY_Delete => {
+            keysyms::KEY_Delete => {
                 self.inner.prompt.delete();
                 self.inner.selection = 0;
                 widget.update(&self.inner);
             }
-            keysyms::XKB_KEY_Escape => self.exit(),
-            keysyms::XKB_KEY_Return => widget.trigger(&mut self.inner),
-            keysyms::XKB_KEY_Left => self.inner.prompt.move_cursor(-1),
-            keysyms::XKB_KEY_Right => self.inner.prompt.move_cursor(1),
-            keysyms::XKB_KEY_Up => {
+            keysyms::KEY_Escape => self.exit(),
+            keysyms::KEY_Return => widget.trigger(&mut self.inner),
+            keysyms::KEY_Left => self.inner.prompt.move_cursor(-1),
+            keysyms::KEY_Right => self.inner.prompt.move_cursor(1),
+            keysyms::KEY_Up => {
                 self.inner.selection += 1;
             }
-            keysyms::XKB_KEY_Down => {
+            keysyms::KEY_Down => {
                 if self.inner.selection > 0 {
                     self.inner.selection -= 1;
                 }

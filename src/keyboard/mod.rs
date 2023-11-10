@@ -20,7 +20,8 @@ use std::{
 use wayland_client::{protocol::wl_keyboard, WEnum};
 use xkbcommon::xkb;
 
-pub mod keysyms;
+pub use xkbcommon::xkb::keysyms;
+
 mod repeat;
 mod state;
 

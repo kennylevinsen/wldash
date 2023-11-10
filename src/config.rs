@@ -81,6 +81,7 @@ pub struct Config {
     pub widget: Widget,
     pub mode: OperationMode,
     pub background: Option<u32>,
+    pub server: bool,
 }
 
 impl Config {
@@ -161,6 +162,7 @@ impl Config {
             widget: widget,
             mode: OperationMode::LayerSurface((1024, 768)),
             background: Some(0xFAFAFAFA),
+            server: false,
         }
     }
 
@@ -253,6 +255,7 @@ impl Config {
                 OperationMode::LayerSurface((1024, 1))
             },
             background: Some(0xFAFAFAFA),
+            server: false,
         }
     }
 }

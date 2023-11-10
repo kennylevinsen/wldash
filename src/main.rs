@@ -9,8 +9,6 @@ mod state;
 mod utils;
 mod widgets;
 
-use std::fs::File;
-
 use wayland_client::{Connection, QueueHandle, WaylandSource};
 
 use calloop::{
@@ -25,10 +23,20 @@ use event::{Event, Events};
 use fonts::{FontMap, MaybeFontMap};
 use keyboard::{KeyRepeatSource, RepeatMessage};
 use state::State;
+use utils::{
+    desktop::{load_desktop_files, write_desktop_cache},
+    xdg,
+};
 use widgets::{Geometry, Widget};
-use utils::{xdg, desktop::{load_desktop_files, write_desktop_cache}};
 
-use std::{env, rc::Rc, thread};
+use std::{
+    env,
+    fs::File,
+    io::{BufRead, BufReader, Write},
+    os::unix::net::{UnixListener, UnixStream},
+    rc::Rc,
+    thread,
+};
 
 fn main() {
     let mut args = env::args();
@@ -39,12 +47,10 @@ fn main() {
 
     loop {
         match args.next() {
-            Some(ref s) if s == "--config" => {
-                match args.next() {
-                    Some(ref s) => config_file = s.clone(),
-                    None => panic!("missing argument to --config"),
-                }
-            }
+            Some(ref s) if s == "--config" => match args.next() {
+                Some(ref s) => config_file = s.clone(),
+                None => panic!("missing argument to --config"),
+            },
             Some(ref s) if s == "generate" => {
                 let config = match args.next() {
                     Some(ref s) if s == "v1" => Config::generate_v1(),
@@ -135,6 +141,11 @@ fn main() {
         })
         .expect("Failed to insert keyrepeat source!");
 
+    let socket_path = match env::var("XDG_RUNTIME_DIR") {
+        Ok(dir) => dir + "/wldash",
+        Err(_) => "/tmp/wldash".to_string(),
+    };
+
     let events = Events::new(ping_sender);
 
     let mut fm = FontMap::new();
@@ -143,6 +154,40 @@ fn main() {
         Ok(f) => serde_yaml::from_reader(f).unwrap(),
         Err(_) => panic!("configuration file missing"),
     };
+
+    if config.server {
+        if let Ok(mut socket) = UnixStream::connect(socket_path.clone()) {
+            socket.write_all(b"kill\n").unwrap();
+            return;
+        };
+
+        let _ = std::fs::remove_file(socket_path.clone());
+        let _ = thread::Builder::new()
+            .name("ipc_server".to_string())
+            .spawn(move || {
+                let listener = UnixListener::bind(socket_path.clone()).unwrap();
+                loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            let _ = thread::Builder::new().name("ipc_client".to_string()).spawn(
+                                move || {
+                                    let r = BufReader::new(stream);
+                                    for line in r.lines() {
+                                        match line {
+                                            Ok(ref cmd) if cmd == "kill" => {
+                                                std::process::exit(0);
+                                            }
+                                            _ => {}
+                                        }
+                                    }
+                                },
+                            );
+                        }
+                        _ => (),
+                    }
+                }
+            });
+    }
 
     if let Some(font_paths) = config.font_paths {
         for (key, value) in font_paths.into_iter() {

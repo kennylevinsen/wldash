@@ -163,7 +163,7 @@ impl<'a> Font<'a> {
             }
         }
 
-        let height = buf.get_bounds().3;
+        let height = self.size.ceil() as u32;
         for (i, glyph) in glyphs.iter().enumerate() {
             if i == cursor {
                 self.draw_cursor(buf, c, x_off as u32, height)?;

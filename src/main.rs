@@ -155,7 +155,7 @@ fn main() {
         Err(_) => panic!("configuration file missing"),
     };
 
-    if config.server {
+    if let Some(true) = config.server {
         if let Ok(mut socket) = UnixStream::connect(socket_path.clone()) {
             socket.write_all(b"kill\n").unwrap();
             return;

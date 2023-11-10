@@ -255,5 +255,8 @@ fn main() {
         surface.attach(Some(&buf.buffer), 0, 0);
         surface.commit();
         conn.flush().unwrap();
+
+        // Now is a good as time as any to load the keymap
+        state.keyboard.resolve();
     }
 }

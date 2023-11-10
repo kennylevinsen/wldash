@@ -61,6 +61,7 @@ pub struct Protocols {
 
 pub struct State {
     mode: OperationMode,
+    background: Option<u32>,
     pub main_surface: MainSurface,
     pub bg_surface: BackgroundSurface,
     pub protocols: Protocols,
@@ -82,6 +83,7 @@ pub struct State {
 impl State {
     pub fn new(
         mode: OperationMode,
+        background: Option<u32>,
         widgets: Vec<Box<dyn Widget>>,
         layout: Rc<Box<dyn Layout>>,
         fonts: MaybeFontMap,
@@ -102,6 +104,7 @@ impl State {
             pointer: None,
             keyrepeat_sender,
             mode,
+            background,
             widgets,
             fonts,
             events,
@@ -264,12 +267,12 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                     }
                     state.protocols.viewporter = Some(viewporter);
                 }
-                "wp_single_pixel_buffer_manager_v1" => {
+                "wp_single_pixel_buffer_manager_v1" if state.background.is_some() => {
                     let singlepixel = registry.bind::<wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1, _, _>(name, 1, qh, ());
                     match &state.bg_surface.wl_surface {
                         Some(surface) => {
                             let buffer =
-                                singlepixel.create_u32_rgba_buffer(0, 0, 0, 0xFAFAFAFA, qh, ());
+                                singlepixel.create_u32_rgba_buffer(0, 0, 0, state.background.unwrap(), qh, ());
                             surface.attach(Some(&buffer), 0, 0);
                             surface.damage_buffer(0, 0, 1, 1);
                         }

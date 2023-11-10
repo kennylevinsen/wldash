@@ -80,6 +80,7 @@ pub struct Config {
     pub font_paths: Option<HashMap<String, String>>,
     pub widget: Widget,
     pub mode: OperationMode,
+    pub background: Option<u32>,
 }
 
 impl Config {
@@ -159,6 +160,7 @@ impl Config {
             font_paths: Some(map),
             widget: widget,
             mode: OperationMode::LayerSurface((1024, 768)),
+            background: Some(0xFAFAFAFA),
         }
     }
 
@@ -250,6 +252,7 @@ impl Config {
             } else {
                 OperationMode::LayerSurface((1024, 1))
             },
+            background: Some(0xFAFAFAFA),
         }
     }
 }

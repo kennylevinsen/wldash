@@ -166,6 +166,7 @@ fn main() {
 
     let mut state = State::new(
         config.mode,
+        config.background,
         widgets,
         layout,
         MaybeFontMap::Waiting(font_thread),

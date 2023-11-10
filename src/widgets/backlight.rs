@@ -1,11 +1,12 @@
 use std::{
-    fs,
-    io::{Error, ErrorKind},
+    fs::{self, OpenOptions},
+    io::{Write, Error, ErrorKind},
     path::{Path, PathBuf},
 };
 
 use crate::{
     color::Color,
+    event::PointerButton,
     fonts::FontMap,
     widgets::bar_widget::{BarWidget, BarWidgetImpl},
 };
@@ -17,10 +18,16 @@ fn read_file_as_u64(path: &Path) -> Result<u64, Error> {
         .map_err(|_e| Error::new(ErrorKind::Other, "unable to parse value"))
 }
 
+fn write_file_as_u64(path: &Path, value: u64) -> Result<(), Error> {
+    let mut file = OpenOptions::new().write(true).open(path)?;
+    file.write_fmt(format_args!("{}", value))
+}
+
 pub struct Backlight {
     device_path: PathBuf,
     cur: u64,
     max: u64,
+    dirty: bool
 }
 
 impl Backlight {
@@ -34,6 +41,7 @@ impl Backlight {
             device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
             cur: 0,
             max: 0,
+            dirty: true,
         };
 
         dev.update();
@@ -47,11 +55,20 @@ impl Backlight {
             Err(_) => false,
         }
     }
+
+    pub fn set(&mut self, brightness: f32) {
+        let val = (self.max as f32 * brightness) as u64;
+        write_file_as_u64(self.device_path.join("brightness").as_path(), val);
+        self.cur = read_file_as_u64(self.device_path.join("brightness").as_path()).unwrap();
+    }
 }
 
 impl BarWidgetImpl for Backlight {
     fn name(&self) -> &'static str {
         "backlight"
+    }
+    fn get_dirty(&self) -> bool {
+        self.dirty
     }
     fn value(&mut self) -> f32 {
         if self.cur > self.max {
@@ -59,9 +76,17 @@ impl BarWidgetImpl for Backlight {
             return 1.0;
         }
 
+        self.dirty = false;
         self.cur as f32 / self.max as f32
     }
     fn color(&self) -> Color {
         Color::WHITE
+    }
+    fn click(&mut self, pos: f32, btn: PointerButton) {
+        self.dirty = true;
+        match btn {
+            PointerButton::Left => self.set(pos),
+            _ => (),
+        };
     }
 }

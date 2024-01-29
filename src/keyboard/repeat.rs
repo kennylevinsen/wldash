@@ -64,7 +64,7 @@ impl EventSource for KeyRepeatSource {
 
         let mut reregister = false;
 
-        let mut next_deadline = std::time::Instant::now();
+        let now = std::time::Instant::now();
 
         // Check if the key repeat should stop
         let channel_pa = self
@@ -78,9 +78,7 @@ impl EventSource for KeyRepeatSource {
                         WEnum::Value(wl_keyboard::KeyState::Pressed) => {
                             key.replace(event);
                             reregister = true;
-
-                            next_deadline = std::time::Instant::now() + *delay;
-                            timer.set_deadline(next_deadline);
+                            timer.set_deadline(now + *delay);
                         }
                         WEnum::Value(wl_keyboard::KeyState::Released) => match key {
                             Some(k) if k.keysym == event.keysym => {
@@ -95,8 +93,7 @@ impl EventSource for KeyRepeatSource {
                         *delay = Duration::from_millis(new_delay as u64);
                         *disabled = false;
                         if key.is_some() {
-                            next_deadline = std::time::Instant::now() + *delay;
-                            timer.set_deadline(next_deadline);
+                            timer.set_deadline(now + *delay);
                         }
                     }
                 },
@@ -117,14 +114,28 @@ impl EventSource for KeyRepeatSource {
             return Ok(PostAction::Reregister);
         }
 
-        let timer_pa = timer.process_events(readiness, token, |_event, _| {
+        let timer_pa = timer.process_events(readiness, token, |deadline, _| {
             if self.disabled || key.is_none() {
                 return TimeoutAction::Drop;
+            }
+            if deadline - now > std::time::Duration::from_millis(5) {
+                // We have not yet reached the deadline within our tolerance
+                return TimeoutAction::ToInstant(deadline);
             }
 
             // Invoke the event
             callback(key.as_ref().unwrap().clone(), &mut ());
-            next_deadline += *rate;
+
+            let mut next_deadline = deadline;
+            if now - deadline > *rate * 2 {
+                // We're way behind, let's just set a new time
+                println!("KeyRepeatSource::process_events: More than two repeat cycles behind, resetting");
+                next_deadline = now + *rate;
+            } else {
+                while next_deadline < now {
+                    next_deadline += *rate;
+                }
+            }
             TimeoutAction::ToInstant(next_deadline)
         })?;
 

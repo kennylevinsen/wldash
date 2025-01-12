@@ -9,7 +9,7 @@ use std::{
 use wayland_client::{
     protocol::{
         wl_buffer, wl_compositor, wl_keyboard, wl_pointer, wl_registry, wl_seat, wl_shm,
-        wl_shm_pool, wl_subcompositor, wl_subsurface, wl_surface,
+        wl_shm_pool, wl_subcompositor, wl_subsurface, wl_surface, wl_callback,
     },
     Connection, Dispatch, QueueHandle, WEnum,
 };
@@ -54,9 +54,14 @@ pub struct BackgroundSurface {
 
 #[derive(Default)]
 pub struct Protocols {
+    wl_compositor: Option<wl_compositor::WlCompositor>,
+    wl_subcompositor: Option<wl_subcompositor::WlSubcompositor>,
     wl_shm: Option<wl_shm::WlShm>,
+    xdg_wm_base: Option<xdg_wm_base::XdgWmBase>,
     xdg_activation: Option<xdg_activation_v1::XdgActivationV1>,
+    zwlr_layer_shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
     viewporter: Option<wp_viewporter::WpViewporter>,
+    wp_single_pixel_buffer_manager: Option<wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1>,
 }
 
 pub struct State {
@@ -66,6 +71,7 @@ pub struct State {
     pub bg_surface: BackgroundSurface,
     pub protocols: Protocols,
     pub running: bool,
+    pub ready: bool,
     pub dirty: bool,
     activated: bool,
     pub configured: bool,
@@ -109,6 +115,7 @@ impl State {
             fonts,
             events,
             layout,
+            ready: false,
         }
     }
 
@@ -155,6 +162,84 @@ impl WidgetUpdater for State {
     }
 }
 
+impl State {
+    pub fn check_registry(&mut self, qh: &QueueHandle<Self>) {
+        let wl_compositor = self.protocols.wl_compositor.as_ref().expect("wl_compositor missing");
+        let main_surface = wl_compositor.create_surface(qh, ());
+        let bg_surface = wl_compositor.create_surface(qh, ());
+        self.main_surface.wl_surface = Some(main_surface.clone());
+        self.bg_surface.wl_surface = Some(bg_surface.clone());
+        self.activate(qh);
+
+        let wl_subcompositor = self.protocols.wl_subcompositor.as_ref().expect("wl_subcompositor missing");
+        let subsurface = wl_subcompositor.get_subsurface(&bg_surface, &main_surface, qh, ());
+        subsurface.place_below(&main_surface);
+        self.bg_surface.subsurface = Some(subsurface.clone());
+
+        match self.mode {
+            OperationMode::XdgToplevel => {
+                self.fonts.resolve();
+                let xdg_wm_base = self.protocols.xdg_wm_base.as_ref().expect("xdg_wm_base missing");
+                let xdg_surface = xdg_wm_base.get_xdg_surface(&main_surface, qh, ());
+                let toplevel = xdg_surface.get_toplevel(qh, ());
+                toplevel.set_title("wldash".into());
+                main_surface.commit();
+
+                self.main_surface.xdg_surface = Some((xdg_surface, toplevel));
+            }
+            OperationMode::LayerSurface(size) => {
+                self.fonts.resolve();
+                let layer_shell = self.protocols.zwlr_layer_shell.as_ref().expect("zwlr_layer_shell_v1 missing");
+                let layer_surface = layer_shell.get_layer_surface(
+                    &main_surface,
+                    None,
+                    zwlr_layer_shell_v1::Layer::Top,
+                    "launcher".to_string(),
+                    qh,
+                    (),
+                );
+                let fonts = self.fonts.unwrap();
+                let layout = self.layout.clone();
+                let min_size = layout.minimum_size(&mut fonts.borrow_mut(), self);
+                layer_surface.set_keyboard_interactivity(
+                    zwlr_layer_surface_v1::KeyboardInteractivity::Exclusive,
+                );
+                layer_surface.set_anchor(
+                    zwlr_layer_surface_v1::Anchor::Left
+                        .union(zwlr_layer_surface_v1::Anchor::Bottom)
+                        .union(zwlr_layer_surface_v1::Anchor::Right)
+                        .union(zwlr_layer_surface_v1::Anchor::Top)
+                );
+                layer_surface.set_size(
+                    max(size.0, min_size.width),
+                    max(size.1, min_size.height),
+                );
+
+                main_surface.commit();
+                self.main_surface.layer_surface = Some(layer_surface);
+            }
+        }
+
+        let viewporter = self.protocols.viewporter.as_ref().expect("wp_viewporter missing");
+        let viewport = viewporter.get_viewport(&bg_surface, qh, ());
+        self.bg_surface.viewport = Some(viewport);
+
+        if let Some(background) = self.background {
+            let wp_single_pixel_buffer_manager = self.protocols.wp_single_pixel_buffer_manager.as_ref().expect("wp_single_pixel_buffer_manager_v1 missing");
+            let buffer = wp_single_pixel_buffer_manager.create_u32_rgba_buffer(
+                0,
+                0,
+                0,
+                background,
+                qh,
+                (),
+            );
+            bg_surface.attach(Some(&buffer), 0, 0);
+            bg_surface.damage_buffer(0, 0, 1, 1);
+        }
+    }
+}
+
 impl Dispatch<wl_registry::WlRegistry, ()> for State {
     fn event(
         state: &mut Self,
@@ -170,26 +255,12 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
         {
             match &interface[..] {
                 "wl_compositor" => {
-                    let compositor =
-                        registry.bind::<wl_compositor::WlCompositor, _, _>(name, 5, qh, ());
-                    let main_surface = compositor.create_surface(qh, ());
-                    let bg_surface = compositor.create_surface(qh, ());
-                    state.main_surface.wl_surface = Some(main_surface);
-                    state.bg_surface.wl_surface = Some(bg_surface);
-                    state.activate(qh);
+                    state.protocols.wl_compositor =
+                        Some(registry.bind::<wl_compositor::WlCompositor, _, _>(name, 5, qh, ()));
                 }
                 "wl_subcompositor" => {
-                    let subcompositor =
-                        registry.bind::<wl_subcompositor::WlSubcompositor, _, _>(name, 1, qh, ());
-
-                    match (&state.main_surface.wl_surface, &state.bg_surface.wl_surface) {
-                        (Some(parent), Some(child)) => {
-                            let subsurface = subcompositor.get_subsurface(child, parent, qh, ());
-                            subsurface.place_below(parent);
-                            state.bg_surface.subsurface = Some(subsurface);
-                        }
-                        _ => todo!("handle early subcompositor creation"),
-                    }
+                    state.protocols.wl_subcompositor =
+                        Some(registry.bind::<wl_subcompositor::WlSubcompositor, _, _>(name, 1, qh, ()));
                 }
                 "wl_shm" => {
                     state.protocols.wl_shm =
@@ -200,87 +271,48 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                 }
                 "xdg_wm_base" => {
                     if let OperationMode::XdgToplevel = state.mode {
-                        let wm_base =
-                            registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 2, qh, ());
-                        match &state.main_surface.wl_surface {
-                            Some(surface) => {
-                                let xdg_surface = wm_base.get_xdg_surface(surface, qh, ());
-                                let toplevel = xdg_surface.get_toplevel(qh, ());
-                                toplevel.set_title("wldash".into());
-
-                                surface.commit();
-
-                                state.main_surface.xdg_surface = Some((xdg_surface, toplevel));
-                            }
-                            _ => todo!("handle early xdg_shell creation"),
-                        }
+                        state.protocols.xdg_wm_base =
+                            Some(registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 2, qh, ()));
                     }
                 }
                 "xdg_activation_v1" => {
                     state.protocols.xdg_activation = Some(
                         registry.bind::<xdg_activation_v1::XdgActivationV1, _, _>(name, 1, qh, ()),
                     );
-                    state.activate(qh);
                 }
                 "zwlr_layer_shell_v1" => {
-                    if let OperationMode::LayerSurface(size) = state.mode {
-                        let layer_shell = registry
-                            .bind::<zwlr_layer_shell_v1::ZwlrLayerShellV1, _, _>(name, 4, qh, ());
-                        state.fonts.resolve();
-                        let fonts = state.fonts.unwrap();
-                        let layout = state.layout.clone();
-                        let min_size = layout.minimum_size(&mut fonts.borrow_mut(), state);
-                        match &state.main_surface.wl_surface {
-                            Some(surface) => {
-                                let layer_surface = layer_shell.get_layer_surface(
-                                    surface,
-                                    None,
-                                    zwlr_layer_shell_v1::Layer::Top,
-                                    "launcher".to_string(),
-                                    qh,
-                                    (),
-                                );
-                                layer_surface.set_keyboard_interactivity(
-                                    zwlr_layer_surface_v1::KeyboardInteractivity::Exclusive,
-                                );
-                                layer_surface.set_size(
-                                    max(size.0, min_size.width),
-                                    max(size.1, min_size.height),
-                                );
-
-                                surface.commit();
-                                state.main_surface.layer_surface = Some(layer_surface);
-                            }
-                            _ => todo!("handle early layer_shell creation"),
-                        }
+                    if let OperationMode::LayerSurface(_) = state.mode {
+                        state.protocols.zwlr_layer_shell = Some(registry
+                            .bind::<zwlr_layer_shell_v1::ZwlrLayerShellV1, _, _>(name, 4, qh, ()));
                     }
                 }
                 "wp_viewporter" => {
-                    let viewporter =
-                        registry.bind::<wp_viewporter::WpViewporter, _, _>(name, 1, qh, ());
-                    match &state.bg_surface.wl_surface {
-                        Some(surface) => {
-                            state.bg_surface.viewport =
-                                Some(viewporter.get_viewport(surface, qh, ()));
-                        }
-                        _ => todo!("handle early viewporter creation"),
-                    }
-                    state.protocols.viewporter = Some(viewporter);
+                    state.protocols.viewporter =
+                        Some(registry.bind::<wp_viewporter::WpViewporter, _, _>(name, 1, qh, ()));
                 }
-                "wp_single_pixel_buffer_manager_v1" if state.background.is_some() => {
-                    let singlepixel = registry.bind::<wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1, _, _>(name, 1, qh, ());
-                    match &state.bg_surface.wl_surface {
-                        Some(surface) => {
-                            let buffer =
-                                singlepixel.create_u32_rgba_buffer(0, 0, 0, state.background.unwrap(), qh, ());
-                            surface.attach(Some(&buffer), 0, 0);
-                            surface.damage_buffer(0, 0, 1, 1);
-                        }
-                        _ => todo!("handle early single_pixel_buffer creation"),
-                    }
+                "wp_single_pixel_buffer_manager_v1" => {
+                    state.protocols.wp_single_pixel_buffer_manager = Some(registry.bind::<wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1, _, _>(name, 1, qh, ()));
                 }
                 _ => {}
             }
+        }
+    }
+}
+
+impl Dispatch<wl_callback::WlCallback, ()> for State {
+    fn event(
+        state: &mut Self,
+        _: &wl_callback::WlCallback,
+        event: wl_callback::Event,
+        _: &(),
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        match event {
+            wl_callback::Event::Done { callback_data: _ } => {
+                state.ready = true
+            },
+            _ => {},
         }
     }
 }
@@ -395,49 +427,51 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
         _: &Connection,
         _: &QueueHandle<Self>,
     ) {
-        if let zwlr_layer_surface_v1::Event::Configure {
-            serial,
-            mut width,
-            mut height,
-        } = event
-        {
-            if (width, height) == (0, 0) {
-                if state.configured {
+        match event {
+            zwlr_layer_surface_v1::Event::Configure {
+                serial,
+                mut width,
+                mut height,
+            } => {
+                if (width, height) == (0, 0) {
+                    if state.configured {
+                        return;
+                    }
+                    (width, height) = (640, 480);
+                }
+                layer_surface.ack_configure(serial);
+                state.configured = true;
+                state.dirty = true;
+
+                let dim = (width as i32, height as i32);
+
+                if state.configured && state.dimensions == dim {
                     return;
                 }
-                (width, height) = (640, 480);
-            }
-            layer_surface.ack_configure(serial);
-            state.configured = true;
-            state.dirty = true;
+                state.bufmgr.clear_buffers();
+                state.dimensions = dim;
+                let fonts = state.fonts.unwrap();
+                let layout = state.layout.clone();
+                layout.geometry_update(
+                    &mut fonts.borrow_mut(),
+                    &Geometry {
+                        x: 0,
+                        y: 0,
+                        width: width as u32,
+                        height: height as u32,
+                    },
+                    state,
+                );
 
-            let dim = (width as i32, height as i32);
-
-            if state.configured && state.dimensions == dim {
-                return;
+                let surface = state.bg_surface.wl_surface.as_ref().expect("bg surface was not ready");
+                let viewport = state.bg_surface.viewport.as_ref().expect("bg viewport was not ready");
+                viewport.set_destination(dim.0, dim.1);
+                surface.commit();
             }
-            state.bufmgr.clear_buffers();
-            state.dimensions = dim;
-            let fonts = state.fonts.unwrap();
-            let layout = state.layout.clone();
-            layout.geometry_update(
-                &mut fonts.borrow_mut(),
-                &Geometry {
-                    x: 0,
-                    y: 0,
-                    width: width as u32,
-                    height: height as u32,
-                },
-                state,
-            );
-
-            match (&state.bg_surface.wl_surface, &state.bg_surface.viewport) {
-                (Some(surface), Some(viewport)) => {
-                    viewport.set_destination(dim.0, dim.1);
-                    surface.commit();
-                }
-                _ => todo!("handle early layer shell creation"),
+            zwlr_layer_surface_v1::Event::Closed => {
+                std::process::exit(0);
             }
+            _ => (),
         }
     }
 }
@@ -511,13 +545,10 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                 }
 
                 if !state.configured || state.dimensions != (width, height) {
-                    match (&state.bg_surface.wl_surface, &state.bg_surface.viewport) {
-                        (Some(surface), Some(viewport)) => {
-                            viewport.set_destination(width, height);
-                            surface.commit();
-                        }
-                        _ => todo!("handle early xdg creation"),
-                    }
+                    let surface = state.bg_surface.wl_surface.as_ref().expect("bg surface was not ready");
+                    let viewport = state.bg_surface.viewport.as_ref().expect("bg viewportw as not ready");
+                    viewport.set_destination(width, height);
+                    surface.commit();
 
                     state.bufmgr.clear_buffers();
                     state.dimensions = (width, height);

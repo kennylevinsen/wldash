@@ -82,6 +82,7 @@ fn main() {
 
     let display = conn.display();
     display.get_registry(&qhandle, ());
+    display.sync(&qhandle, ());
 
     let (ping_sender, ping_source) = calloop::ping::make_ping().unwrap();
     let (keyrepeat_sender, keyrepeat_channel) = calloop::channel::channel::<RepeatMessage>();
@@ -224,12 +225,21 @@ fn main() {
         damage.push(Geometry::new());
     }
 
+    // Initial setup
+    //
+    while state.running && !state.ready {
+        event_loop
+            .dispatch(None, &mut state)
+            .expect("Could not dispatch event loop");
+    }
+    state.check_registry(&qhandle);
+
     while state.running {
         event_loop
             .dispatch(None, &mut state)
             .expect("Could not dispatch event loop");
 
-        if !state.configured || !state.dirty {
+        if !state.configured || !state.dirty || !state.ready {
             continue;
         }
 
@@ -243,8 +253,16 @@ fn main() {
         let buf = match state.bufmgr.next_buffer() {
             Some(b) => b,
             None => {
-                // We are still waiting for our buffer
-                continue;
+                if state.bufmgr.buffers.len() >= 3 {
+                    continue;
+                }
+                state.add_buffer(&qhandle);
+                match state.bufmgr.next_buffer() {
+                    Some(b) => b,
+                    None => {
+                        continue;
+                    }
+                }
             }
         };
 
@@ -297,7 +315,9 @@ fn main() {
             }
         }
 
+        state.ready = false;
         surface.attach(Some(&buf.buffer), 0, 0);
+        surface.frame(&qhandle, ());
         surface.commit();
         conn.flush().unwrap();
 

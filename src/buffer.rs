@@ -82,16 +82,18 @@ pub struct ShmBuffer {
     pub mmap: MmapMut,
     pub buffer: wl_buffer::WlBuffer,
     pub refcnt: u32,
+    pub id: u32,
 }
 
 impl ShmBuffer {
-    pub fn new<D>(
+    fn new<D>(
         shm: &wl_shm::WlShm,
         qh: &QueueHandle<D>,
         width: i32,
         height: i32,
         stride: i32,
         format: wl_shm::Format,
+        id: u32,
     ) -> io::Result<ShmBuffer>
     where
         D: Dispatch<wl_shm_pool::WlShmPool, ()> + Dispatch<wl_buffer::WlBuffer, ()> + 'static,
@@ -108,6 +110,7 @@ impl ShmBuffer {
             file,
             mmap,
             buffer,
+            id,
         })
     }
 
@@ -122,12 +125,14 @@ impl ShmBuffer {
 
 pub struct BufferManager {
     pub buffers: Vec<ShmBuffer>,
+    pub next_id: u32,
 }
 
 impl BufferManager {
     pub fn new() -> BufferManager {
         BufferManager {
             buffers: Vec::new(),
+            next_id: 0,
         }
     }
 
@@ -162,8 +167,10 @@ impl BufferManager {
             dimensions.1,
             dimensions.0 * 4,
             wl_shm::Format::Argb8888,
+            self.next_id,
         )
         .expect("unable to add buffer");
+        self.next_id += 1;
         BufferView::new(&mut buf.mmap, (dimensions.0 as u32, dimensions.1 as u32));
         self.buffers.push(buf);
     }

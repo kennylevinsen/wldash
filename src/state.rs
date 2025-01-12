@@ -193,7 +193,7 @@ impl State {
                 let layer_surface = layer_shell.get_layer_surface(
                     &main_surface,
                     None,
-                    zwlr_layer_shell_v1::Layer::Top,
+                    zwlr_layer_shell_v1::Layer::Overlay,
                     "launcher".to_string(),
                     qh,
                     (),

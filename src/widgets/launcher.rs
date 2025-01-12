@@ -212,10 +212,11 @@ struct Launcher {
     next_token: Option<String>,
     options: Arc<Mutex<Vec<Desktop>>>,
     matches: Vec<Desktop>,
+    launch_cmd: Option<String>,
 }
 
 impl Launcher {
-    fn new(events: Arc<Mutex<Events>>) -> Launcher {
+    fn new(events: Arc<Mutex<Events>>, launch_cmd: Option<String>) -> Launcher {
         let options = Arc::new(Mutex::new(Vec::new()));
         {
             let options = Arc::clone(&options);
@@ -242,15 +243,22 @@ impl Launcher {
             next_token: None,
             options: options,
             matches: Vec::new(),
+            launch_cmd,
         }
     }
 
-    fn exec(&self, args: Vec<String>) {
-        let mut cmd = Command::new(args[0].clone());
+    fn exec(&self, cmdline: &str) {
+        let mut cmd = Command::new("/bin/sh");
         if let Some(token) = &self.next_token {
             cmd.env("XDG_ACTIVATION_TOKEN", token);
         }
-        cmd.args(&args[1..]).spawn().unwrap();
+        cmd.arg("-c");
+        if let Some(l) = &self.launch_cmd {
+            cmd.arg(format!("{} {}", l, cmdline));
+        } else {
+            cmd.arg(cmdline);
+        }
+        cmd.spawn().unwrap();
         exit(0);
     }
 }
@@ -266,10 +274,7 @@ impl InterfaceWidget for Launcher {
                     .replace("%u", "")
                     .replace("%U", "");
 
-                let lexed = shlex::split(&exec).unwrap();
-                if !lexed.is_empty() {
-                    self.exec(lexed);
-                }
+                self.exec(&exec);
             }
         }
     }
@@ -379,12 +384,9 @@ struct Shell {
     next_token: Option<String>,
 }
 
-
 impl Shell {
     fn new() -> Shell {
-        Shell {
-            next_token: None,
-        }
+        Shell { next_token: None }
     }
 
     fn exec(&self, args: Vec<String>) {
@@ -613,6 +615,7 @@ impl Interface {
         fm: &mut FontMap,
         font: &'static str,
         size: f32,
+        launch_cmd: Option<String>
     ) -> Interface {
         fm.queue_font(
             font,
@@ -621,7 +624,7 @@ impl Interface {
         );
 
         Interface {
-            launcher: Launcher::new(events),
+            launcher: Launcher::new(events, launch_cmd),
             shell: Shell::new(),
             calc: Calc::new(),
             inner: InnerInterface {

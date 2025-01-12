@@ -52,6 +52,7 @@ pub enum Widget {
     Launcher {
         font: Option<String>,
         font_size: f32,
+        launch_cmd: Option<String>,
     },
     Battery {
         font: Option<String>,
@@ -148,6 +149,7 @@ impl Config {
                 Widget::Launcher {
                     font: None,
                     font_size: 32.,
+                    launch_cmd: None,
                 },
             ])),
         };
@@ -236,6 +238,7 @@ impl Config {
                     widget: Box::new(Widget::Launcher {
                         font: None,
                         font_size: 32.,
+                        launch_cmd: None,
                     }),
                 },
             ]),
@@ -321,11 +324,12 @@ impl Widget {
                 sections_x,
                 sections_y,
             ))),
-            Widget::Launcher { font, font_size } => v.push(Box::new(Interface::new(
+            Widget::Launcher { font, font_size, launch_cmd } => v.push(Box::new(Interface::new(
                 events.clone(),
                 &mut fm,
                 leak_or_default(font, "sans"),
                 font_size,
+                launch_cmd,
             ))),
             Widget::Battery { font, font_size } => v.push(Box::new(Battery::new(
                 events.clone(),

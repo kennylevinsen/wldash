@@ -1,8 +1,10 @@
 use std::{
     fs::{self, OpenOptions},
-    io::{Write, Error, ErrorKind},
+    io::{Error, ErrorKind, Write},
     path::{Path, PathBuf},
 };
+
+use walkdir::WalkDir;
 
 use crate::{
     color::Color,
@@ -27,7 +29,7 @@ pub struct Backlight {
     device_path: PathBuf,
     cur: u64,
     max: u64,
-    dirty: bool
+    dirty: bool,
 }
 
 impl Backlight {
@@ -36,9 +38,19 @@ impl Backlight {
         self.max = read_file_as_u64(self.device_path.join("max_brightness").as_path()).unwrap();
     }
 
-    pub fn new(path: &str, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
+    pub fn new(path: Option<&str>, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
+        let mut device_path = None;
+        if let Some(path) = path {
+            device_path = Some(Path::new("/sys/class/backlight").to_path_buf().join(path));
+        } else {
+            for entry in WalkDir::new("/sys/class/backlight") {
+                if let Ok(entry) = entry {
+                    device_path = Some(entry.path().to_path_buf());
+                }
+            }
+        }
         let mut dev = Backlight {
-            device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
+            device_path: device_path.expect("did not find backlight device"),
             cur: 0,
             max: 0,
             dirty: true,
@@ -48,17 +60,18 @@ impl Backlight {
         BarWidget::new(Box::new(dev), fm, font, size)
     }
 
-    pub fn detect(path: &str) -> bool {
-        let path = Path::new("/sys/class/backlight").to_path_buf().join(path);
-        match read_file_as_u64(path.join("brightness").as_path()) {
-            Ok(_) => true,
-            Err(_) => false,
+    pub fn detect() -> bool {
+        for entry in WalkDir::new("/sys/class/backlight") {
+            if entry.is_ok() {
+                return true;
+            }
         }
+        return false;
     }
 
     pub fn set(&mut self, brightness: f32) {
         let val = (self.max as f32 * brightness) as u64;
-        write_file_as_u64(self.device_path.join("brightness").as_path(), val);
+        let _ = write_file_as_u64(self.device_path.join("brightness").as_path(), val);
         self.cur = read_file_as_u64(self.device_path.join("brightness").as_path()).unwrap();
     }
 }

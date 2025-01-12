@@ -87,7 +87,7 @@ pub struct Config {
 impl Config {
     pub fn generate_v1() -> Config {
         let has_battery = Battery::detect();
-        let has_backlight = Backlight::detect("intel_backlight");
+        let has_backlight = Backlight::detect();
         let sans = find_font("sans");
         let monospace = find_font("monospace");
 
@@ -105,7 +105,7 @@ impl Config {
             bars.push(Widget::Margin {
                 margins: (0, 0, 0, 8),
                 widget: Box::new(Widget::Backlight {
-                    device: Some("intel_backlight".to_string()),
+                    device: None,
                     font: None,
                     font_size: 24.,
                 }),
@@ -168,7 +168,7 @@ impl Config {
 
     pub fn generate_v2(clay: bool) -> Config {
         let has_battery = Battery::detect();
-        let has_backlight = Backlight::detect("intel_backlight");
+        let has_backlight = Backlight::detect();
         let sans = find_font("sans");
         let monospace = find_font("monospace");
 
@@ -186,7 +186,7 @@ impl Config {
             bars.push(Widget::Margin {
                 margins: (16, 8, 8, 0),
                 widget: Box::new(Widget::Backlight {
-                    device: Some("intel_backlight".to_string()),
+                    device: None,
                     font: None,
                     font_size: 24.,
                 }),
@@ -267,6 +267,13 @@ fn leak_or_default(v: Option<String>, d: &'static str) -> &'static str {
     }
 }
 
+fn leak_or_none(v: Option<String>) -> Option<&'static str> {
+    match v {
+        Some(v) => Some(Box::leak(v.into_boxed_str())),
+        None => None,
+    }
+}
+
 impl Widget {
     pub fn construct_widgets(
         self,
@@ -331,7 +338,7 @@ impl Widget {
                 font,
                 font_size,
             } => v.push(Box::new(Backlight::new(
-                leak_or_default(device, "intel_backlight"),
+                leak_or_none(device),
                 &mut fm,
                 leak_or_default(font, "sans"),
                 font_size,

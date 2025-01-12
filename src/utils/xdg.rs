@@ -10,7 +10,6 @@ pub fn cache_folder() -> String {
     }
 }
 
-
 pub fn config_folder() -> String {
     match env::var_os("XDG_CONFIG_HOME") {
         Some(s) => s.into_string().unwrap(),
@@ -35,5 +34,7 @@ pub fn data_folders() -> Vec<String> {
     };
 
     // Eww.
-    std::iter::once(xdg_data_home.to_string()).chain(xdg_data_dirs.split(':').map(|x| x.to_string())).collect()
+    std::iter::once(xdg_data_home.to_string())
+        .chain(xdg_data_dirs.split(':').map(|x| x.to_string()))
+        .collect()
 }

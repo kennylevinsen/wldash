@@ -77,14 +77,14 @@ impl PartialEq for Desktop {
 pub fn load_desktop_cache() -> Result<Vec<Desktop>, Box<dyn Error>> {
     match File::open(format!("{}/wldash/desktop.json", xdg::cache_folder())) {
         Ok(f) => simd_json::from_reader(f).map_err(|e| e.into()),
-        Err(e) => Err(e.into())
+        Err(e) => Err(e.into()),
     }
 }
 
 pub fn write_desktop_cache(v: &Vec<Desktop>) -> Result<(), Box<dyn Error>> {
     match File::create(format!("{}/wldash/desktop.json", xdg::cache_folder())) {
         Ok(f) => simd_json::to_writer(f, v).map_err(|e| e.into()),
-        Err(e) => Err(e.into())
+        Err(e) => Err(e.into()),
     }
 }
 

@@ -1,3 +1,3 @@
 pub mod desktop;
-pub mod xdg;
 mod inish;
+pub mod xdg;

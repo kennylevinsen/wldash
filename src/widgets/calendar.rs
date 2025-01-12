@@ -44,7 +44,11 @@ impl Calendar {
         fm.queue_font(font, size * DAY_FACTOR, "ADEFHIMNORSTUW");
         fm.queue_font(font, size * YEAR_FACTOR, "0123456789");
         fm.queue_font(font, size * DATE_FACTOR, "0123456789");
-        fm.queue_font(month_font, size * MONTH_FACTOR, "ADFJMNOSabcehgilmnoprstuvy");
+        fm.queue_font(
+            month_font,
+            size * MONTH_FACTOR,
+            "ADFJMNOSabcehgilmnoprstuvy",
+        );
 
         Calendar {
             font,

@@ -16,7 +16,7 @@ use crate::{
     fonts::FontMap,
     keyboard::{keysyms, KeyEvent},
     utils::{
-        desktop::{load_desktop_files, load_desktop_cache, write_desktop_cache, Desktop},
+        desktop::{load_desktop_cache, load_desktop_files, write_desktop_cache, Desktop},
         xdg,
     },
     widgets::{Geometry, Widget},
@@ -615,7 +615,7 @@ impl Interface {
         fm: &mut FontMap,
         font: &'static str,
         size: f32,
-        launch_cmd: Option<String>
+        launch_cmd: Option<String>,
     ) -> Interface {
         fm.queue_font(
             font,

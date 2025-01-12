@@ -8,8 +8,8 @@ use std::{
 
 use wayland_client::{
     protocol::{
-        wl_buffer, wl_compositor, wl_keyboard, wl_pointer, wl_registry, wl_seat, wl_shm,
-        wl_shm_pool, wl_subcompositor, wl_subsurface, wl_surface, wl_callback,
+        wl_buffer, wl_callback, wl_compositor, wl_keyboard, wl_pointer, wl_registry, wl_seat,
+        wl_shm, wl_shm_pool, wl_subcompositor, wl_subsurface, wl_surface,
     },
     Connection, Dispatch, QueueHandle, WEnum,
 };
@@ -61,7 +61,8 @@ pub struct Protocols {
     xdg_activation: Option<xdg_activation_v1::XdgActivationV1>,
     zwlr_layer_shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
     viewporter: Option<wp_viewporter::WpViewporter>,
-    wp_single_pixel_buffer_manager: Option<wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1>,
+    wp_single_pixel_buffer_manager:
+        Option<wp_single_pixel_buffer_manager_v1::WpSinglePixelBufferManagerV1>,
 }
 
 pub struct State {
@@ -164,14 +165,22 @@ impl WidgetUpdater for State {
 
 impl State {
     pub fn check_registry(&mut self, qh: &QueueHandle<Self>) {
-        let wl_compositor = self.protocols.wl_compositor.as_ref().expect("wl_compositor missing");
+        let wl_compositor = self
+            .protocols
+            .wl_compositor
+            .as_ref()
+            .expect("wl_compositor missing");
         let main_surface = wl_compositor.create_surface(qh, ());
         let bg_surface = wl_compositor.create_surface(qh, ());
         self.main_surface.wl_surface = Some(main_surface.clone());
         self.bg_surface.wl_surface = Some(bg_surface.clone());
         self.activate(qh);
 
-        let wl_subcompositor = self.protocols.wl_subcompositor.as_ref().expect("wl_subcompositor missing");
+        let wl_subcompositor = self
+            .protocols
+            .wl_subcompositor
+            .as_ref()
+            .expect("wl_subcompositor missing");
         let subsurface = wl_subcompositor.get_subsurface(&bg_surface, &main_surface, qh, ());
         subsurface.place_below(&main_surface);
         self.bg_surface.subsurface = Some(subsurface.clone());
@@ -179,7 +188,11 @@ impl State {
         match self.mode {
             OperationMode::XdgToplevel => {
                 self.fonts.resolve();
-                let xdg_wm_base = self.protocols.xdg_wm_base.as_ref().expect("xdg_wm_base missing");
+                let xdg_wm_base = self
+                    .protocols
+                    .xdg_wm_base
+                    .as_ref()
+                    .expect("xdg_wm_base missing");
                 let xdg_surface = xdg_wm_base.get_xdg_surface(&main_surface, qh, ());
                 let toplevel = xdg_surface.get_toplevel(qh, ());
                 toplevel.set_title("wldash".into());
@@ -189,7 +202,11 @@ impl State {
             }
             OperationMode::LayerSurface(size) => {
                 self.fonts.resolve();
-                let layer_shell = self.protocols.zwlr_layer_shell.as_ref().expect("zwlr_layer_shell_v1 missing");
+                let layer_shell = self
+                    .protocols
+                    .zwlr_layer_shell
+                    .as_ref()
+                    .expect("zwlr_layer_shell_v1 missing");
                 let layer_surface = layer_shell.get_layer_surface(
                     &main_surface,
                     None,
@@ -208,32 +225,31 @@ impl State {
                     zwlr_layer_surface_v1::Anchor::Left
                         .union(zwlr_layer_surface_v1::Anchor::Bottom)
                         .union(zwlr_layer_surface_v1::Anchor::Right)
-                        .union(zwlr_layer_surface_v1::Anchor::Top)
+                        .union(zwlr_layer_surface_v1::Anchor::Top),
                 );
-                layer_surface.set_size(
-                    max(size.0, min_size.width),
-                    max(size.1, min_size.height),
-                );
+                layer_surface.set_size(max(size.0, min_size.width), max(size.1, min_size.height));
 
                 main_surface.commit();
                 self.main_surface.layer_surface = Some(layer_surface);
             }
         }
 
-        let viewporter = self.protocols.viewporter.as_ref().expect("wp_viewporter missing");
+        let viewporter = self
+            .protocols
+            .viewporter
+            .as_ref()
+            .expect("wp_viewporter missing");
         let viewport = viewporter.get_viewport(&bg_surface, qh, ());
         self.bg_surface.viewport = Some(viewport);
 
         if let Some(background) = self.background {
-            let wp_single_pixel_buffer_manager = self.protocols.wp_single_pixel_buffer_manager.as_ref().expect("wp_single_pixel_buffer_manager_v1 missing");
-            let buffer = wp_single_pixel_buffer_manager.create_u32_rgba_buffer(
-                0,
-                0,
-                0,
-                background,
-                qh,
-                (),
-            );
+            let wp_single_pixel_buffer_manager = self
+                .protocols
+                .wp_single_pixel_buffer_manager
+                .as_ref()
+                .expect("wp_single_pixel_buffer_manager_v1 missing");
+            let buffer =
+                wp_single_pixel_buffer_manager.create_u32_rgba_buffer(0, 0, 0, background, qh, ());
             bg_surface.attach(Some(&buffer), 0, 0);
             bg_surface.damage_buffer(0, 0, 1, 1);
         }
@@ -259,8 +275,9 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                         Some(registry.bind::<wl_compositor::WlCompositor, _, _>(name, 5, qh, ()));
                 }
                 "wl_subcompositor" => {
-                    state.protocols.wl_subcompositor =
-                        Some(registry.bind::<wl_subcompositor::WlSubcompositor, _, _>(name, 1, qh, ()));
+                    state.protocols.wl_subcompositor = Some(
+                        registry.bind::<wl_subcompositor::WlSubcompositor, _, _>(name, 1, qh, ()),
+                    );
                 }
                 "wl_shm" => {
                     state.protocols.wl_shm =
@@ -282,8 +299,14 @@ impl Dispatch<wl_registry::WlRegistry, ()> for State {
                 }
                 "zwlr_layer_shell_v1" => {
                     if let OperationMode::LayerSurface(_) = state.mode {
-                        state.protocols.zwlr_layer_shell = Some(registry
-                            .bind::<zwlr_layer_shell_v1::ZwlrLayerShellV1, _, _>(name, 4, qh, ()));
+                        state.protocols.zwlr_layer_shell = Some(
+                            registry.bind::<zwlr_layer_shell_v1::ZwlrLayerShellV1, _, _>(
+                                name,
+                                4,
+                                qh,
+                                (),
+                            ),
+                        );
                     }
                 }
                 "wp_viewporter" => {
@@ -309,10 +332,8 @@ impl Dispatch<wl_callback::WlCallback, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         match event {
-            wl_callback::Event::Done { callback_data: _ } => {
-                state.ready = true
-            },
-            _ => {},
+            wl_callback::Event::Done { callback_data: _ } => state.ready = true,
+            _ => {}
         }
     }
 }
@@ -463,8 +484,16 @@ impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ()> for State {
                     state,
                 );
 
-                let surface = state.bg_surface.wl_surface.as_ref().expect("bg surface was not ready");
-                let viewport = state.bg_surface.viewport.as_ref().expect("bg viewport was not ready");
+                let surface = state
+                    .bg_surface
+                    .wl_surface
+                    .as_ref()
+                    .expect("bg surface was not ready");
+                let viewport = state
+                    .bg_surface
+                    .viewport
+                    .as_ref()
+                    .expect("bg viewport was not ready");
                 viewport.set_destination(dim.0, dim.1);
                 surface.commit();
             }
@@ -545,8 +574,16 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                 }
 
                 if !state.configured || state.dimensions != (width, height) {
-                    let surface = state.bg_surface.wl_surface.as_ref().expect("bg surface was not ready");
-                    let viewport = state.bg_surface.viewport.as_ref().expect("bg viewportw as not ready");
+                    let surface = state
+                        .bg_surface
+                        .wl_surface
+                        .as_ref()
+                        .expect("bg surface was not ready");
+                    let viewport = state
+                        .bg_surface
+                        .viewport
+                        .as_ref()
+                        .expect("bg viewportw as not ready");
                     viewport.set_destination(width, height);
                     surface.commit();
 

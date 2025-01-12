@@ -324,7 +324,11 @@ impl Widget {
                 sections_x,
                 sections_y,
             ))),
-            Widget::Launcher { font, font_size, launch_cmd } => v.push(Box::new(Interface::new(
+            Widget::Launcher {
+                font,
+                font_size,
+                launch_cmd,
+            } => v.push(Box::new(Interface::new(
                 events.clone(),
                 &mut fm,
                 leak_or_default(font, "sans"),

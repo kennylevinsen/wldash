@@ -13,9 +13,9 @@ Consider this alpha-quality: While it works, *everything* is subject to change w
 3. Put somewhere: `cp target/release/wldash /usr/local/bin/wldash`
 4. Run: `wldash`
 
-To see the default configuration, run `wldash print-config`. To configure, place a file in `$XDG_CONFIG_HOME/wldash/config.yaml` (or if `XDG_CONFIG_HOME` is not set, `~/.config/wldash/config.yaml`). JSON is also currently supported.
+To generate a new default configuration, run `wldash --write-default-config`. To configure, edit `$XDG_CONFIG_HOME/wldash/config.yml` (or if `XDG_CONFIG_HOME` is not set, `~/.config/wldash/config.yaml`).
 
-Notable settings: `outptuMode` can be `active` or `all`, `scale` can be set to `2` to half the buffer size, and the widgets (and their layout) can be configured.
+To regenerate the desktop file cache, run `wldash --desktop-refresh`.
 
 For more info, look in `src/config.rs`.
 
@@ -63,9 +63,6 @@ The launcher also accepts prefix operators to change its mode:
 ## Notable missing features:
 
 - Scaling of any kind - all sizes are currently hardcoded in pixels
-- Configurability
-- Cleanup and reorganization
-- Proper line editor for the launcher
 
 ## How to discuss
 

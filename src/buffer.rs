@@ -83,6 +83,7 @@ pub struct ShmBuffer {
     pub buffer: wl_buffer::WlBuffer,
     pub refcnt: u32,
     pub id: u32,
+    pub last_damage: Vec<Geometry>,
 }
 
 impl ShmBuffer {
@@ -111,6 +112,7 @@ impl ShmBuffer {
             mmap,
             buffer,
             id,
+            last_damage: Vec::new(),
         })
     }
 

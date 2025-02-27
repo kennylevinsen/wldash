@@ -220,11 +220,6 @@ fn main() {
         keyrepeat_sender,
     );
 
-    let mut damage = Vec::new();
-    for _ in 0..state.widgets.len() {
-        damage.push(Geometry::new());
-    }
-
     // Initial setup
     //
     while state.running && !state.ready {
@@ -249,7 +244,7 @@ fn main() {
             force = true;
         }
 
-        // We expect to see the usual shm optimization
+        let mut bufcnt = state.bufmgr.buffers.len();
         let buf = match state.bufmgr.next_buffer() {
             Some(b) => b,
             None => {
@@ -257,6 +252,8 @@ fn main() {
                     continue;
                 }
                 state.add_buffer(&qhandle);
+                bufcnt = state.bufmgr.buffers.len();
+
                 match state.bufmgr.next_buffer() {
                     Some(b) => b,
                     None => {
@@ -265,6 +262,12 @@ fn main() {
                 }
             }
         };
+
+        if buf.last_damage.len() == 0 {
+            for _ in 0..state.widgets.len() {
+                buf.last_damage.push(Geometry::new());
+            }
+        }
 
         state.dirty = false;
         buf.acquire();
@@ -279,17 +282,18 @@ fn main() {
                 if force || widget.get_dirty() {
                     let geo = widget.geometry();
                     let mut subview = bufview.subgeometry(geo);
-                    damage[idx] = widget.draw(&mut state.fonts.unwrap().borrow_mut(), &mut subview);
+                    buf.last_damage[idx] =
+                        widget.draw(&mut state.fonts.unwrap().borrow_mut(), &mut subview);
                 }
             }
             surface.damage_buffer(0, 0, 0x7FFFFFFF, 0x7FFFFFFF);
         } else {
             let mut drew = false;
             for (idx, widget) in state.widgets.iter_mut().enumerate() {
-                if widget.get_dirty() {
+                if bufcnt > 1 || widget.get_dirty() {
                     drew = true;
 
-                    let old_damage = damage[idx];
+                    let old_damage = buf.last_damage[idx];
                     bufview.subgeometry(old_damage).clear();
 
                     let geo = widget.geometry();
@@ -298,7 +302,7 @@ fn main() {
                     let new_damage =
                         widget.draw(&mut state.fonts.unwrap().borrow_mut(), &mut subview);
                     let combined_damage = new_damage.expand(old_damage);
-                    damage[idx] = new_damage;
+                    buf.last_damage[idx] = new_damage;
 
                     surface.damage_buffer(
                         combined_damage.x as i32,

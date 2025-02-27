@@ -1,21 +1,17 @@
-use crate::color::Color;
-use crate::widget::WaitContext;
-use crate::{
-    fonts::FontRef,
-    widgets::bar_widget::{BarWidget, BarWidgetImpl},
+use std::{
+    fs::{self, OpenOptions},
+    io::{Error, ErrorKind, Write},
+    path::{Path, PathBuf},
 };
 
-use std::fs;
-use std::fs::OpenOptions;
-use std::io::Write;
-use std::io::{Error, ErrorKind};
-use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
-pub struct Backlight {
-    device_path: PathBuf,
-    cur_brightness: u64,
-    max_brightness: u64,
-}
+use crate::{
+    color::Color,
+    event::PointerButton,
+    fonts::FontMap,
+    widgets::bar_widget::{BarWidget, BarWidgetImpl},
+};
 
 fn read_file_as_u64(path: &Path) -> Result<u64, Error> {
     let mut s = fs::read_to_string(path)?;
@@ -29,113 +25,81 @@ fn write_file_as_u64(path: &Path, value: u64) -> Result<(), Error> {
     file.write_fmt(format_args!("{}", value))
 }
 
+pub struct Backlight {
+    device_path: PathBuf,
+    cur: u64,
+    max: u64,
+    dirty: bool,
+}
+
 impl Backlight {
-    pub fn update(&mut self) -> Result<(), Error> {
-        self.cur_brightness = read_file_as_u64(self.device_path.join("brightness").as_path())?;
-        self.max_brightness = read_file_as_u64(self.device_path.join("max_brightness").as_path())?;
-        Ok(())
+    fn update(&mut self) {
+        self.cur = read_file_as_u64(self.device_path.join("brightness").as_path()).unwrap();
+        self.max = read_file_as_u64(self.device_path.join("max_brightness").as_path()).unwrap();
     }
 
-    pub fn sync(&mut self) -> Result<(), Error> {
-        write_file_as_u64(
-            self.device_path.join("brightness").as_path(),
-            self.cur_brightness,
-        )?;
-        self.update()?;
-        Ok(())
-    }
-
-    pub fn brightness(&self) -> f32 {
-        if self.cur_brightness > self.max_brightness {
-            // what.
-            return 1.0;
-        }
-
-        self.cur_brightness as f32 / self.max_brightness as f32
-    }
-
-    pub fn set(&mut self, val: f32) -> Result<(), Error> {
-        self.cur_brightness = (self.max_brightness as f32 * val) as u64;
-        Ok(())
-    }
-
-    pub fn add(&mut self, diff: f32) -> Result<(), Error> {
-        let inc = (self.max_brightness as f32 * diff) as i64;
-
-        self.cur_brightness = if self.cur_brightness as i64 + inc < 1 {
-            1
-        } else if self.cur_brightness as i64 + inc > self.max_brightness as i64 {
-            self.max_brightness
+    pub fn new(path: Option<&str>, fm: &mut FontMap, font: &'static str, size: f32) -> BarWidget {
+        let mut device_path = None;
+        if let Some(path) = path {
+            device_path = Some(Path::new("/sys/class/backlight").to_path_buf().join(path));
         } else {
-            (self.cur_brightness as i64 + inc) as u64
+            for entry in WalkDir::new("/sys/class/backlight") {
+                if let Ok(entry) = entry {
+                    device_path = Some(entry.path().to_path_buf());
+                }
+            }
+        }
+        let mut dev = Backlight {
+            device_path: device_path.expect("did not find backlight device"),
+            cur: 0,
+            max: 0,
+            dirty: true,
         };
 
-        Ok(())
+        dev.update();
+        BarWidget::new(Box::new(dev), fm, font, size)
     }
 
-    pub fn new<'a>(
-        path: &str,
-        font: FontRef<'a>,
-        font_size: f32,
-        length: u32,
-    ) -> Result<Box<BarWidget<'a>>, Error> {
-        let mut dev = Backlight {
-            device_path: Path::new("/sys/class/backlight").to_path_buf().join(path),
-            cur_brightness: 0,
-            max_brightness: 0,
-        };
+    pub fn detect() -> bool {
+        for entry in WalkDir::new("/sys/class/backlight") {
+            if entry.is_ok() {
+                return true;
+            }
+        }
+        return false;
+    }
 
-        dev.update()?;
-
-        Ok(BarWidget::new_simple(
-            font,
-            font_size,
-            length,
-            Box::new(dev),
-        ))
+    pub fn set(&mut self, brightness: f32) {
+        let val = (self.max as f32 * brightness) as u64;
+        let _ = write_file_as_u64(self.device_path.join("brightness").as_path(), val);
+        self.cur = read_file_as_u64(self.device_path.join("brightness").as_path()).unwrap();
     }
 }
 
 impl BarWidgetImpl for Backlight {
-    fn wait(&mut self, _: &mut WaitContext) {}
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "backlight"
     }
-    fn value(&self) -> f32 {
-        self.brightness()
+    fn get_dirty(&self) -> bool {
+        self.dirty
+    }
+    fn value(&mut self) -> f32 {
+        if self.cur > self.max {
+            // what.
+            return 1.0;
+        }
+
+        self.dirty = false;
+        self.cur as f32 / self.max as f32
     }
     fn color(&self) -> Color {
-        Color::new(1.0, 1.0, 1.0, 1.0)
+        Color::WHITE
     }
-    fn inc(&mut self, inc: f32) {
-        self.add(inc).unwrap();
-        match self.sync() {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("Error while trying to change brightness: {}", err);
-            }
-        }
-    }
-    fn set(&mut self, val: f32) {
-        self.set(val).unwrap();
-        match self.sync() {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("Error while trying to change brightness: {}", err);
-            }
-        }
-    }
-    fn toggle(&mut self) {
-        self.cur_brightness = if self.cur_brightness == 1 {
-            self.max_brightness
-        } else {
-            1
+    fn click(&mut self, pos: f32, btn: PointerButton) {
+        self.dirty = true;
+        match btn {
+            PointerButton::Left => self.set(pos),
+            _ => (),
         };
-        match self.sync() {
-            Ok(val) => val,
-            Err(err) => {
-                eprintln!("Error while trying to change brightness: {}", err);
-            }
-        }
     }
 }

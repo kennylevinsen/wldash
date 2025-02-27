@@ -1,232 +1,40 @@
-use crate::buffer::Buffer;
-use crate::cmd::Cmd;
-use crate::color::Color;
-use crate::desktop::{load_desktop_files, Desktop};
-use crate::draw::Font;
-use crate::{
-    fonts::FontRef,
-    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+use std::{
+    cmp::{max, min, Ordering},
+    collections::HashMap,
+    default::Default,
+    fs::{read_to_string, File},
+    io::Write,
+    process::{exit, Command},
+    sync::{Arc, Mutex},
+    thread,
 };
 
-use std::cell::RefCell;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::process::Command;
-use std::sync::mpsc::Sender;
+use crate::{
+    buffer::BufferView,
+    color::Color,
+    event::{Event, Events, PointerButton, PointerEvent},
+    fonts::FontMap,
+    keyboard::{keysyms, KeyEvent},
+    utils::{
+        desktop::{load_desktop_cache, load_desktop_files, write_desktop_cache, Desktop},
+        xdg,
+    },
+    widgets::{Geometry, Widget},
+};
 
-use crate::data::Data;
-use crate::keyboard::keysyms;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use unicode_segmentation::UnicodeSegmentation;
-
-pub struct Launcher<'a> {
-    cursor: usize,
-    options: Vec<Desktop>,
-    term_opener: String,
-    app_opener: String,
-    url_opener: String,
-    matches: Vec<Desktop>,
-    input: String,
-    result: Option<String>,
-    offset: usize,
-    font: RefCell<Font<'a>>,
-    font_size: u32,
-    length: u32,
-    dirty: bool,
-    tx: Sender<Cmd>,
-    counter: Data,
-}
-
-impl<'a> Launcher<'a> {
-    pub fn new(
-        font: FontRef,
-        font_size: f32,
-        length: u32,
-        listener: Sender<Cmd>,
-        app: String,
-        term: String,
-        url: String,
-    ) -> Box<Launcher> {
-        Box::new(Launcher {
-            cursor: 0,
-            options: load_desktop_files(),
-            term_opener: term,
-            app_opener: app,
-            url_opener: url,
-            matches: vec![],
-            input: "".to_string(),
-            result: None,
-            offset: 0,
-            font: RefCell::new(Font::new(font, font_size)),
-            font_size: font_size as u32,
-            length,
-            dirty: true,
-            tx: listener,
-            counter: Data::load().unwrap_or_default(),
-        })
-    }
-
-    fn draw_launcher(
-        &self,
-        buf: &mut Buffer,
-        bg: &Color,
-        width: u32,
-    ) -> Result<(), ::std::io::Error> {
-        let mut x_off = if !self.input.is_empty() {
-            let c = if self.matches.is_empty() {
-                Color::new(1.0, 0.5, 0.5, 1.0)
-            } else {
-                Color::new(1.0, 1.0, 1.0, 1.0)
-            };
-
-            let dim = self.font.borrow_mut().auto_draw_text_with_cursor(
-                buf,
-                bg,
-                &c,
-                &self.input,
-                self.cursor,
-            )?;
-
-            dim.0 + self.font_size / 4
-        } else {
-            0
-        };
-
-        let mut width_remaining: i32 = (width - x_off) as i32;
-        let fuzzy_matcher = SkimMatcherV2::default();
-        for (idx, m) in self.matches.iter().enumerate() {
-            let mut b = match buf.offset((x_off, 0)) {
-                Ok(b) => b,
-                Err(_) => break,
-            };
-            let size = if idx == self.offset {
-                let (_, indices) = fuzzy_matcher
-                    .fuzzy_indices(&m.name.to_lowercase(), &self.input.to_lowercase())
-                    .unwrap_or((0, vec![]));
-
-                let mut colors = Vec::with_capacity(m.name.len());
-                for pos in 0..m.name.len() {
-                    if indices.contains(&pos) {
-                        colors.push(Color::new(1.0, 1.0, 1.0, 1.0));
-                    } else {
-                        colors.push(Color::new(0.75, 0.75, 0.75, 1.0));
-                    }
-                }
-                self.font
-                    .borrow_mut()
-                    .auto_draw_text_individual_colors(&mut b, bg, &colors, &m.name)?
-            } else {
-                self.font.borrow_mut().auto_draw_text(
-                    &mut b,
-                    bg,
-                    &Color::new(0.5, 0.5, 0.5, 1.0),
-                    &m.name,
-                )?
-            };
-
-            x_off += size.0 + self.font_size / 2;
-            width_remaining -= (size.0 + self.font_size / 2) as i32;
-
-            if width_remaining < 0 {
-                break;
-            }
-        }
-
-        Ok(())
-    }
-
-    fn draw_calc(&self, buf: &mut Buffer, bg: &Color) -> Result<(), ::std::io::Error> {
-        let x_off = self
-            .font
-            .borrow_mut()
-            .auto_draw_text(buf, bg, &Color::new(1.0, 1.0, 0.0, 1.0), "=")?
-            .0
-            + self.font_size / 4;
-
-        let x_off = if !self.input.is_empty() {
-            let dim = self.font.borrow_mut().auto_draw_text_with_cursor(
-                &mut buf.offset((x_off, 0))?,
-                bg,
-                &Color::new(1.0, 1.0, 1.0, 1.0),
-                &self.input[1..],
-                self.cursor - 1,
-            )?;
-
-            x_off + dim.0 + self.font_size / 4
-        } else {
-            0
-        };
-
-        if let Some(result) = &self.result {
-            self.font.borrow_mut().auto_draw_text(
-                &mut buf.offset((x_off, 0))?,
-                bg,
-                &Color::new(0.75, 0.75, 0.75, 1.0),
-                &format!(" = {:}", result),
-            )?;
-        }
-
-        Ok(())
-    }
-
-    fn draw_shell(&self, buf: &mut Buffer, bg: &Color) -> Result<(), ::std::io::Error> {
-        let x_off = self
-            .font
-            .borrow_mut()
-            .auto_draw_text(
-                &mut buf.offset((0, 0))?,
-                bg,
-                &Color::new(1.0, 1.0, 0.0, 1.0),
-                "!",
-            )?
-            .0
-            + self.font_size / 4;
-
-        if !self.input.is_empty() {
-            self.font.borrow_mut().auto_draw_text_with_cursor(
-                &mut buf.offset((x_off, 0))?,
-                bg,
-                &Color::new(1.0, 1.0, 1.0, 1.0),
-                &self.input[1..],
-                self.cursor - 1,
-            )?;
-        };
-
-        Ok(())
-    }
-}
-
-fn calc(s: &str) -> Result<String, String> {
-    rcalc_lib::parse::eval(s, &mut rcalc_lib::parse::CalcState::new())
-        .map(|x| format!("{}", x))
-        .map_err(|x| format!("{}", x))
-}
-
-fn wlcopy(s: &str) -> Result<(), String> {
-    let mut child = std::process::Command::new("wl-copy")
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .arg(s)
-        .spawn()
-        .map_err(|_| "wl-copy not available".to_string())?;
-    child
-        .wait()
-        .map_err(|_| "unable to run wl-copy".to_string())?;
-    Ok(())
-}
+use wayland_client::{protocol::wl_keyboard, WEnum};
 
 struct Matcher {
     matches: HashMap<Desktop, i64>,
-    counter: Data,
 }
 
 impl Matcher {
-    fn new(counter: Data) -> Self {
+    fn new() -> Self {
         Self {
             matches: HashMap::new(),
-            counter,
         }
     }
 
@@ -254,16 +62,9 @@ impl Matcher {
             .collect::<Vec<(i64, Desktop)>>();
 
         m.sort_by(|(ma1, d1), (ma2, d2)| {
-            let count1 = self.counter.entries.get(&d1.name).unwrap_or(&0);
-            let count2 = self.counter.entries.get(&d2.name).unwrap_or(&0);
-
-            if ma1 + count1 > ma2 + count2 {
+            if ma1 > ma2 {
                 Ordering::Less
-            } else if ma1 + count1 < ma2 + count2 {
-                Ordering::Greater
-            } else if d1.name.len() < d2.name.len() {
-                Ordering::Less
-            } else if d1.name.len() > d2.name.len() {
+            } else if ma1 < ma2 {
                 Ordering::Greater
             } else {
                 d1.cmp(d2)
@@ -274,236 +75,709 @@ impl Matcher {
     }
 }
 
-impl<'a> Widget for Launcher<'a> {
-    fn wait(&mut self, _: &mut WaitContext) {}
-    fn enter(&mut self) {}
-    fn leave(&mut self) {
-        self.input = "".to_string();
-        self.cursor = 0;
-        self.offset = 0;
-        self.result = None;
-        self.dirty = true;
+enum PromptMode {
+    Normal,
+    Shell,
+    Calc,
+}
+
+struct Prompt {
+    input: String,
+    mode: PromptMode,
+    cursor: usize,
+}
+
+impl Prompt {
+    fn new() -> Prompt {
+        Prompt {
+            input: String::new(),
+            mode: PromptMode::Normal,
+            cursor: 0,
+        }
     }
 
-    fn size(&self) -> (u32, u32) {
-        (self.length, self.font_size)
+    fn move_cursor(&mut self, distance: isize) {
+        let new_cursor = self.cursor as isize + distance;
+        if new_cursor < 0 {
+            self.cursor = 0;
+            return;
+        } else if new_cursor > self.input.len() as isize {
+            self.cursor = self.input.len()
+        } else {
+            self.cursor = new_cursor as usize;
+        }
+    }
+
+    fn set(&mut self, v: &str) {
+        self.input = v.to_string();
+        self.cursor = self.input.len();
+    }
+
+    fn append(&mut self, v: &str) {
+        if self.input.len() == 0 {
+            match v {
+                "!" => {
+                    self.mode = PromptMode::Shell;
+                    return;
+                }
+                "=" => {
+                    self.mode = PromptMode::Calc;
+                    return;
+                }
+                _ => (),
+            }
+        }
+        let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if self.cursor == indices.len() {
+            self.input += &v;
+        } else {
+            let index_at = indices[self.cursor].0;
+            self.input.insert_str(index_at, &v);
+        }
+        self.cursor += 1;
+    }
+
+    fn backspace(&mut self) {
+        let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if indices.is_empty() {
+            self.mode = PromptMode::Normal;
+            return;
+        }
+        if self.cursor == 0 {
+            return;
+        }
+        self.cursor -= 1;
+        indices.remove(self.cursor);
+        self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
+    }
+
+    fn delete(&mut self) {
+        let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if indices.is_empty() {
+            self.mode = PromptMode::Normal;
+            return;
+        }
+        if self.cursor >= indices.len() {
+            return;
+        }
+
+        indices.remove(self.cursor);
+        self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
+    }
+
+    fn clear_right(&mut self) {
+        let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if !indices.is_empty() {
+            self.input = indices[0..self.cursor]
+                .iter()
+                .fold("".into(), |acc, el| acc + el.1);
+        } else {
+            self.mode = PromptMode::Normal;
+        }
+    }
+
+    fn clear_left(&mut self) {
+        let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
+        if !indices.is_empty() {
+            self.input = indices[self.cursor..indices.len()]
+                .iter()
+                .fold("".into(), |acc, el| acc + el.1);
+            self.cursor = 0;
+        } else {
+            self.mode = PromptMode::Normal;
+        }
+    }
+
+    fn home(&mut self) {
+        self.cursor = 0;
+    }
+
+    fn end(&mut self) {
+        self.cursor = self.input.len();
+    }
+}
+
+trait InterfaceWidget {
+    fn trigger(&mut self, intf: &mut InnerInterface);
+    fn draw(
+        &mut self,
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry;
+    fn update(&mut self, intf: &InnerInterface);
+}
+
+struct Launcher {
+    next_token: Option<String>,
+    options: Arc<Mutex<Vec<Desktop>>>,
+    matches: Vec<Desktop>,
+    launch_cmd: Option<String>,
+}
+
+impl Launcher {
+    fn new(events: Arc<Mutex<Events>>, launch_cmd: Option<String>) -> Launcher {
+        let options = Arc::new(Mutex::new(Vec::new()));
+        {
+            let options = Arc::clone(&options);
+            thread::Builder::new()
+                .name("desktopini".to_string())
+                .spawn(move || {
+                    let mut options = options.lock().unwrap();
+                    *options = match load_desktop_cache() {
+                        Ok(v) => v,
+                        Err(_) => {
+                            let v = load_desktop_files();
+                            write_desktop_cache(&v).unwrap();
+                            v
+                        }
+                    };
+                    drop(options);
+                    let mut events = events.lock().unwrap();
+                    events.add_event(Event::LauncherUpdate);
+                })
+                .unwrap();
+        }
+
+        Launcher {
+            next_token: None,
+            options: options,
+            matches: Vec::new(),
+            launch_cmd,
+        }
+    }
+
+    fn exec(&self, cmdline: &str) {
+        let mut cmd = Command::new("/bin/sh");
+        if let Some(token) = &self.next_token {
+            cmd.env("XDG_ACTIVATION_TOKEN", token);
+        }
+        cmd.arg("-c");
+        if let Some(l) = &self.launch_cmd {
+            cmd.arg(format!("{} {}", l, cmdline));
+        } else {
+            cmd.arg(cmdline);
+        }
+        cmd.spawn().unwrap();
+        exit(0);
+    }
+}
+
+impl InterfaceWidget for Launcher {
+    fn trigger(&mut self, intf: &mut InnerInterface) {
+        if self.matches.len() > intf.selection {
+            let d = &self.matches[intf.selection];
+            if let Some(exec) = &d.exec {
+                let exec = exec
+                    .replace("%f", "")
+                    .replace("%F", "")
+                    .replace("%u", "")
+                    .replace("%U", "");
+
+                self.exec(&exec);
+            }
+        }
+    }
+
+    fn update(&mut self, intf: &InnerInterface) {
+        let mut matcher = Matcher::new();
+        let options = self.options.lock().unwrap();
+        for desktop in options.iter() {
+            matcher.try_match(
+                desktop.clone(),
+                &desktop.name.to_lowercase(),
+                &intf.prompt.input.to_lowercase(),
+                1.0,
+            );
+            for keyword in desktop.keywords.iter() {
+                matcher.try_match(
+                    desktop.clone(),
+                    &keyword.to_lowercase(),
+                    &intf.prompt.input.to_lowercase(),
+                    0.5,
+                );
+            }
+        }
+
+        self.matches = matcher.matches();
     }
 
     fn draw(
         &mut self,
-        ctx: &mut DrawContext,
-        pos: (u32, u32),
-        expansion: (u32, u32),
-    ) -> Result<DrawReport, ::std::io::Error> {
-        if self.length == 0 {
-            self.length = expansion.0;
-        }
-        let (width, height) = (self.length, self.font_size);
-        if !self.dirty && !ctx.force {
-            return Ok(DrawReport::empty(width, height));
-        }
-        self.dirty = false;
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry {
+        let fg = Color::WHITE;
 
-        match self.input.chars().next() {
-            Some('=') => {
-                if self.input.len() > 1 {
-                    match calc(&self.input.chars().skip(1).collect::<String>()) {
-                        Ok(v) => self.result = Some(v),
-                        Err(_) => self.result = None,
+        let line_height = intf.size.ceil() as u32;
+
+        // Draw line
+        let mut prompt_offset = intf.geometry.height - line_height;
+        let mut prompt_line = view.offset((0, prompt_offset));
+
+        let font = fonts.get_font(intf.font, intf.size);
+        let mut x_max = font
+            .auto_draw_text_with_cursor(
+                &mut prompt_line,
+                fg,
+                &format!("   {}", &intf.prompt.input),
+                intf.prompt.cursor + 3,
+            )
+            .unwrap();
+
+        font.auto_draw_text(&mut prompt_line, fg, ">").unwrap();
+
+        // Draw entries
+        let dimfg = Color::GREY50;
+        prompt_offset -= 8;
+
+        for (idx, m) in self.matches.iter().enumerate() {
+            if prompt_offset < line_height {
+                break;
+            }
+            prompt_offset -= line_height;
+            let mut line = view.offset((0, prompt_offset));
+
+            if idx == intf.selection {
+                let fuzzy_matcher = SkimMatcherV2::default();
+                let (_, indices) = fuzzy_matcher
+                    .fuzzy_indices(&m.name.to_lowercase(), &intf.prompt.input.to_lowercase())
+                    .unwrap_or((0, vec![]));
+
+                let mut colors = Vec::with_capacity(m.name.len());
+                for pos in 0..m.name.len() {
+                    if indices.contains(&pos) {
+                        colors.push(Color::LIGHTORANGE);
+                    } else {
+                        colors.push(Color::GREY75);
                     }
                 }
+                x_max = max(
+                    x_max,
+                    font.auto_draw_text_individual_colors(&mut line, &colors, &m.name)
+                        .unwrap(),
+                );
+            } else {
+                x_max = max(
+                    x_max,
+                    font.auto_draw_text(&mut line, dimfg, &m.name).unwrap(),
+                );
             }
-            Some('!') => (),
-            _ => {
-                let mut matcher = Matcher::new(self.counter.clone());
+        }
 
-                for desktop in self.options.iter() {
-                    matcher.try_match(
-                        desktop.clone(),
-                        &desktop.name.to_lowercase(),
-                        &self.input.to_lowercase(),
-                        1.0,
-                    );
-                    for keyword in desktop.keywords.iter() {
-                        matcher.try_match(
-                            desktop.clone(),
-                            &keyword.to_lowercase(),
-                            &self.input.to_lowercase(),
-                            0.5,
-                        );
-                    }
+        let content_height = min(
+            intf.geometry.height,
+            (self.matches.len() + 1) as u32 * line_height + 8,
+        );
+        let content_width = min(intf.geometry.width, x_max.0 + 1);
+        Geometry {
+            x: intf.geometry.x,
+            y: intf.geometry.y + intf.geometry.height - content_height,
+            width: content_width,
+            height: content_height,
+        }
+    }
+}
+
+struct Shell {
+    next_token: Option<String>,
+}
+
+impl Shell {
+    fn new() -> Shell {
+        Shell { next_token: None }
+    }
+
+    fn exec(&self, args: Vec<String>) {
+        let mut cmd = Command::new(args[0].clone());
+        if let Some(token) = &self.next_token {
+            cmd.env("XDG_ACTIVATION_TOKEN", token);
+        }
+        cmd.args(&args[1..]).spawn().unwrap();
+        exit(0);
+    }
+}
+
+impl InterfaceWidget for Shell {
+    fn trigger(&mut self, intf: &mut InnerInterface) {
+        let args = vec![
+            "/bin/sh".to_string(),
+            "-c".to_string(),
+            intf.prompt.input.clone(),
+        ];
+        self.exec(args);
+    }
+
+    fn update(&mut self, _intf: &InnerInterface) {}
+
+    fn draw(
+        &mut self,
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry {
+        let fg = Color::WHITE;
+
+        let line_height = intf.size.ceil() as u32;
+
+        // Draw line
+        let prompt_offset = intf.geometry.height - line_height;
+        let mut prompt_line = view.offset((0, prompt_offset));
+
+        // Draw prompt
+        let font = fonts.get_font(intf.font, intf.size);
+        let x_max = font
+            .auto_draw_text_with_cursor(
+                &mut prompt_line,
+                fg,
+                &format!("   {}", &intf.prompt.input),
+                intf.prompt.cursor + 3,
+            )
+            .unwrap();
+        font.auto_draw_text(&mut prompt_line, Color::BUFF, "!")
+            .unwrap();
+
+        Geometry {
+            x: intf.geometry.x,
+            y: intf.geometry.y + intf.geometry.height - line_height,
+            width: x_max.0 + 1,
+            height: line_height,
+        }
+    }
+}
+
+struct Calc {
+    old: Arc<Mutex<Vec<(String, String)>>>,
+    result: Option<String>,
+}
+
+impl Calc {
+    fn new() -> Calc {
+        let old: Arc<Mutex<Vec<(String, String)>>> = Arc::new(Mutex::new(Vec::new()));
+        let old_local = old.clone();
+        thread::Builder::new()
+            .name("calc".to_string())
+            .spawn(move || {
+                let s = match read_to_string(format!("{}/wldash/calc", xdg::cache_folder())) {
+                    Ok(s) => s,
+                    _ => return,
+                };
+
+                let mut old = old_local.lock().unwrap();
+                for line in s.lines() {
+                    let pos = match line.find("=") {
+                        Some(v) => v,
+                        _ => continue,
+                    };
+                    let (input, res) = line.split_at(pos);
+                    let (input, res) = (input.trim(), res[1..].trim());
+                    old.push((input.to_string(), res.to_string()));
                 }
+            })
+            .unwrap();
 
-                self.matches = matcher.matches();
-            }
+        Calc { old, result: None }
+    }
+
+    fn sync(&self) {
+        let mut f = match File::create(format!("{}/wldash/calc", xdg::cache_folder())) {
+            Ok(f) => f,
+            _ => return,
         };
 
-        let buf = &mut ctx.buf.subdimensions((pos.0, pos.1, width, height))?;
-        buf.memset(ctx.bg);
+        let old = self.old.lock().unwrap();
+        for (input, res) in old.iter() {
+            write!(f, "{}={}\n", input, res).unwrap();
+        }
+        f.sync_data().unwrap();
+    }
+}
 
-        match self.input.chars().next() {
-            Some('=') => self.draw_calc(buf, ctx.bg),
-            Some('!') => self.draw_shell(buf, ctx.bg),
-            _ => self.draw_launcher(buf, ctx.bg, width),
-        }?;
-
-        Ok(DrawReport {
-            width,
-            height,
-            damage: vec![buf.get_signed_bounds()],
-            full_damage: false,
-        })
+impl InterfaceWidget for Calc {
+    fn trigger(&mut self, intf: &mut InnerInterface) {
+        let mut old = self.old.lock().unwrap();
+        if intf.selection == 0 {
+            if let Some(res) = &self.result {
+                old.push((intf.prompt.input.to_string(), res.to_string()));
+                while old.len() > 32 {
+                    old.remove(0);
+                }
+                drop(old);
+                self.sync();
+            }
+        } else if old.len() >= intf.selection {
+            let (input, res) = &old[old.len() - intf.selection];
+            self.result = Some(res.to_string());
+            intf.prompt.set(input);
+            intf.selection = 0;
+        }
     }
 
-    fn keyboard_input(
+    fn update(&mut self, intf: &InnerInterface) {
+        let res =
+            rcalc_lib::parse::eval(&intf.prompt.input, &mut rcalc_lib::parse::CalcState::new())
+                .map(|x| format!("{}", x))
+                .map_err(|x| format!("{}", x));
+        self.result = match res {
+            Ok(v) => Some(v),
+            Err(_) => None,
+        };
+    }
+
+    fn draw(
         &mut self,
-        key: u32,
-        modifiers: ModifiersState,
-        _: KeyState,
-        interpreted: Option<String>,
-    ) {
-        match key {
-            keysyms::XKB_KEY_u if modifiers.ctrl => self.leave(),
-            keysyms::XKB_KEY_a if modifiers.ctrl => {
-                self.cursor = 0;
-                self.dirty = true;
-            }
-            keysyms::XKB_KEY_e if modifiers.ctrl => {
-                self.cursor = self.input.len();
-                self.dirty = true;
-            }
-            keysyms::XKB_KEY_Home => {
-                self.cursor = 0;
-                self.dirty = true;
-            }
-            keysyms::XKB_KEY_End => {
-                self.cursor = self.input.len();
-                self.dirty = true;
-            }
-            keysyms::XKB_KEY_BackSpace => {
-                let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
-                if !indices.is_empty() && self.cursor > 0 {
-                    self.cursor -= 1;
-                    indices.remove(self.cursor);
-                    self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
-                    self.offset = 0;
-                    self.result = None;
-                    self.dirty = true
-                }
-            }
-            keysyms::XKB_KEY_Delete => {
-                let mut indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
-                if !indices.is_empty() && self.cursor < indices.len() {
-                    indices.remove(self.cursor);
-                    self.input = indices.iter().fold("".into(), |acc, el| acc + el.1);
-                    self.dirty = true;
-                }
-            }
-            keysyms::XKB_KEY_Return => {
-                match self.input.chars().next() {
-                    Some('=') => {
-                        if let Some(ref v) = self.result {
-                            let _ = wlcopy(&v);
-                        }
-                    }
-                    Some('!') => {
-                        self.cursor = 0;
-                        let _ = Command::new("sh")
-                            .arg("-c")
-                            .arg(self.input.chars().skip(1).collect::<String>())
-                            .spawn();
-                        self.tx.send(Cmd::Exit).unwrap();
-                    }
-                    _ => {
-                        if self.matches.len() > self.offset {
-                            let d = &self.matches[self.offset];
-                            if let Some(exec) = &d.exec {
-                                let exec = exec
-                                    .replace("%f", "")
-                                    .replace("%F", "")
-                                    .replace("%u", "")
-                                    .replace("%U", "");
-                                let prefix = if d.term {
-                                    &self.term_opener
-                                } else {
-                                    &self.app_opener
-                                };
+        intf: &InnerInterface,
+        fonts: &mut FontMap,
+        view: &mut BufferView,
+    ) -> Geometry {
+        let old = self.old.lock().unwrap();
+        let fg = Color::WHITE;
 
-                                let mut lexed = shlex::split(&exec).unwrap();
-                                let lexed = if !prefix.is_empty() {
-                                    let mut prefix = shlex::split(prefix).unwrap();
-                                    prefix.append(&mut lexed);
-                                    prefix
-                                } else {
-                                    lexed
-                                };
+        let line_height = intf.size.ceil() as u32;
 
-                                *self.counter.entries.entry(d.name.clone()).or_insert(0) += 1;
-                                self.counter.save().expect("Unable to save data");
+        // Draw line
+        let mut prompt_offset = intf.geometry.height - (line_height);
+        let mut prompt_line = view.offset((0, prompt_offset));
 
-                                if !lexed.is_empty() {
-                                    let _ =
-                                        Command::new(lexed[0].clone()).args(&lexed[1..]).spawn();
-                                    self.tx.send(Cmd::Exit).unwrap();
-                                }
-                            }
-                            if let Some(url) = &d.url {
-                                if !self.url_opener.is_empty() {
-                                    let mut lexed = shlex::split(&self.url_opener).unwrap();
-                                    lexed.push(url.to_string());
-                                    if !lexed.is_empty() {
-                                        let _ = Command::new(lexed[0].clone())
-                                            .args(&lexed[1..])
-                                            .spawn();
-                                        self.tx.send(Cmd::Exit).unwrap();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                };
+        // Draw prompt
+        let font = fonts.get_font(intf.font, intf.size);
+        font.auto_draw_text_with_cursor(
+            &mut prompt_line,
+            fg,
+            &format!("   {} ", &intf.prompt.input),
+            intf.prompt.cursor + 3,
+        )
+        .unwrap();
+
+        font.auto_draw_text(&mut prompt_line, Color::BUFF, "=")
+            .unwrap();
+
+        prompt_offset -= 8;
+        prompt_offset -= line_height;
+        if let Some(res) = &self.result {
+            let c = if intf.selection == 0 {
+                Color::LIGHTORANGE
+            } else {
+                Color::GREY50
+            };
+            let mut result_line = view.offset((0, prompt_offset));
+            font.auto_draw_text(&mut result_line, c, res).unwrap();
+        }
+
+        for (idx, (input, res)) in old.iter().rev().enumerate() {
+            if prompt_offset < line_height {
+                break;
             }
-            keysyms::XKB_KEY_Tab => {
-                if !self.matches.is_empty() && self.offset < self.matches.len() - 1 {
-                    self.offset += 1;
-                    self.dirty = true;
+            let c = if idx + 1 == intf.selection {
+                Color::GREY75
+            } else {
+                Color::GREY50
+            };
+            prompt_offset -= line_height;
+            let mut result_line = view.offset((0, prompt_offset));
+            font.auto_draw_text(&mut result_line, c, &format!("{} = {}", input, res))
+                .unwrap();
+        }
+
+        let content_height = min(
+            intf.geometry.height,
+            (old.len() + 2) as u32 * line_height + 8,
+        );
+        Geometry {
+            x: intf.geometry.x,
+            y: intf.geometry.y + intf.geometry.height - content_height,
+            width: intf.geometry.width,
+            height: content_height,
+        }
+    }
+}
+
+struct InnerInterface {
+    font: &'static str,
+    size: f32,
+    dirty: bool,
+    geometry: Geometry,
+    selection: usize,
+    prompt: Prompt,
+}
+
+pub struct Interface {
+    launcher: Launcher,
+    shell: Shell,
+    calc: Calc,
+    inner: InnerInterface,
+}
+
+impl Interface {
+    pub fn new(
+        events: Arc<Mutex<Events>>,
+        fm: &mut FontMap,
+        font: &'static str,
+        size: f32,
+        launch_cmd: Option<String>,
+    ) -> Interface {
+        fm.queue_font(
+            font,
+            size,
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 >=!,.-/()",
+        );
+
+        Interface {
+            launcher: Launcher::new(events, launch_cmd),
+            shell: Shell::new(),
+            calc: Calc::new(),
+            inner: InnerInterface {
+                font,
+                size,
+                dirty: false,
+                geometry: Default::default(),
+                selection: 0,
+                prompt: Prompt::new(),
+            },
+        }
+    }
+
+    fn pointer_input(&mut self, event: &PointerEvent) {
+        if let PointerButton::Left = event.button {
+            let line_height = self.inner.size.ceil() as u32;
+            let height = self.inner.geometry.height - line_height - 8;
+            let lines = height / line_height;
+
+            let offset = height % line_height;
+            let pos = if event.pos.1 >= offset {
+                event.pos.1 - offset
+            } else {
+                return;
+            };
+            self.inner.selection = (lines - pos / line_height - 1) as usize;
+            self.inner.dirty = true;
+        }
+    }
+
+    fn exit(&mut self) {
+        if self.inner.prompt.input.len() == 0 {
+            std::process::exit(0);
+        }
+
+        if let Ok(mut f) = File::create(format!("{}/wldash/prompt", xdg::cache_folder())) {
+            write!(f, "{}", self.inner.prompt.input).unwrap();
+            f.sync_data().unwrap();
+        }
+        std::process::exit(0);
+    }
+
+    fn keyboard_input(&mut self, event: &KeyEvent) {
+        if event.state != WEnum::Value(wl_keyboard::KeyState::Pressed) {
+            return;
+        }
+        self.inner.dirty = true;
+        let widget = match self.inner.prompt.mode {
+            PromptMode::Shell => &mut self.shell as &mut dyn InterfaceWidget,
+            PromptMode::Normal => &mut self.launcher as &mut dyn InterfaceWidget,
+            PromptMode::Calc => &mut self.calc as &mut dyn InterfaceWidget,
+        };
+        match event.keysym {
+            keysyms::KEY_a if event.modifiers.ctrl => self.inner.prompt.home(),
+            keysyms::KEY_e if event.modifiers.ctrl => self.inner.prompt.end(),
+            keysyms::KEY_u if event.modifiers.ctrl => {
+                self.inner.prompt.clear_left();
+                self.inner.selection = 0;
+                widget.update(&self.inner);
+            }
+            keysyms::KEY_k if event.modifiers.ctrl => {
+                self.inner.prompt.clear_right();
+                self.inner.selection = 0;
+                widget.update(&self.inner);
+            }
+            keysyms::KEY_r if event.modifiers.ctrl => {
+                if let Ok(s) = read_to_string(format!("{}/wldash/prompt", xdg::cache_folder())) {
+                    self.inner.prompt.set(&s);
                 }
             }
-            keysyms::XKB_KEY_ISO_Left_Tab => {
-                if !self.matches.is_empty() && self.offset > 0 {
-                    self.offset -= 1;
-                    self.dirty = true;
-                }
+            keysyms::KEY_Home => self.inner.prompt.home(),
+            keysyms::KEY_End => self.inner.prompt.end(),
+            keysyms::KEY_BackSpace => {
+                self.inner.prompt.backspace();
+                self.inner.selection = 0;
+                widget.update(&self.inner);
             }
-            keysyms::XKB_KEY_Left => {
-                if self.cursor > 0 {
-                    self.cursor -= 1;
-                    self.dirty = true;
-                }
+            keysyms::KEY_Delete => {
+                self.inner.prompt.delete();
+                self.inner.selection = 0;
+                widget.update(&self.inner);
             }
-            keysyms::XKB_KEY_Right => {
-                if self.cursor < self.input.len() {
-                    self.cursor += 1;
-                    self.dirty = true;
+            keysyms::KEY_Escape => self.exit(),
+            keysyms::KEY_Return => widget.trigger(&mut self.inner),
+            keysyms::KEY_Left => self.inner.prompt.move_cursor(-1),
+            keysyms::KEY_Right => self.inner.prompt.move_cursor(1),
+            keysyms::KEY_Up => {
+                self.inner.selection += 1;
+            }
+            keysyms::KEY_Down => {
+                if self.inner.selection > 0 {
+                    self.inner.selection -= 1;
                 }
             }
             _ => {
-                if let Some(v) = interpreted {
-                    let indices: Vec<(usize, &str)> = self.input.grapheme_indices(true).collect();
-                    if self.cursor == indices.len() {
-                        self.input += &v;
-                    } else {
-                        let index_at = indices[self.cursor].0;
-                        self.input.insert_str(index_at, &v);
-                    }
-                    self.cursor += 1;
-                    self.offset = 0;
-                    self.result = None;
-                    self.dirty = true;
+                if let Some(utf8) = &event.utf8 {
+                    self.inner.prompt.append(&utf8);
+                    self.inner.selection = 0;
+                    widget.update(&self.inner);
+                } else {
+                    self.inner.dirty = false;
                 }
             }
         }
     }
-    fn mouse_click(&mut self, _: u32, _: (u32, u32)) {}
-    fn mouse_scroll(&mut self, _: (f64, f64), _: (u32, u32)) {}
+}
+
+impl Widget for Interface {
+    fn get_dirty(&self) -> bool {
+        self.inner.dirty
+    }
+
+    fn geometry(&self) -> Geometry {
+        self.inner.geometry
+    }
+
+    fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
+        self.inner.dirty = false;
+        match self.inner.prompt.mode {
+            PromptMode::Shell => self.shell.draw(&self.inner, fonts, view),
+            PromptMode::Normal => self.launcher.draw(&self.inner, fonts, view),
+            PromptMode::Calc => self.calc.draw(&self.inner, fonts, view),
+        }
+    }
+
+    fn geometry_update(&mut self, _fonts: &mut FontMap, geometry: &Geometry) -> Geometry {
+        self.inner.geometry = geometry.clone();
+        self.inner.geometry
+    }
+
+    fn minimum_size(&mut self, _fonts: &mut FontMap) -> Geometry {
+        Geometry {
+            x: 0,
+            y: 0,
+            width: 256,
+            height: (self.inner.size.ceil() as u32) * 4 + 8,
+        }
+    }
+
+    fn event(&mut self, event: &Event) {
+        match event {
+            Event::KeyEvent(e) => self.keyboard_input(e),
+            Event::PointerEvent(e) => self.pointer_input(e),
+            Event::FocusLost => self.exit(),
+            Event::LauncherUpdate => {
+                self.inner.dirty = true;
+                self.launcher.update(&self.inner);
+            }
+            Event::TokenUpdate(t) => {
+                self.launcher.next_token = Some(t.to_string());
+                self.shell.next_token = Some(t.to_string());
+            }
+            _ => (),
+        }
+    }
 }

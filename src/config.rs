@@ -1,29 +1,39 @@
-use crate::cmd::Cmd;
-use crate::color::Color;
-use crate::widget;
-use crate::{
-    fonts::{FontMap, FontRef},
-    widgets,
-};
-use chrono::NaiveDateTime;
-use serde::{Deserialize, Serialize};
+use serde::{self, Deserialize, Serialize};
+
+use std::collections::HashMap;
 use std::default::Default;
-use std::{collections::HashMap, sync::mpsc::Sender};
+use std::sync::{Arc, Mutex};
+
+use crate::{
+    event::Events,
+    fonts::{find_font, FontMap},
+    widgets::{
+        Backlight, Battery, Calendar, Clock, Date, HorizontalLayout, IndexedLayout, Interface,
+        InvertedHorizontalLayout, InvertedVerticalLayout, Layout, Line, Margin, PulseAudio,
+        VerticalLayout, Widget as RealWidget,
+    },
+};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "snake_case")]
+pub enum OperationMode {
+    LayerSurface((u32, u32)),
+    XdgToplevel,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
 pub enum Widget {
     Margin {
         margins: (u32, u32, u32, u32),
         widget: Box<Widget>,
     },
-    Fixed {
-        width: u32,
-        height: u32,
-        widget: Box<Widget>,
-    },
     HorizontalLayout(Vec<Widget>),
+    InvertedHorizontalLayout(Vec<Widget>),
     VerticalLayout(Vec<Widget>),
+    InvertedVerticalLayout(Vec<Widget>),
+    HorizontalLine(u32),
+    VerticalLine(u32),
     Clock {
         font: Option<String>,
         font_size: f32,
@@ -36,315 +46,342 @@ pub enum Widget {
         font_primary: Option<String>,
         font_secondary: Option<String>,
         font_size: f32,
-        sections: u32,
+        sections_x: i32,
+        sections_y: i32,
     },
     Launcher {
         font: Option<String>,
         font_size: f32,
-        length: u32,
-        #[serde(default)]
-        app_opener: String,
-        #[serde(default)]
-        term_opener: String,
-        #[serde(default)]
-        url_opener: String,
+        launch_cmd: Option<String>,
     },
     Battery {
         font: Option<String>,
         font_size: f32,
-        length: u32,
     },
     Backlight {
-        #[serde(default)]
-        device: String,
+        device: Option<String>,
         font: Option<String>,
         font_size: f32,
-        length: u32,
     },
-    #[cfg(feature = "pulseaudio-widget")]
     PulseAudio {
         font: Option<String>,
         font_size: f32,
-        length: u32,
-    },
-    #[cfg(feature = "alsa-widget")]
-    AlsaSound {
-        font: Option<String>,
-        font_size: f32,
-        length: u32,
     },
 }
 
+impl Default for OperationMode {
+    fn default() -> OperationMode {
+        OperationMode::LayerSurface((1024, 768))
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub struct Config {
+    pub font_paths: Option<HashMap<String, String>>,
+    pub widget: Widget,
+    pub mode: OperationMode,
+    pub background: Option<u32>,
+    pub server: Option<bool>,
+}
+
+impl Config {
+    pub fn generate_v1() -> Config {
+        let has_battery = Battery::detect();
+        let has_backlight = Backlight::detect();
+        let sans = find_font("sans");
+        let monospace = find_font("monospace");
+
+        let mut bars = Vec::new();
+        if has_battery {
+            bars.push(Widget::Margin {
+                margins: (0, 0, 0, 8),
+                widget: Box::new(Widget::Battery {
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
+        }
+        if has_backlight {
+            bars.push(Widget::Margin {
+                margins: (0, 0, 0, 8),
+                widget: Box::new(Widget::Backlight {
+                    device: None,
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
+        }
+        bars.push(Widget::Margin {
+            margins: (0, 0, 0, 8),
+            widget: Box::new(Widget::PulseAudio {
+                font: None,
+                font_size: 24.,
+            }),
+        });
+
+        let widget = Widget::Margin {
+            margins: (20, 20, 20, 20),
+            widget: Box::new(Widget::VerticalLayout(vec![
+                Widget::HorizontalLayout(vec![
+                    Widget::VerticalLayout(vec![
+                        Widget::Date {
+                            font: None,
+                            font_size: 48.,
+                        },
+                        Widget::Clock {
+                            font: None,
+                            font_size: 256.,
+                        },
+                    ]),
+                    Widget::Margin {
+                        margins: (88, 0, 0, 0),
+                        widget: Box::new(Widget::VerticalLayout(bars)),
+                    },
+                ]),
+                Widget::Calendar {
+                    font_primary: None,
+                    font_secondary: None,
+                    font_size: 36.,
+                    sections_x: 3,
+                    sections_y: 1,
+                },
+                Widget::Launcher {
+                    font: None,
+                    font_size: 32.,
+                    launch_cmd: None,
+                },
+            ])),
+        };
+
+        let map = HashMap::from([
+            ("sans".to_string(), sans),
+            ("monospace".to_string(), monospace),
+        ]);
+
+        Config {
+            font_paths: Some(map),
+            widget: widget,
+            mode: OperationMode::LayerSurface((1024, 768)),
+            background: Some(0xFAFAFAFA),
+            server: None,
+        }
+    }
+
+    pub fn generate_v2(clay: bool) -> Config {
+        let has_battery = Battery::detect();
+        let has_backlight = Backlight::detect();
+        let sans = find_font("sans");
+        let monospace = find_font("monospace");
+
+        let mut bars = Vec::new();
+        if has_battery {
+            bars.push(Widget::Margin {
+                margins: (16, 8, 8, 0),
+                widget: Box::new(Widget::Battery {
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
+        }
+        if has_backlight {
+            bars.push(Widget::Margin {
+                margins: (16, 8, 8, 0),
+                widget: Box::new(Widget::Backlight {
+                    device: None,
+                    font: None,
+                    font_size: 24.,
+                }),
+            });
+        }
+        bars.push(Widget::Margin {
+            margins: (16, 8, 8, 0),
+            widget: Box::new(Widget::PulseAudio {
+                font: None,
+                font_size: 24.,
+            }),
+        });
+
+        let widget = Widget::VerticalLayout(vec![
+            Widget::HorizontalLayout(vec![
+                Widget::Margin {
+                    margins: (8, 0, 0, 0),
+                    widget: Box::new(Widget::Clock {
+                        font: None,
+                        font_size: 128.,
+                    }),
+                },
+                Widget::Margin {
+                    margins: (16, 64, 0, 0),
+                    widget: Box::new(Widget::Date {
+                        font: None,
+                        font_size: 48.,
+                    }),
+                },
+                Widget::VerticalLayout(bars),
+            ]),
+            Widget::HorizontalLine(1),
+            Widget::InvertedHorizontalLayout(vec![
+                Widget::Margin {
+                    margins: (16, 8, 16, 0),
+                    widget: Box::new(Widget::Calendar {
+                        font_primary: None,
+                        font_secondary: None,
+                        font_size: 24.,
+                        sections_x: 1,
+                        sections_y: if clay { -1 } else { 3 },
+                    }),
+                },
+                Widget::VerticalLine(1),
+                Widget::Margin {
+                    margins: (8, 0, 0, 0),
+                    widget: Box::new(Widget::Launcher {
+                        font: None,
+                        font_size: 32.,
+                        launch_cmd: None,
+                    }),
+                },
+            ]),
+        ]);
+
+        let map = HashMap::from([
+            ("sans".to_string(), sans),
+            ("monospace".to_string(), monospace),
+        ]);
+
+        Config {
+            font_paths: Some(map),
+            widget: widget,
+            mode: if clay {
+                OperationMode::XdgToplevel
+            } else {
+                OperationMode::LayerSurface((1024, 1))
+            },
+            background: Some(0xFAFAFAFA),
+            server: None,
+        }
+    }
+}
+
+fn leak_or_default(v: Option<String>, d: &'static str) -> &'static str {
+    match v {
+        Some(v) => Box::leak(v.into_boxed_str()),
+        None => d,
+    }
+}
+
+fn leak_or_none(v: Option<String>) -> Option<&'static str> {
+    match v {
+        Some(v) => Some(Box::leak(v.into_boxed_str())),
+        None => None,
+    }
+}
+
 impl Widget {
-    pub fn construct<'a>(
+    pub fn construct_widgets(
         self,
-        time: NaiveDateTime,
-        tx: Sender<Cmd>,
-        fonts: &'a FontMap,
-    ) -> Option<Box<dyn widget::Widget + Send + 'a>> {
+        v: &mut Vec<Box<dyn RealWidget>>,
+        mut fm: &mut FontMap,
+        events: &Arc<Mutex<Events>>,
+    ) {
         match self {
-            Widget::Margin { margins, widget } => match widget.construct(time, tx, fonts) {
-                Some(w) => Some(widget::Margin::new(margins, w)),
-                None => None,
-            },
-            Widget::Fixed {
-                width,
-                height,
-                widget,
-            } => match widget.construct(time, tx, fonts) {
-                Some(w) => Some(widget::Fixed::new((width, height), w)),
-                None => None,
-            },
-            Widget::HorizontalLayout(widgets) => Some(widget::HorizontalLayout::new(
-                widgets
-                    .into_iter()
-                    .map(|x| x.construct(time, tx.clone(), fonts))
-                    .filter(|x| x.is_some())
-                    .map(|x| x.unwrap())
-                    .collect(),
-            )),
-            Widget::VerticalLayout(widgets) => Some(widget::VerticalLayout::new(
-                widgets
-                    .into_iter()
-                    .map(|x| x.construct(time, tx.clone(), fonts))
-                    .filter(|x| x.is_some())
-                    .map(|x| x.unwrap())
-                    .collect(),
-            )),
-            Widget::Clock { font, font_size } => match widgets::clock::Clock::new(
-                time,
-                get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
+            Widget::Margin { widget, .. } => widget.construct_widgets(v, fm, events),
+            Widget::HorizontalLayout(widgets) => widgets
+                .into_iter()
+                .for_each(|w| w.construct_widgets(v, fm, events)),
+            Widget::InvertedHorizontalLayout(widgets) => widgets
+                .into_iter()
+                .for_each(|w| w.construct_widgets(v, fm, events)),
+            Widget::VerticalLayout(widgets) => widgets
+                .into_iter()
+                .for_each(|w| w.construct_widgets(v, fm, events)),
+            Widget::InvertedVerticalLayout(widgets) => widgets
+                .into_iter()
+                .for_each(|w| w.construct_widgets(v, fm, events)),
+            Widget::HorizontalLine(width) => v.push(Box::new(Line::new(width, false))),
+            Widget::VerticalLine(width) => v.push(Box::new(Line::new(width, true))),
+            Widget::Clock { font, font_size } => v.push(Box::new(Clock::new(
+                &mut fm,
+                leak_or_default(font, "sans"),
                 font_size,
-            ) {
-                Ok(w) => Some(w),
-                Err(_) => None,
-            },
-            Widget::Date { font, font_size } => match widgets::date::Date::new(
-                time,
-                get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
+            ))),
+            Widget::Date { font, font_size } => v.push(Box::new(Date::new(
+                &mut fm,
+                leak_or_default(font, "sans"),
                 font_size,
-            ) {
-                Ok(w) => Some(w),
-                Err(_) => None,
-            },
+            ))),
             Widget::Calendar {
                 font_primary,
                 font_secondary,
                 font_size,
-                sections,
-            } => Some(widgets::calendar::Calendar::new(
-                time,
-                get_font(
-                    &font_primary.or_else(|| Some("sans".to_string())).unwrap(),
-                    &fonts,
-                ),
-                get_font(
-                    &font_secondary.or_else(|| Some("mono".to_string())).unwrap(),
-                    &fonts,
-                ),
+                sections_x,
+                sections_y,
+            } => v.push(Box::new(Calendar::new(
+                &mut fm,
+                leak_or_default(font_primary, "monospace"),
+                leak_or_default(font_secondary, "sans"),
                 font_size,
-                sections,
-            )),
+                sections_x,
+                sections_y,
+            ))),
             Widget::Launcher {
                 font,
                 font_size,
-                length,
-                app_opener,
-                term_opener,
-                url_opener,
-            } => Some(widgets::launcher::Launcher::new(
-                get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
+                launch_cmd,
+            } => v.push(Box::new(Interface::new(
+                events.clone(),
+                &mut fm,
+                leak_or_default(font, "sans"),
                 font_size,
-                length,
-                tx,
-                app_opener,
-                term_opener,
-                if url_opener.is_empty() {
-                    "xdg_open ".to_string()
-                } else {
-                    url_opener
-                },
-            )),
-            Widget::Battery {
-                font,
+                launch_cmd,
+            ))),
+            Widget::Battery { font, font_size } => v.push(Box::new(Battery::new(
+                events.clone(),
+                &mut fm,
+                leak_or_default(font, "sans"),
                 font_size,
-                length,
-            } => {
-                match widgets::battery::UpowerBattery::new(
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
-                    font_size,
-                    length,
-                    tx,
-                ) {
-                    Ok(w) => Some(w),
-                    Err(_) => None,
-                }
-            }
+            ))),
             Widget::Backlight {
                 device,
                 font,
                 font_size,
-                length,
-            } => {
-                let d = if device == "" {
-                    "intel_backlight"
-                } else {
-                    &device
-                };
-                match widgets::backlight::Backlight::new(
-                    d,
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
-                    font_size,
-                    length,
-                ) {
-                    Ok(w) => Some(w),
-                    Err(_) => None,
-                }
-            }
-            #[cfg(feature = "pulseaudio-widget")]
-            Widget::PulseAudio {
-                font,
+            } => v.push(Box::new(Backlight::new(
+                leak_or_none(device),
+                &mut fm,
+                leak_or_default(font, "sans"),
                 font_size,
-                length,
-            } => {
-                match widgets::audio::PulseAudio::new(
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
-                    font_size,
-                    length,
-                    tx,
-                ) {
-                    Ok(w) => Some(w),
-                    Err(_) => None,
-                }
-            }
-            #[cfg(feature = "alsa-widget")]
-            Widget::AlsaSound {
-                font,
+            ))),
+            Widget::PulseAudio { font, font_size } => v.push(Box::new(PulseAudio::new(
+                events.clone(),
+                &mut fm,
+                Box::leak(font.unwrap_or_else(|| "sans".to_string()).into_boxed_str()),
                 font_size,
-                length,
-            } => {
-                match widgets::audio::Alsa::new(
-                    get_font(&font.or_else(|| Some("sans".to_string())).unwrap(), &fonts),
-                    font_size,
-                    length,
-                ) {
-                    Ok(w) => Some(w),
-                    Err(_) => None,
-                }
-            }
+            ))),
         }
     }
-}
 
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub enum OutputMode {
-    All,
-    Active,
-}
-
-impl Default for OutputMode {
-    fn default() -> Self {
-        OutputMode::Active
-    }
-}
-
-fn default_fonts() -> HashMap<String, String> {
-    let mut map = HashMap::with_capacity(2);
-    map.insert("mono".to_string(), "mono".to_string());
-    map.insert("sans".to_string(), "sans".to_string());
-    map
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct Config {
-    pub output_mode: OutputMode,
-    pub scale: u32,
-    pub background: Color,
-    pub widget: Widget,
-
-    #[serde(default = "default_fonts")]
-    pub fonts: HashMap<String, String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            widget: Widget::Margin {
-                margins: (20, 20, 20, 20),
-                widget: Box::new(Widget::VerticalLayout(vec![
-                    Widget::HorizontalLayout(vec![
-                        Widget::Margin {
-                            margins: (0, 88, 0, 32),
-                            widget: Box::new(Widget::VerticalLayout(vec![
-                                Widget::Date {
-                                    font: None,
-                                    font_size: 64.0,
-                                },
-                                Widget::Clock {
-                                    font: None,
-                                    font_size: 256.0,
-                                },
-                            ])),
-                        },
-                        Widget::VerticalLayout(vec![
-                            Widget::Margin {
-                                margins: (0, 0, 0, 8),
-                                widget: Box::new(Widget::Battery {
-                                    font: None,
-                                    font_size: 24.0,
-                                    length: 0,
-                                }),
-                            },
-                            Widget::Margin {
-                                margins: (0, 0, 0, 8),
-                                widget: Box::new(Widget::Backlight {
-                                    device: "intel_backlight".to_string(),
-                                    font: None,
-                                    font_size: 24.0,
-                                    length: 0,
-                                }),
-                            },
-                            #[cfg(feature = "pulseaudio-widget")]
-                            Widget::Margin {
-                                margins: (0, 0, 0, 8),
-                                widget: Box::new(Widget::PulseAudio {
-                                    font: None,
-                                    font_size: 24.0,
-                                    length: 0,
-                                }),
-                            },
-                        ]),
-                    ]),
-                    Widget::Calendar {
-                        font_primary: None,
-                        font_secondary: None,
-                        font_size: 16.0,
-                        sections: 3,
-                    },
-                    Widget::Launcher {
-                        font: None,
-                        font_size: 32.0,
-                        length: 0,
-                        app_opener: "".to_string(),
-                        term_opener: "".to_string(),
-                        url_opener: "".to_string(),
-                    },
-                ])),
-            },
-            output_mode: Default::default(),
-            scale: 1,
-            background: Color::new(0.0, 0.0, 0.0, 0.9),
-            fonts: default_fonts(),
+    pub fn construct_layout(&self, idx: &mut usize) -> Box<dyn Layout> {
+        match self {
+            Widget::Margin { margins, widget } => {
+                Margin::new(widget.construct_layout(idx), *margins)
+            }
+            Widget::HorizontalLayout(widgets) => {
+                HorizontalLayout::new(widgets.iter().map(|w| w.construct_layout(idx)).collect())
+            }
+            Widget::InvertedHorizontalLayout(widgets) => InvertedHorizontalLayout::new(
+                widgets.iter().map(|w| w.construct_layout(idx)).collect(),
+            ),
+            Widget::VerticalLayout(widgets) => {
+                VerticalLayout::new(widgets.iter().map(|w| w.construct_layout(idx)).collect())
+            }
+            Widget::InvertedVerticalLayout(widgets) => InvertedVerticalLayout::new(
+                widgets.iter().map(|w| w.construct_layout(idx)).collect(),
+            ),
+            _ => IndexedLayout::new({
+                let i = *idx;
+                *idx += 1;
+                i
+            }),
         }
-    }
-}
-
-#[inline]
-fn get_font<'a>(name: &str, map: &'a FontMap) -> FontRef<'a> {
-    match map.get(name) {
-        Some(f) => f,
-        None => panic!("Font {} is missing from the config", name),
     }
 }

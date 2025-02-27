@@ -1,37 +1,114 @@
-use crate::buffer::Buffer;
-use crate::color::Color;
-use crate::draw::Font;
+use std::default::Default;
+
 use crate::{
-    fonts::FontRef,
-    widget::{DrawContext, DrawReport, KeyState, ModifiersState, WaitContext, Widget},
+    buffer::BufferView,
+    color::Color,
+    event::Event,
+    fonts::FontMap,
+    widgets::{Geometry, Widget},
 };
 
-use chrono::{Datelike, NaiveDate, NaiveDateTime};
+use chrono::{Datelike, Local, NaiveDate};
 
-pub struct Calendar<'a> {
-    cur_date: NaiveDate,
+pub struct Calendar {
+    font: &'static str,
+    month_font: &'static str,
+    sections_x: i32,
+    sections_y: i32,
+    shown_sections_x: u32,
+    shown_sections_y: u32,
+    size: f32,
     dirty: bool,
-    offset: f64,
-    sections: u32,
-    font_size: u32,
-    calendar_cache: Font<'a>,
-    month_cache: Font<'a>,
-    year_cache: Font<'a>,
-    day_cache: Font<'a>,
+    geometry: Geometry,
+    year_width: u32,
+    date_width: u32,
+    day_width: u32,
 }
 
-impl<'a> Calendar<'a> {
-    fn draw_month(
-        &self,
-        buf: &mut Buffer,
-        background_color: &Color,
-        orig: NaiveDate,
-        time: NaiveDate,
-    ) -> Result<(i32, i32, i32, i32), ::std::io::Error> {
-        let mut time = time;
-        let mut y_off = 1;
-        let mut done = false;
+const DAY_FACTOR: f32 = 0.6;
+const YEAR_FACTOR: f32 = 0.75;
+const MONTH_FACTOR: f32 = 1.25;
+const DATE_FACTOR: f32 = 1.;
 
+const LINE_HEIGHT: f32 = 0.85;
+
+impl Calendar {
+    pub fn new(
+        fm: &mut FontMap,
+        font: &'static str,
+        month_font: &'static str,
+        size: f32,
+        sections_x: i32,
+        sections_y: i32,
+    ) -> Calendar {
+        fm.queue_font(font, size * DAY_FACTOR, "ADEFHIMNORSTUW");
+        fm.queue_font(font, size * YEAR_FACTOR, "0123456789");
+        fm.queue_font(font, size * DATE_FACTOR, "0123456789");
+        fm.queue_font(
+            month_font,
+            size * MONTH_FACTOR,
+            "ADFJMNOSabcehgilmnoprstuvy",
+        );
+
+        Calendar {
+            font,
+            month_font,
+            size,
+            sections_x,
+            sections_y,
+            shown_sections_x: 0,
+            shown_sections_y: 0,
+            dirty: true,
+            geometry: Default::default(),
+            date_width: 0,
+            day_width: 0,
+            year_width: 0,
+        }
+    }
+
+    fn draw_month(
+        &mut self,
+        fonts: &mut FontMap,
+        mut view: &mut BufferView,
+        orig: NaiveDate,
+        mut time: NaiveDate,
+    ) {
+        let cal_width = 8 * self.date_width + 7 * (self.date_width / 2);
+        //
+        // Draw the week day
+        //
+        let day_offset = (self.date_width - self.day_width) / 2;
+        let date_offset = self.date_width + self.date_width / 2;
+        for idx in 1..8 {
+            let day_font = fonts.get_font(self.font, self.size * DAY_FACTOR);
+            let (wk_chr, c) = match idx {
+                1 => ("MON", Color::WHITE),
+                2 => ("TUE", Color::WHITE),
+                3 => ("WED", Color::WHITE),
+                4 => ("THU", Color::WHITE),
+                5 => ("FRI", Color::WHITE),
+                6 => ("SAT", Color::GREY80),
+                7 => ("SUN", Color::GREY80),
+                _ => panic!("impossible value"),
+            };
+
+            day_font
+                .draw_text(
+                    &mut view.offset((
+                        idx * date_offset + day_offset,
+                        (self.size * MONTH_FACTOR).ceil() as u32
+                            + (self.size * DAY_FACTOR * 0.2).ceil() as u32,
+                    )),
+                    c,
+                    &wk_chr,
+                )
+                .unwrap();
+        }
+
+        //
+        // Draw the month
+        //
+        let month_font = fonts.get_font(self.month_font, self.size * MONTH_FACTOR);
         let month_str = match time.month() {
             1 => "January",
             2 => "February",
@@ -47,234 +124,228 @@ impl<'a> Calendar<'a> {
             12 => "December",
             _ => panic!("impossible value"),
         };
+        month_font
+            .draw_text(&mut view, Color::WHITE, month_str)
+            .unwrap();
 
         //
-        // Draw the of the month
+        // Draw the year
         //
-
-        self.month_cache.draw_text(
-            buf,
-            background_color,
-            &Color::new(1.0, 1.0, 1.0, 1.0),
-            month_str,
-        )?;
         if time.year() != orig.year() {
-            self.year_cache.draw_text(
-                &mut buf.offset((self.font_size * 20, 0))?,
-                background_color,
-                &Color::new(0.8, 0.8, 0.8, 1.0),
-                &format!("{:}", time.year()),
-            )?;
+            let year_font = fonts.get_font(self.font, self.size * YEAR_FACTOR);
+            year_font
+                .draw_text(
+                    &mut view.offset((cal_width - self.year_width, 0)),
+                    Color::GREY80,
+                    &format!("{:}", time.year()),
+                )
+                .unwrap();
         }
 
-        //
-        // Draw the week day
-        //
-
-        for idx in 1..8 {
-            let wk_chr = match idx {
-                1 => "MON",
-                2 => "TUE",
-                3 => "WED",
-                4 => "THU",
-                5 => "FRI",
-                6 => "SAT",
-                7 => "SUN",
-                _ => panic!("impossible value"),
-            };
-
-            self.day_cache.draw_text(
-                &mut buf.offset((
-                    idx * self.font_size * 3 + self.font_size / 5,
-                    y_off * self.font_size * 2 + self.font_size * 4,
-                ))?,
-                background_color,
-                &Color::new(1.0, 1.0, 1.0, 1.0),
-                &wk_chr,
-            )?;
-        }
-
-        y_off += 1;
-
-        while !done {
-            let mut x_pos = 0;
-
-            //
-            // Find the start of this week
-            //
-            let mut wkday = time.weekday();
-            while wkday != chrono::Weekday::Mon {
-                x_pos += 1;
-                wkday = wkday.pred();
-            }
-
+        let cal_font = fonts.get_font(self.font, self.size * DATE_FACTOR);
+        'row: for y_off in 1.. {
             //
             // Draw the week number
             //
             let wk = time.iso_week();
-            self.calendar_cache.draw_text(
-                &mut buf.offset((0, y_off * self.font_size * 2 + self.font_size * 4))?,
-                background_color,
-                &Color::new(0.75, 0.75, 0.75, 1.0),
-                &format!("{:02}", wk.week()),
-            )?;
-            x_pos += 1;
+            cal_font
+                .draw_text(
+                    &mut view.offset((
+                        0,
+                        y_off * (self.size * LINE_HEIGHT).ceil() as u32
+                            + (self.size * MONTH_FACTOR).ceil() as u32,
+                    )),
+                    if wk == orig.iso_week() {
+                        Color::WHITE
+                    } else {
+                        Color::GREY75
+                    },
+                    &format!("{:02}", wk.week()),
+                )
+                .unwrap();
 
             //
             // Draw the dates
             //
-            while x_pos < 8 {
+            let x_off = time.weekday().number_from_monday();
+            for x_pos in x_off..8 {
                 let c = if time.day() == orig.day() && time.month() == orig.month() {
-                    Color::new(1.0, 1.0, 1.0, 1.0)
+                    Color::WHITE
+                } else if x_pos < 6 {
+                    Color::GREY50
                 } else {
-                    Color::new(0.5, 0.5, 0.5, 1.0)
+                    Color::GREY35
                 };
 
-                self.calendar_cache.draw_text(
-                    &mut buf.offset((
-                        x_pos * self.font_size * 3,
-                        y_off * self.font_size * 2 + self.font_size * 4,
-                    ))?,
-                    background_color,
-                    &c,
-                    &format!("{:02}", time.day()),
-                )?;
+                cal_font
+                    .draw_text(
+                        &mut view.offset((
+                            x_pos * date_offset,
+                            y_off * (self.size * LINE_HEIGHT).ceil() as u32
+                                + (self.size * MONTH_FACTOR).ceil() as u32,
+                        )),
+                        c,
+                        &format!("{:02}", time.day()),
+                    )
+                    .unwrap();
 
                 let t = time.with_day(time.day() + 1);
                 if t.is_none() {
-                    done = true;
-                    break;
+                    break 'row;
                 }
                 time = t.unwrap();
-                x_pos += 1;
             }
-
-            y_off += 1;
         }
-        Ok(buf.get_signed_bounds())
     }
 }
 
-impl<'a> Calendar<'a> {
-    pub fn new(
-        time: NaiveDateTime,
-        font_primary: FontRef<'a>,
-        font_secondary: FontRef<'a>,
-        font_size: f32,
-        sections: u32,
-    ) -> Box<Calendar<'a>> {
-        let mut calendar_cache = Font::new(font_secondary, font_size * 2.0);
-        calendar_cache.add_str_to_cache("0123456789");
-        let mut month_cache = Font::new(font_primary, font_size * 4.0);
-        month_cache.add_str_to_cache("JanuryFebMchApilJgstSmOoNvD");
-        let mut year_cache = Font::new(font_primary, font_size * 1.5);
-        year_cache.add_str_to_cache("-0123456789");
-        let mut day_cache = Font::new(font_primary, font_size);
-        day_cache.add_str_to_cache("MONTUEWDHFRISA");
-        Box::new(Calendar {
-            cur_date: time.date(),
-            dirty: true,
-            offset: 0.0,
-            sections,
-            font_size: font_size as u32,
-            calendar_cache,
-            month_cache,
-            year_cache,
-            day_cache,
-        })
-    }
-}
-
-impl<'a> Widget for Calendar<'a> {
-    fn wait(&mut self, _: &mut WaitContext) {}
-    fn enter(&mut self) {}
-    fn leave(&mut self) {}
-
-    fn size(&self) -> (u32, u32) {
-        let cal_width = 7 * self.font_size * 3 + self.font_size * 2;
-        let cal_pad = self.font_size * 3;
-        (
-            cal_width * self.sections + cal_pad * (self.sections - 1),
-            (self.font_size as f32 * 21.5) as u32,
-        )
+impl<'a> Widget for Calendar {
+    fn get_dirty(&self) -> bool {
+        self.dirty
     }
 
-    fn draw(
-        &mut self,
-        ctx: &mut DrawContext,
-        pos: (u32, u32),
-        _expansion: (u32, u32),
-    ) -> Result<DrawReport, ::std::io::Error> {
-        let (width, height) = self.size();
-        if ctx.time.date() == self.cur_date && !ctx.force && !self.dirty {
-            return Ok(DrawReport::empty(width, height));
+    fn geometry(&self) -> Geometry {
+        self.geometry
+    }
+
+    fn event(&mut self, event: &Event) {
+        match event {
+            Event::NewMinute => {
+                self.dirty = true;
+            }
+            _ => (),
         }
-        self.dirty = false;
-        self.cur_date = ctx.time.date();
+    }
 
-        let buf = &mut ctx.buf.subdimensions((pos.0, pos.1, width, height))?;
-        buf.memset(ctx.bg);
-        let time = ctx.time.date();
+    fn draw(&mut self, fonts: &mut FontMap, view: &mut BufferView) -> Geometry {
+        if self.shown_sections_y == 0 || self.shown_sections_x == 0 {
+            return Geometry {
+                x: self.geometry.x,
+                y: self.geometry.y,
+                width: 0,
+                height: 0,
+            };
+        }
+
+        let time = Local::now().naive_local().date();
+
+        let cal_height =
+            (self.size * MONTH_FACTOR).ceil() as u32 + (self.size * LINE_HEIGHT * 8.).ceil() as u32;
+        let cal_width = 8 * self.date_width + 7 * (self.date_width / 2);
+        let cal_pad = self.date_width * 2;
+
         let mut t = time.with_day(1).unwrap();
-        let o = (self.offset / 100.0) as i32;
-
-        let cals = self.sections - 1;
-        let pre_cals = cals / 2;
-        for _ in 0..pre_cals {
+        let cals = self.shown_sections_y * self.shown_sections_x;
+        if cals >= 3 {
             t = t.pred_opt().unwrap().with_day(1).unwrap();
         }
 
-        if o != 0 {
-            let mut month = (t.month() - 1) as i32 + o;
-            let mut year = t.year();
-            while month > 11 {
-                year += 1;
-                month -= 12;
+        for ydx in 0..self.shown_sections_y {
+            for idx in 0..self.shown_sections_x {
+                self.draw_month(
+                    fonts,
+                    &mut view.offset(((cal_width + cal_pad) * idx, cal_height * ydx)),
+                    time,
+                    t,
+                );
+                t = if t.month() == 12 {
+                    t.with_year(t.year() + 1).unwrap().with_month(1).unwrap()
+                } else {
+                    t.with_month(t.month() + 1).unwrap()
+                };
             }
-            while month < 0 {
-                year -= 1;
-                month += 12;
-            }
-            t = t
-                .with_year(year)
-                .unwrap()
-                .with_month((month + 1) as u32)
-                .unwrap();
         }
-        let cal_pad = 7 * self.font_size * 3 + self.font_size * 5;
-        for idx in 0..self.sections {
-            self.draw_month(&mut buf.offset((cal_pad * idx, 0))?, ctx.bg, time, t)?;
+        self.dirty = false;
+        self.geometry
+    }
 
-            t = if t.month() == 12 {
-                t.with_year(t.year() + 1).unwrap().with_month(1).unwrap()
+    fn geometry_update(&mut self, fonts: &mut FontMap, geometry: &Geometry) -> Geometry {
+        let year_font = fonts.get_font(self.font, self.size * YEAR_FACTOR);
+        self.year_width = year_font.auto_widest("0123456789").unwrap() * 4;
+        let cal_font = fonts.get_font(self.font, self.size * DATE_FACTOR);
+        self.date_width = cal_font.auto_widest("0123456789").unwrap() * 2;
+        let day_font = fonts.get_font(self.font, self.size * DAY_FACTOR);
+        self.day_width = day_font.auto_widest("ADEFHIMNORSTUW").unwrap() * 3;
+
+        let cal_width = 8 * self.date_width + 7 * (self.date_width / 2);
+        let cal_height =
+            (self.size * MONTH_FACTOR).ceil() as u32 + (self.size * LINE_HEIGHT * 8.).ceil() as u32;
+
+        let cal_pad = self.date_width * 2;
+
+        if geometry.width < cal_width || geometry.height < cal_height {
+            self.shown_sections_x = 0;
+            self.shown_sections_y = 0;
+            self.geometry = Default::default();
+            return self.geometry;
+        }
+
+        let possible_sections_x = 1 + (geometry.width - cal_width) / (cal_width + cal_pad);
+        let possible_sections_y = 1 + (geometry.height - cal_height) / cal_height;
+
+        self.shown_sections_x =
+            if self.sections_x > 0 && self.sections_x < possible_sections_x as i32 {
+                self.sections_x as u32
             } else {
-                t.with_month(t.month() + 1).unwrap()
+                possible_sections_x
             };
-        }
-        Ok(DrawReport {
-            width,
-            height,
-            damage: vec![buf.get_signed_bounds()],
-            full_damage: false,
-        })
+        self.shown_sections_y =
+            if self.sections_y > 0 && self.sections_y < possible_sections_y as i32 {
+                self.sections_y as u32
+            } else {
+                possible_sections_y
+            };
+
+        self.geometry = Geometry {
+            x: geometry.x,
+            y: geometry.y,
+            width: cal_width * self.shown_sections_x as u32
+                + cal_pad * (self.shown_sections_x as u32 - 1),
+            height: cal_height * self.shown_sections_y as u32,
+        };
+        self.geometry
     }
 
-    fn keyboard_input(&mut self, _: u32, _: ModifiersState, _: KeyState, _: Option<String>) {}
-    fn mouse_click(&mut self, _: u32, (x, _): (u32, u32)) {
-        let cal_pad = 7 * self.font_size * 3 + self.font_size * 5;
-        let cals = self.sections - 1;
-        let pre_cals = cals / 2;
-        if x < pre_cals * cal_pad {
-            self.offset -= 100.0;
-        } else if x >= (pre_cals + 1) * cal_pad {
-            self.offset += 100.0;
-        } else {
-            self.offset = 0.0;
+    fn minimum_size(&mut self, fonts: &mut FontMap) -> Geometry {
+        let cal_font = fonts.get_font(self.font, self.size * DATE_FACTOR);
+        let date_width = cal_font.auto_widest("0123456789").unwrap() * 2;
+
+        let cal_width = 8 * date_width + 7 * (date_width / 2);
+        let cal_height =
+            (self.size * MONTH_FACTOR).ceil() as u32 + (self.size * LINE_HEIGHT * 8.).ceil() as u32;
+        let cal_pad = date_width * 2;
+
+        let sections_x = match self.sections_x {
+            -1 => 1,
+            0 => {
+                return Geometry {
+                    x: 0,
+                    y: 0,
+                    width: 0,
+                    height: 0,
+                }
+            }
+            x => x,
+        };
+        let sections_y = match self.sections_y {
+            -1 => 1,
+            0 => {
+                return Geometry {
+                    x: 0,
+                    y: 0,
+                    width: 0,
+                    height: 0,
+                }
+            }
+            y => y,
+        };
+        let width = cal_width * sections_x as u32 + cal_pad * (sections_x as u32 - 1);
+        let height = cal_height * sections_y as u32;
+        Geometry {
+            x: 0,
+            y: 0,
+            width: width,
+            height: height,
         }
-        self.dirty = true;
-    }
-    fn mouse_scroll(&mut self, (_, y): (f64, f64), _: (u32, u32)) {
-        self.offset += y;
-        self.dirty = true;
     }
 }

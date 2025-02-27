@@ -1,389 +1,353 @@
-use std::env;
-use std::fs::File;
-use std::io::{BufRead, BufReader, Read, Write};
-use std::os::unix::io::AsRawFd;
-use std::os::unix::net::{UnixListener, UnixStream};
-use std::{collections::HashMap, sync::mpsc::channel};
-
-use chrono::{Duration, Local};
-use nix::poll::{poll, PollFd, PollFlags};
-use os_pipe::pipe;
-use timerfd::{SetTimeFlags, TimerFd, TimerState};
-
-mod app;
 mod buffer;
-mod cmd;
 mod color;
 mod config;
-mod configfmt;
-mod data;
-mod desktop;
-mod doublemempool;
 mod draw;
+mod event;
 mod fonts;
 mod keyboard;
-mod widget;
+mod state;
+mod utils;
 mod widgets;
 
-#[macro_use]
-extern crate dlib;
+use wayland_client::{Connection, QueueHandle, WaylandSource};
 
-use app::{App, OutputMode};
-use cmd::Cmd;
+use calloop::{
+    timer::{TimeoutAction, Timer},
+    EventLoop,
+};
+use chrono::{Duration, Local, Timelike};
+
+use buffer::BufferView;
 use config::Config;
-use configfmt::ConfigFmt;
-use fonts::{FontLoader, FontMap, FontSeeker};
-use widget::WaitContext;
+use event::{Event, Events};
+use fonts::{FontMap, MaybeFontMap};
+use keyboard::{KeyRepeatSource, RepeatMessage};
+use state::State;
+use utils::{
+    desktop::{load_desktop_files, write_desktop_cache},
+    xdg,
+};
+use widgets::{Geometry, Widget};
 
-enum Mode {
-    Start,
-    Daemonize,
-    StartOrKill,
-    ToggleVisible,
-    PrintConfig(ConfigFmt),
+use std::{
+    env,
+    fs::File,
+    io::{BufRead, BufReader, Write},
+    os::unix::net::{UnixListener, UnixStream},
+    rc::Rc,
+    thread,
+};
+
+fn print_usage() {
+    println!(
+        "
+usage: wldash [OPTIONS]
+
+OPTIONS:
+  --config CONFIG_FILE                     use the specified config file
+                                           (~/.config/wldash/config.yml by default)
+  --write-default-config [v1|v2|toplevel]  generate and write a new config file
+                                           (v2 by default)
+  --desktop-refresh                        refresh desktop file cache
+"
+    );
 }
 
 fn main() {
+    let mut args = env::args();
+    // Skip program name
+    _ = args.next();
+
+    let mut config_file = format!("{}/wldash/config.yml", xdg::config_folder());
+
+    loop {
+        match args.next() {
+            Some(ref s) if s == "--config" => match args.next() {
+                Some(ref s) => config_file = s.clone(),
+                None => panic!("missing argument to --config"),
+            },
+            Some(ref s) if s == "--write-default-config" => {
+                let config = match args.next() {
+                    Some(ref s) if s == "v1" => Config::generate_v1(),
+                    Some(ref s) if s == "v2" => Config::generate_v2(false),
+                    Some(ref s) if s == "toplevel" => Config::generate_v2(true),
+                    None => Config::generate_v2(false),
+                    Some(s) => panic!("unknown argument: {}", s),
+                };
+                match File::create(config_file) {
+                    Ok(f) => serde_yaml::to_writer(f, &config).unwrap(),
+                    Err(_) => panic!("uh"),
+                }
+                std::process::exit(0);
+            }
+            Some(ref s) if s == "--desktop-refresh" => {
+                let v = load_desktop_files();
+                write_desktop_cache(&v).unwrap();
+                std::process::exit(0);
+            }
+            Some(ref s) if s == "--help" => {
+                print_usage();
+                std::process::exit(0);
+            }
+            Some(_) => {
+                print_usage();
+                std::process::exit(1);
+            }
+            None => break,
+        }
+    }
+
+    let conn = Connection::connect_to_env().unwrap();
+
+    let event_queue = conn.new_event_queue();
+    let qhandle: QueueHandle<State> = event_queue.handle();
+
+    let display = conn.display();
+    display.get_registry(&qhandle, ());
+    display.sync(&qhandle, ());
+
+    let (ping_sender, ping_source) = calloop::ping::make_ping().unwrap();
+    let (keyrepeat_sender, keyrepeat_channel) = calloop::channel::channel::<RepeatMessage>();
+
+    let mut event_loop: EventLoop<State> =
+        EventLoop::try_new().expect("Failed to initialize the event loop!");
+
+    let handle = event_loop.handle();
+    handle
+        .insert_source(
+            WaylandSource::new(event_queue).expect("Could not create WaylandSource!"),
+            |_event, queue, mut state| queue.dispatch_pending(&mut state),
+        )
+        .expect("Failed to insert event source!");
+
+    handle
+        .insert_source(ping_source, |(), &mut (), state| {
+            let events = state.events.lock().unwrap().flush();
+            for widget in state.widgets.iter_mut() {
+                for event in events.iter() {
+                    widget.event(event);
+                }
+            }
+            state.dirty = true;
+        })
+        .expect("Failed to insert ping source!");
+
+    let clock_source = Timer::from_duration(std::time::Duration::from_secs(1));
+    handle
+        .insert_source(clock_source, |_event, _metadata, state| {
+            let now = Local::now().naive_local();
+            let target = (now + Duration::seconds(60))
+                .with_second(0)
+                .unwrap()
+                .with_nanosecond(0)
+                .unwrap();
+            let d = target - now;
+            for widget in state.widgets.iter_mut() {
+                widget.event(&Event::NewMinute);
+            }
+            state.dirty = true;
+
+            // The timer event source requires us to return a TimeoutAction to
+            // specify if the timer should be rescheduled. In our case we just drop it.
+            TimeoutAction::ToDuration(d.to_std().unwrap())
+        })
+        .expect("Failed to insert event source!");
+
+    let keyrepeat_source = KeyRepeatSource::new(keyrepeat_channel);
+    handle
+        .insert_source(keyrepeat_source, |event, _metadata, state| {
+            let ev = Event::KeyEvent(event);
+            for widget in state.widgets.iter_mut() {
+                widget.event(&ev);
+            }
+            state.dirty = true;
+        })
+        .expect("Failed to insert keyrepeat source!");
+
     let socket_path = match env::var("XDG_RUNTIME_DIR") {
         Ok(dir) => dir + "/wldash",
         Err(_) => "/tmp/wldash".to_string(),
     };
-    let config_home = match env::var("XDG_CONFIG_HOME") {
-        Ok(dir) => dir + "/wldash",
-        Err(_) => match env::var("HOME") {
-            Ok(home) => home + "/.config/wldash",
-            _ => panic!("unable to find user folder"),
-        },
+
+    let events = Events::new(ping_sender);
+
+    let mut fm = FontMap::new();
+
+    let config: Config = match File::open(config_file) {
+        Ok(f) => serde_yaml::from_reader(f).unwrap(),
+        Err(_) => panic!("configuration file missing"),
     };
 
-    // From all existing files take the first readable one and write it's extension to `ext`
-    let mut ext = [0x0; 8];
-    let file = configfmt::CONFIG_NAMES
-        .iter()
-        .map(|name| std::path::Path::new(&config_home).join(name))
-        .filter_map(|path| {
-            match File::open(&path) {
-                Ok(file) => {
-                    let e = path.extension().and_then(|e| e.to_str())?;
-                    let len = e.len();
-                    let from = len.saturating_sub(8); // the longest possible extension
-                    ext[0..len - from].copy_from_slice(&e.as_bytes()[from..]);
-                    Some(file)
-                }
-                Err(_) => None,
-            }
-        })
-        .next();
-
-    let fmt = std::str::from_utf8(&ext)
-        .ok()
-        .and_then(ConfigFmt::new)
-        .unwrap_or_default();
-
-    let config: Config = file
-        .map(|f| fmt.from_reader(BufReader::new(f)))
-        .unwrap_or_default();
-
-    let scale = config.scale;
-
-    let fonts: FontMap = {
-        let load_font = |font_name| {
-            let path = FontSeeker::from_string(font_name);
-            FontLoader::from_path(&path).expect(&format!("Loading {} failed", path.display()))
+    if let Some(true) = config.server {
+        if let Ok(mut socket) = UnixStream::connect(socket_path.clone()) {
+            socket.write_all(b"kill\n").unwrap();
+            return;
         };
 
-        config
-            .fonts
-            .iter()
-            .map(|(key, val)| (key.clone(), load_font(val)))
-            .collect::<HashMap<_, _>>()
-    };
-
-    let mut args = env::args();
-    let _ = args.next();
-    let mode = match args.next() {
-        Some(arg) => match arg.as_str() {
-            "start" => Mode::Daemonize,
-            "start-or-kill" => Mode::StartOrKill,
-            "toggle-visible" => Mode::ToggleVisible,
-            "print-config" => Mode::PrintConfig(fmt),
-            s => {
-                let p = "print-config-";
-                let l = p.len();
-                let fmt = if s.starts_with(p) {
-                    ConfigFmt::new(&s[l..])
-                } else {
-                    None
-                };
-                if let Some(fmt) = fmt {
-                    Mode::PrintConfig(fmt)
-                } else {
-                    eprintln!("unsupported sub-command {}", s);
-                    std::process::exit(1);
-                }
-            }
-        },
-        None => Mode::Start,
-    };
-    if args.next().is_some() {
-        // total = args.count + 2 (the two we skipped + the rest)
-        eprintln!("expected 0 or 1 arguments, got {}", args.count() + 2);
-        std::process::exit(1);
-    }
-
-    let mut daemon = false;
-
-    match mode {
-        Mode::ToggleVisible => {
-            if let Ok(mut socket) = UnixStream::connect(socket_path) {
-                socket.write_all(b"toggle_visible\n").unwrap();
-                return;
-            };
-            eprintln!("wldash is not running");
-            std::process::exit(1);
-        }
-        Mode::StartOrKill => {
-            if let Ok(mut socket) = UnixStream::connect(socket_path.clone()) {
-                socket.write_all(b"kill\n").unwrap();
-                return;
-            };
-        }
-        Mode::Start => {
-            if UnixStream::connect(socket_path.clone()).is_ok() {
-                eprintln!("wldash is already running");
-                std::process::exit(1);
-            };
-        }
-        Mode::Daemonize => {
-            if UnixStream::connect(socket_path.clone()).is_ok() {
-                eprintln!("wldash is already running");
-                std::process::exit(1);
-            };
-            daemon = true;
-        }
-        Mode::PrintConfig(fmt) => {
-            println!("{}", fmt.to_string(&config));
-            std::process::exit(0);
-        }
-    }
-
-    let _ = std::fs::remove_file(socket_path.clone());
-    let listener = UnixListener::bind(socket_path.clone()).unwrap();
-
-    let output_mode = match config.output_mode {
-        config::OutputMode::All => OutputMode::All,
-        config::OutputMode::Active => OutputMode::Active,
-    };
-
-    let background = config.background;
-
-    let (tx_draw, rx_draw) = channel();
-    let tx_draw_mod = tx_draw.clone();
-
-    // Print, write to a file, or send to an HTTP server.
-    let widget = config
-        .widget
-        .construct(Local::now().naive_local(), tx_draw_mod, &fonts)
-        .expect("no widget configured");
-
-    let mut app = App::new(tx_draw, output_mode, background, scale);
-    if daemon {
-        app.hide();
-    } else {
-        app.show();
-    }
-    app.set_widget(widget).unwrap();
-
-    let (mut rx_pipe, mut tx_pipe) = pipe().unwrap();
-    let ipc_pipe = tx_pipe.try_clone().unwrap();
-
-    let worker_queue = app.cmd_queue();
-    let _ = std::thread::Builder::new()
-        .name("cmd_proxy".to_string())
-        .spawn(move || loop {
-            let cmd = rx_draw.recv().unwrap();
-            worker_queue.lock().unwrap().push_back(cmd);
-            tx_pipe.write_all(&[0x1]).unwrap();
-        });
-
-    let mut timer = TimerFd::new().unwrap();
-    let ev_fd = PollFd::new(
-        app.event_queue().display().get_connection_fd(),
-        PollFlags::POLLIN,
-    );
-    let rx_fd = PollFd::new(rx_pipe.as_raw_fd(), PollFlags::POLLIN);
-    let tm_fd = PollFd::new(timer.as_raw_fd(), PollFlags::POLLIN);
-    let ipc_fd = PollFd::new(listener.as_raw_fd(), PollFlags::POLLIN);
-
-    app.cmd_queue().lock().unwrap().push_back(Cmd::Draw);
-
-    let mut visible = !daemon;
-    let mut wait_ctx = WaitContext {
-        fds: Vec::new(),
-        target_time: None,
-    };
-
-    let q = app.cmd_queue();
-    loop {
-        let cmd = q.lock().unwrap().pop_front();
-        match cmd {
-            Some(cmd) => match cmd {
-                Cmd::Draw => {
-                    app.redraw(false).expect("Failed to draw");
-                    app.flush_display();
-                }
-                Cmd::KeyboardTest => {
-                    if let Some(cmd) = app.key_repeat() {
-                        q.lock().unwrap().push_back(cmd);
-                    }
-                }
-                Cmd::ForceDraw => {
-                    app.redraw(true).expect("Failed to draw");
-                    app.flush_display();
-                }
-                Cmd::MouseClick { btn, pos } => {
-                    app.get_widget().mouse_click(btn, pos);
-                    q.lock().unwrap().push_back(Cmd::Draw);
-                }
-                Cmd::MouseScroll { scroll, pos } => {
-                    app.get_widget().mouse_scroll(scroll, pos);
-                    q.lock().unwrap().push_back(Cmd::Draw);
-                }
-                Cmd::Keyboard {
-                    key,
-                    key_state,
-                    modifiers_state,
-                    interpreted,
-                } => {
-                    app.get_widget()
-                        .keyboard_input(key, modifiers_state, key_state, interpreted);
-                    q.lock().unwrap().push_back(Cmd::Draw);
-                }
-                Cmd::ToggleVisible => {
-                    visible = !visible;
-                    if visible {
-                        app.get_widget().enter();
-                        app.show();
-                    } else {
-                        app.hide();
-                        app.get_widget().leave();
-                    }
-                    app.flush_display();
-                }
-                Cmd::Exit => {
-                    if daemon {
-                        visible = false;
-                        app.hide();
-                        app.get_widget().leave();
-                        app.flush_display();
-                    } else {
-                        let _ = std::fs::remove_file(socket_path);
-                        return;
-                    }
-                }
-            },
-            None => {
-                app.flush_display();
-
-                wait_ctx.fds.clear();
-                wait_ctx.fds.push(ev_fd);
-                wait_ctx.fds.push(rx_fd);
-                wait_ctx.fds.push(ipc_fd);
-                wait_ctx.target_time = None;
-
-                app.get_widget().wait(&mut wait_ctx);
-                app.set_keyboard_repeat(&mut wait_ctx);
-
-                if let Some(target_time) = wait_ctx.target_time {
-                    let n = Local::now().naive_local();
-                    let sleep = if target_time > n {
-                        target_time - n
-                    } else {
-                        Duration::seconds(0)
-                    };
-                    timer.set_state(
-                        TimerState::Oneshot(sleep.to_std().unwrap()),
-                        SetTimeFlags::Default,
-                    );
-                    wait_ctx.fds.push(tm_fd);
-                }
-
-                poll(&mut wait_ctx.fds, -1).unwrap();
-
-                if wait_ctx.fds[0]
-                    .revents()
-                    .unwrap()
-                    .contains(PollFlags::POLLIN)
-                {
-                    if let Some(guard) = app.event_queue().prepare_read() {
-                        if let Err(e) = guard.read_events() {
-                            if e.kind() != ::std::io::ErrorKind::WouldBlock {
-                                eprintln!(
-                                    "Error while trying to read from the wayland socket: {:?}",
-                                    e
-                                );
-                            }
-                        }
-                    }
-
-                    app.event_queue()
-                        .dispatch_pending(&mut (), |_, _, _| {})
-                        .expect("Failed to dispatch all messages.");
-                }
-
-                if wait_ctx.fds[1]
-                    .revents()
-                    .unwrap()
-                    .contains(PollFlags::POLLIN)
-                {
-                    let mut v = [0x00];
-                    rx_pipe.read_exact(&mut v).unwrap();
-                }
-
-                if wait_ctx.fds[2]
-                    .revents()
-                    .unwrap()
-                    .contains(PollFlags::POLLIN)
-                {
-                    if let Ok((stream, _)) = listener.accept() {
-                        let client_queue = q.clone();
-                        let mut client_pipe = ipc_pipe.try_clone().unwrap();
-                        let _ = std::thread::Builder::new()
-                            .name("ipc_client".to_string())
-                            .spawn(move || {
-                                let r = BufReader::new(stream);
-                                for line in r.lines() {
-                                    match line {
-                                        Ok(v) => match v.as_str() {
-                                            "kill" => {
-                                                client_queue.lock().unwrap().push_back(Cmd::Exit)
+        let _ = std::fs::remove_file(socket_path.clone());
+        let _ = thread::Builder::new()
+            .name("ipc_server".to_string())
+            .spawn(move || {
+                let listener = UnixListener::bind(socket_path.clone()).unwrap();
+                loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => {
+                            let _ = thread::Builder::new().name("ipc_client".to_string()).spawn(
+                                move || {
+                                    let r = BufReader::new(stream);
+                                    for line in r.lines() {
+                                        match line {
+                                            Ok(ref cmd) if cmd == "kill" => {
+                                                std::process::exit(0);
                                             }
-                                            "toggle_visible" => client_queue
-                                                .lock()
-                                                .unwrap()
-                                                .push_back(Cmd::ToggleVisible),
-                                            v => eprintln!("unknown command: {}", v),
-                                        },
-                                        Err(_) => return,
+                                            _ => {}
+                                        }
                                     }
-                                    client_pipe.write_all(&[0x1]).unwrap();
-                                }
-                            });
+                                },
+                            );
+                        }
+                        _ => (),
                     }
                 }
+            });
+    }
 
-                if wait_ctx.target_time.is_some()
-                    && wait_ctx.fds[wait_ctx.fds.len() - 1]
-                        .revents()
-                        .unwrap()
-                        .contains(PollFlags::POLLIN)
-                {
-                    timer.read();
-                    let mut qq = q.lock().unwrap();
-                    qq.push_back(Cmd::KeyboardTest);
-                    qq.push_back(Cmd::Draw);
+    if let Some(font_paths) = config.font_paths {
+        for (key, value) in font_paths.into_iter() {
+            fm.add_font_path(Box::leak(key.into_boxed_str()), value);
+        }
+    }
+
+    let layout = Rc::new(config.widget.construct_layout(&mut 0));
+    let mut widgets: Vec<Box<dyn Widget>> = Vec::new();
+    config
+        .widget
+        .construct_widgets(&mut widgets, &mut fm, &events);
+
+    let font_thread = thread::Builder::new()
+        .name("fontloader".to_string())
+        .spawn(move || {
+            fm.load_fonts();
+            fm
+        })
+        .unwrap();
+
+    let mut state = State::new(
+        config.mode,
+        config.background,
+        widgets,
+        layout,
+        MaybeFontMap::Waiting(font_thread),
+        events,
+        keyrepeat_sender,
+    );
+
+    // Initial setup
+    //
+    while state.running && !state.ready {
+        event_loop
+            .dispatch(None, &mut state)
+            .expect("Could not dispatch event loop");
+    }
+    state.check_registry(&qhandle);
+
+    while state.running {
+        event_loop
+            .dispatch(None, &mut state)
+            .expect("Could not dispatch event loop");
+
+        if !state.configured || !state.dirty || !state.ready {
+            continue;
+        }
+
+        let mut force = false;
+        if state.bufmgr.buffers.len() == 0 {
+            state.add_buffer(&qhandle);
+            force = true;
+        }
+
+        let mut bufcnt = state.bufmgr.buffers.len();
+        let buf = match state.bufmgr.next_buffer() {
+            Some(b) => b,
+            None => {
+                if state.bufmgr.buffers.len() >= 3 {
+                    continue;
+                }
+                state.add_buffer(&qhandle);
+                bufcnt = state.bufmgr.buffers.len();
+
+                match state.bufmgr.next_buffer() {
+                    Some(b) => b,
+                    None => {
+                        continue;
+                    }
                 }
             }
+        };
+
+        if buf.last_damage.len() == 0 {
+            for _ in 0..state.widgets.len() {
+                buf.last_damage.push(Geometry::new());
+            }
         }
+
+        state.dirty = false;
+        buf.acquire();
+        let mut bufview = BufferView::new(
+            &mut buf.mmap,
+            (state.dimensions.0 as u32, state.dimensions.1 as u32),
+        );
+
+        let surface = state.main_surface.wl_surface.as_ref().unwrap().clone();
+        if force {
+            for (idx, widget) in state.widgets.iter_mut().enumerate() {
+                if force || widget.get_dirty() {
+                    let geo = widget.geometry();
+                    let mut subview = bufview.subgeometry(geo);
+                    buf.last_damage[idx] =
+                        widget.draw(&mut state.fonts.unwrap().borrow_mut(), &mut subview);
+                }
+            }
+            surface.damage_buffer(0, 0, 0x7FFFFFFF, 0x7FFFFFFF);
+        } else {
+            let mut drew = false;
+            for (idx, widget) in state.widgets.iter_mut().enumerate() {
+                if bufcnt > 1 || widget.get_dirty() {
+                    drew = true;
+
+                    let old_damage = buf.last_damage[idx];
+                    bufview.subgeometry(old_damage).clear();
+
+                    let geo = widget.geometry();
+                    let mut subview = bufview.subgeometry(geo);
+
+                    let new_damage =
+                        widget.draw(&mut state.fonts.unwrap().borrow_mut(), &mut subview);
+                    let combined_damage = new_damage.expand(old_damage);
+                    buf.last_damage[idx] = new_damage;
+
+                    surface.damage_buffer(
+                        combined_damage.x as i32,
+                        combined_damage.y as i32,
+                        combined_damage.width as i32,
+                        combined_damage.height as i32,
+                    );
+                }
+            }
+            if !drew {
+                buf.release();
+                conn.flush().unwrap();
+                continue;
+            }
+        }
+
+        state.ready = false;
+        surface.attach(Some(&buf.buffer), 0, 0);
+        surface.frame(&qhandle, ());
+        surface.commit();
+        conn.flush().unwrap();
+
+        // Now is a good as time as any to load the keymap
+        state.keyboard.resolve();
     }
 }

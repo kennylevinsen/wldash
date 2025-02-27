@@ -26,7 +26,7 @@ unicode-segmentation = "1.10"
 fuzzy-matcher = "0.3"
 shlex = "1.3"
 
-xkbcommon = { version = "0.5", features = ["wayland"] } # update breaks
+xkbcommon = { version = "0.8", features = ["wayland"] }
 
 rcalc_lib = "1.0"
 

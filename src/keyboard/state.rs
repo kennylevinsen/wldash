@@ -1,4 +1,4 @@
-use std::{env, os::unix::io::RawFd};
+use std::{env, os::unix::io::OwnedFd};
 
 use xkbcommon::xkb;
 
@@ -71,16 +71,18 @@ impl KbState {
     }
 
     pub(crate) fn get_one_sym_raw(&mut self, keycode: u32) -> u32 {
-        self.xkb_state.key_get_one_sym(keycode + 8)
+        self.xkb_state
+            .key_get_one_sym(xkb::Keycode::new(keycode + 8))
+            .raw()
     }
 
     pub(crate) fn get_utf8_raw(&mut self, keycode: u32) -> Option<String> {
-        Some(self.xkb_state.key_get_utf8(keycode + 8))
+        Some(self.xkb_state.key_get_utf8(xkb::Keycode::new(keycode + 8)))
     }
 
     pub(crate) fn compose_feed(&mut self, keysym: u32) -> Option<xkb::compose::FeedResult> {
         match &mut self.xkb_compose_state {
-            Some(compose_state) => Some(compose_state.feed(keysym)),
+            Some(compose_state) => Some(compose_state.feed(xkb::Keysym::new(keysym))),
             None => None,
         }
     }
@@ -99,7 +101,7 @@ impl KbState {
         }
     }
 
-    pub(crate) fn new_from_fd(fd: RawFd, size: usize) -> Result<KbState, std::io::Error> {
+    pub(crate) fn new_from_fd(fd: OwnedFd, size: usize) -> Result<KbState, std::io::Error> {
         let xkb_context = xkb::Context::new(xkb::CONTEXT_NO_FLAGS);
         let xkb_keymap = unsafe {
             xkb::Keymap::new_from_fd(

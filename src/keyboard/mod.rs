@@ -39,23 +39,40 @@ pub struct KeyEvent {
     pub repeats: bool,
 }
 
+pub struct KeymapDescription {
+    fd: OwnedFd,
+    size: u32,
+}
+
+impl KeymapDescription {
+    fn new(fd: OwnedFd, size: u32) -> KeymapDescription {
+        KeymapDescription { fd: fd, size: size }
+    }
+}
+
+impl Clone for KeymapDescription {
+    fn clone(&self) -> Self {
+        KeymapDescription::new(self.fd.try_clone().expect("unable to clone fd"), self.size)
+    }
+}
+
 pub struct Keyboard {
     state: Option<KbState>,
-    fd: Option<(OwnedFd, u32)>,
+    desc: Option<KeymapDescription>,
 }
 
 impl Keyboard {
     pub fn new() -> Keyboard {
         Keyboard {
             state: None,
-            fd: None,
+            desc: None,
         }
     }
 
     pub fn keymap(&mut self, format: WEnum<wl_keyboard::KeymapFormat>, fd: OwnedFd, size: u32) {
         match format {
             WEnum::Value(wl_keyboard::KeymapFormat::XkbV1) => {
-                self.fd = Some((fd, size));
+                self.desc = Some(KeymapDescription::new(fd, size));
             }
             WEnum::Value(wl_keyboard::KeymapFormat::NoKeymap) => {
                 // TODO: how to handle this (hopefully never occuring) case?
@@ -69,10 +86,9 @@ impl Keyboard {
             return;
         }
 
-        if let Some((fd, size)) = &self.fd {
+        if let Some(desc) = self.desc.take() {
             self.state = Some(
-                KbState::new_from_fd(fd.as_raw_fd(), *size as usize)
-                    .expect("unable to load keymap"),
+                KbState::new_from_fd(desc.fd, desc.size as usize).expect("unable to load keymap"),
             );
         }
     }
@@ -107,7 +123,7 @@ impl Keyboard {
                 } else {
                     None
                 };
-                let repeats = state.key_repeats(key + 8);
+                let repeats = state.key_repeats(xkb::Keycode::new(key + 8));
                 (sym, utf8, repeats)
             };
             KeyEvent {

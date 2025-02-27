@@ -38,6 +38,21 @@ use std::{
     thread,
 };
 
+fn print_usage() {
+    println!(
+        "
+usage: wldash [OPTIONS]
+
+OPTIONS:
+  --config CONFIG_FILE                     use the specified config file
+                                           (~/.config/wldash/config.yml by default)
+  --write-default-config [v1|v2|toplevel]  generate and write a new config file
+                                           (v2 by default)
+  --desktop-refresh                        refresh desktop file cache
+"
+    );
+}
+
 fn main() {
     let mut args = env::args();
     // Skip program name
@@ -51,11 +66,11 @@ fn main() {
                 Some(ref s) => config_file = s.clone(),
                 None => panic!("missing argument to --config"),
             },
-            Some(ref s) if s == "generate" => {
+            Some(ref s) if s == "--write-default-config" => {
                 let config = match args.next() {
                     Some(ref s) if s == "v1" => Config::generate_v1(),
                     Some(ref s) if s == "v2" => Config::generate_v2(false),
-                    Some(ref s) if s == "clay" => Config::generate_v2(true),
+                    Some(ref s) if s == "toplevel" => Config::generate_v2(true),
                     None => Config::generate_v2(false),
                     Some(s) => panic!("unknown argument: {}", s),
                 };
@@ -65,12 +80,19 @@ fn main() {
                 }
                 std::process::exit(0);
             }
-            Some(ref s) if s == "desktop-refresh" => {
+            Some(ref s) if s == "--desktop-refresh" => {
                 let v = load_desktop_files();
                 write_desktop_cache(&v).unwrap();
                 std::process::exit(0);
             }
-            Some(_) => panic!("unknown argument"),
+            Some(ref s) if s == "--help" => {
+                print_usage();
+                std::process::exit(0);
+            }
+            Some(_) => {
+                print_usage();
+                std::process::exit(1);
+            }
             None => break,
         }
     }

@@ -141,7 +141,7 @@ impl State {
                 activation.activate(key, surface);
                 let activation_token = activation.get_activation_token(qh, ());
                 activation_token.commit();
-                env::remove_var("XDG_ACTIVATION_TOKEN");
+                unsafe { env::remove_var("XDG_ACTIVATION_TOKEN"); }
             }
             _ => (),
         }

@@ -4,6 +4,7 @@ packages:
   - libpulse
   - alsa-lib
   - fontconfig
+  - libxkbcommon
 sources:
   - https://git.sr.ht/~kennylevinsen/wldash
 tasks:

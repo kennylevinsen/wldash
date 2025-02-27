@@ -8,6 +8,9 @@ edition = "2021"
 lto = "fat"
 panic = "abort"
 
+[features]
+default = ["fontconfig"]
+
 [dependencies]
 wayland-client = { version = "0.30", features = ["calloop", "log"] }
 wayland-protocols = { version = "0.30", features = ["client", "unstable", "staging"] }

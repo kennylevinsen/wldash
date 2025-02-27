@@ -6,6 +6,10 @@ A dashboard/launcher/control-panel thing for Wayland. Requires wlr-layer-shell-u
 
 Consider this alpha-quality: While it works, *everything* is subject to change with a moments notice. You may end up pulling in the latest changes, and *poof*, wldash suddenly turns into an artisan espresso machine.
 
+## Rewrite note
+
+wldash has received a significant rewrite. The old version is available in the wldash1 branch for now.
+
 ## How to use
 
 1. Checkout: `git clone https://github.com/kennylevinsen/wldash`

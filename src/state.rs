@@ -557,7 +557,7 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ()> for State {
                     if state.configured {
                         return;
                     }
-                    (width, height) = (640, 480);
+                    (width, height) = (1280, 720);
                 }
                 let activated = states
                     .iter()

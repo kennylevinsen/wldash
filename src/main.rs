@@ -32,6 +32,8 @@ use widgets::{Geometry, Widget};
 use std::{
     env,
     fs::File,
+    fs,
+    path::Path,
     io::{BufRead, BufReader, Write},
     os::unix::net::{UnixListener, UnixStream},
     rc::Rc,
@@ -53,10 +55,26 @@ OPTIONS:
     );
 }
 
+fn ensure_dir_exists(path: &str) {
+    match fs::create_dir_all(path) {
+        Ok(_) => (),
+        Err(err) => panic!("error creating directory: {}", err),
+    }
+}
+
+fn create_required_directories() {
+    let dir_config_wldash = format!("{}/wldash", xdg::config_folder());
+    let dir_cache_wldash = format!("{}/wldash", xdg::cache_folder());
+    ensure_dir_exists(&dir_config_wldash);
+    ensure_dir_exists(&dir_cache_wldash);
+}
+
 fn main() {
     let mut args = env::args();
     // Skip program name
     _ = args.next();
+
+    create_required_directories();
 
     let mut config_file = format!("{}/wldash/config.yml", xdg::config_folder());
 
@@ -175,7 +193,7 @@ fn main() {
 
     let config: Config = match File::open(config_file) {
         Ok(f) => serde_yaml::from_reader(f).unwrap(),
-        Err(_) => panic!("configuration file missing"),
+        Err(_) => panic!("configuration file missing: try 'wldash --write-default-config'"),
     };
 
     if let Some(true) = config.server {

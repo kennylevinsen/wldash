@@ -269,6 +269,7 @@ impl InterfaceWidget for Launcher {
             let d = &self.matches[intf.selection];
             if let Some(exec) = &d.exec {
                 let exec = exec
+                    .replace("\\\\", "\\")
                     .replace("%f", "")
                     .replace("%F", "")
                     .replace("%u", "")
